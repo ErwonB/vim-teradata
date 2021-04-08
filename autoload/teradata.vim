@@ -25,7 +25,7 @@ endfunction
 function! s:buildbteqtable(sql, user, tdpid, pattern, ...)
 	let body = ['#!/bin/bash', 'bteq > ' . g:td_log . ' <<EOF' , '.LOGON ' . a:tdpid . '/' . a:user 
 	\ . ',\$tdwallet(' . a:user . ');', ' ' ]
-	\ + ['.os rm ' . g:td_out , ' ']
+	\ + ['.os rm -f ' . g:td_out , ' ']
 	\ + ['.EXPORT FILE = ' . g:td_out . ';', ' ']
 	\ + ["SELECT DATABASENAME||'.'||TABLENAME (TITLE '')"]
 	\ + ["FROM DBC.TABLESV WHERE DATABASENAME||TABLENAME like '" . a:pattern . "'"]
@@ -39,7 +39,7 @@ endfunction
 function! s:buildbteqfield(sql, user, tdpid, pattern, ...)
 	let body = ['#!/bin/bash', 'bteq > ' . g:td_log . ' <<EOF' , '.LOGON ' . a:tdpid . '/' . a:user 
 	\ . ',\$tdwallet(' . a:user . ');', ' ' ]
-	\ + ['.os rm ' . g:td_out , ' ']
+	\ + ['.os rm -f ' . g:td_out , ' ']
 	\ + ['.EXPORT FILE = ' . g:td_out . ';', ' ']
 	\ + ["SELECT COLUMNNAME (TITLE '') "]
 	\ + ["FROM DBC.COLUMNSV WHERE DATABASENAME||TABLENAME like '" . a:pattern . "'"]
@@ -53,7 +53,7 @@ endfunction
 function! s:buildbteq(sql, user, tdpid, ...)
 	let body = ['#!/bin/bash', 'bteq > ' . g:td_log . ' <<EOF' , '.LOGON ' . a:tdpid . '/' . a:user 
 	\ . ',\$tdwallet(' . a:user . ');', ' ' ]
-	\ + ['.os rm ' . g:td_out , ' ']
+	\ + ['.os rm -f ' . g:td_out , ' ']
 	\ + ['.set WIDTH 10000', ' ']
 	\ + ['.EXPORT FILE = ' . g:td_out . ';', ' ']
 	\ + split(a:sql, '\n')
@@ -76,7 +76,7 @@ endfunction
 
 function! s:addexplain(sql)
 	"add an explain to the beginning of every query 
-	let l:explain = substitute(a:sql, '\(.\{-};\)', 'Explain \1 ', 'g')
+	let l:explain = substitute(a:sql, '\(.\{-};\)', '\n Explain \1 ', 'g')
 	
 	"echom l:explain
 	return l:explain 
