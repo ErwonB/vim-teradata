@@ -12,7 +12,7 @@
 let g:loaded_teradata = 1
 
 " defining a command to call TD
-command! -bang -range -nargs=* TD execute teradata#parser(<q-args>, <bang>0, <range>)
+command! -bang -range -nargs=* TD call teradata#parser(<q-args>, <bang>0, <range>)
 
 augroup teradata
 	" database connection paramete
