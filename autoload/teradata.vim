@@ -57,16 +57,14 @@ function! s:buildbteqoutput(sql, user, tdpid, ...)
     "save sql into query folder history
     call writefile(split(a:sql, '\n'), g:td_queries . '/' . l:max_num, 'a')
 
-
-
     let body = ['.logmech ' . g:log_mech, ' ']
     \ + ['.logon ' . a:tdpid . '/' . a:user . ',$tdwallet(' . a:user . ');', ' ' ]
 	\ + ['.set titledashes off', ' ']
 	\ + ['.set WIDTH 30000', ' ']
+	\ + ['.set retlimit ' . g:td_retlimit . ' * ', ' ']
 	\ + ['.set separator ''@''', ' ']
 	\ + ['.EXPORT FILE = ' . g:td_resultsets .'/' . l:max_num . ';', ' ']
 	\ + split(a:sql, '\n')
-	\ + [';']
 	\ + ['.LOGOFF']
 	\ + ['.EXIT']
 	return { 'bteq' : body, 'max_num' : l:max_num }
@@ -177,6 +175,24 @@ let l:current_buf = bufnr('%')
     endif
 endfunction
 
+function! ExtractRowsFound(logfile)
+    " Initialize the variable to store the result
+    let rows_found = ''
+
+    " Read the file line by line
+    let lines = readfile(a:logfile)
+    for line in lines
+        " Check if the line matches the pattern
+        if line =~ '^ \*\*\* Query completed\.\s\+\(\d\+\) rows found\.'
+            " Extract the number of rows found
+            let rows_found = matchstr(line, '\d\+')
+            break
+        endif
+    endfor
+
+    " Return the extracted value
+    return rows_found
+endfunction
 
 function! s:runSql(sql, user, tdpid, option, table, sample, ...)
 	let clean_sql = a:sql
@@ -218,6 +234,7 @@ function! s:runSql(sql, user, tdpid, option, table, sample, ...)
         call s:writebteq(bteq['bteq'])
 		let res = s:execbteq()
 		if (res.rc == 0)
+            let l:actual_lines = ExtractRowsFound(g:td_log)
 			call s:removefile(g:td_script, g:td_log)
             let filesize = getfsize(g:td_resultsets .'/' . bteq['max_num'] )
             if (filesize == 0)
@@ -239,6 +256,9 @@ function! s:runSql(sql, user, tdpid, option, table, sample, ...)
                 setlocal filetype=csv
                 call csv#ArrangeCol(1,line('$'), 1, -1)
                 write
+            endif
+            if (l:actual_lines != '' && str2nr(l:actual_lines) > str2nr(g:td_retlimit))
+                echom l:actual_lines . ' actual lines, only ' . g:td_retlimit . ' displayed'
             endif
 		else
 			call s:removefile(g:td_script, g:td_log)

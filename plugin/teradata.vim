@@ -25,6 +25,7 @@ augroup teradata
 	" database connection parameters
 	let g:td_user='*****'
     let g:log_mech='ldap'
+    let g:td_retlimit='100'
 	let g:td_tdpid='*****'
 	" temp file location and name 
 	let g:td_script='/path/to/tmp/tdsql.bteq'
