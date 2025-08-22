@@ -14,14 +14,10 @@ let g:loaded_teradata = 1
 " defining a command to call TD
 command! -bang -range -nargs=* TD call teradata#parser(<q-args>, <bang>0, <range>)
 command! -bang -range -nargs=* TDO call teradata#parser('-o output', <bang>0, <range>)
-command! -bang TDH call teradata#PopulateQuickfix()
+command! -bang TDH call teradata#ShowQueries()
+command! -bang TDR call teradata#FindQueryByContent()
 
 augroup teradata
-    if has('win32') || has('win64')
-        let g:teradata_win = 1
-    elseif has('unix')
-        let g:teradata_win = 0
-    endif
 	" database connection parameters
 	let g:td_user='*****'
     let g:log_mech='ldap'
