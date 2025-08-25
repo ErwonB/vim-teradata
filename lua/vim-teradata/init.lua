@@ -1,9 +1,9 @@
 -- lua/teradata/init.lua
-local config = require('teradata.config')
-local util = require('teradata.util')
-local bteq = require('teradata.bteq')
-local ui = require('teradata.ui')
-local fzf = require('teradata.fzf')
+local config = require('vim-teradata.config')
+local util = require('vim-teradata.util')
+local bteq = require('vim-teradata.bteq')
+local ui = require('vim-teradata.ui')
+local fzf = require('vim-teradata.fzf')
 
 local M = {}
 

@@ -1,4 +1,4 @@
-local config = require('teradata.config')
+local config = require('vim-teradata.config')
 
 local M = {}
 

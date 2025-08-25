@@ -1,5 +1,5 @@
-local config = require('teradata.config')
-local util = require('teradata.util')
+local config = require('vim-teradata.config')
+local util = require('vim-teradata.util')
 
 local M = {}
 

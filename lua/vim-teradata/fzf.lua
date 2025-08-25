@@ -1,6 +1,6 @@
 -- lua/teradata/fzf.lua
-local ui = require('teradata.ui')
-local util = require('teradata.util')
+local ui = require('vim-teradata.ui')
+local util = require('vim-teradata.util')
 
 local M = {}
 

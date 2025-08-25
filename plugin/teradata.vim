@@ -3,4 +3,4 @@ if exists("g:loaded_teradata")
 endif
 let g:loaded_teradata = 1
 
-lua require('teradata').setup()
+lua require('vim-teradata').setup()
