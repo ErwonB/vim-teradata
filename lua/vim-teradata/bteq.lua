@@ -43,19 +43,7 @@ function M.build_script(sql, user, tdpid, options)
     local body = build_header(user, tdpid)
     local context = {}
 
-    if options.operation == 'table' or options.operation == 'field' then
-        vim.list_extend(body, {
-            '.EXPORT FILE = ' .. util.get_temp_path('bteq_output_name') .. ';',
-            'lock row for access',
-        })
-        if options.operation == 'table' then
-            table.insert(body, "select DATABASENAME||'.'||TABLENAME (TITLE '')")
-            table.insert(body, "from DBC.TABLESV where DATABASENAME||TABLENAME like '" .. options.pattern .. "'")
-        else
-            table.insert(body, "select COLUMNNAME (TITLE '') ")
-            table.insert(body, "from DBC.COLUMNSV where DATABASENAME||TABLENAME like '" .. options.pattern .. "'")
-        end
-    elseif options.operation == 'output' then
+    if options.operation == 'output' then
         context.query_num = get_next_query_number()
         local result_path = util.get_history_path('resultsets_dir_name') .. '/' .. context.query_num
         local query_path = util.get_history_path('queries_dir_name') .. '/' .. context.query_num

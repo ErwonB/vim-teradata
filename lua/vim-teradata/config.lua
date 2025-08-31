@@ -3,9 +3,10 @@ local M = {}
 -- Default configuration values
 M.defaults = {
     -- Connection parameters
-    log_mech = 'TD2',
-    user = 'USER',
-    tdpid = 'TDPID', -- Teradata server hostname or IP
+    -- log_mech = 'TD2',
+    -- user = 'USER',
+    -- tdpid = 'TDPID', -- Teradata server hostname or IP
+    ft = { "sql", "teradata" },
 
     -- Path configuration
     -- Uses standard Neovim cache and data directories
@@ -24,10 +25,12 @@ M.defaults = {
 
     -- Query settings
     retlimit = 100,
-    default_sample_size = 500,
 
-    -- Replacements for variables in queries, e.g. {['${MY_DB}'] = 'MY_ACTUAL_DB'}
+    -- Replacements for variables in queries, e.g. replacements = {['${MY_DB}'] = 'MY_ACTUAL_DB'}
     replacements = {},
+
+    -- csv separator for result query file
+    sep = "|",
 }
 
 M.options = {}

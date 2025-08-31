@@ -50,16 +50,11 @@ end
 --- Displays the help message in a new buffer.
 function M.display_help()
     local help_text = {
-        ':TD : no param for syntax checking',
-        ':TD -o explain  : to get the explain plan',
-        ':TD -o table -p %...% : to list tables matching the pattern',
-        ':TD -o field -p table : to list fields for a table',
-        ':TD -o output  : to get the output of the query',
-        '------------------------------------------------',
-        'Other commands:',
-        'TDO: Shortcut for :TD -o output',
+        'TD: syntax checking',
+        'TDO: to get the output of the query',
         'TDH: Show query history',
         'TDR: Search query history with FZF',
+        'TDHelp: Display this help',
     }
 
     vim.cmd('belowright 10split')
