@@ -81,4 +81,15 @@ function M.save_config()
     vim.fn.writefile({ vim.fn.json_encode(data) }, file)
 end
 
+--- Format string if more than 100s of characters
+function M.formatString(s, width)
+    local len = #s
+    if len >= width then
+        return s
+    end
+
+    local padding = string.rep(' ', width - len)
+    return padding .. s
+end
+
 return M

@@ -29,7 +29,7 @@ M.defaults = {
     replacements = {},
 
     -- csv separator for result query file
-    sep = "|",
+    sep = "~",
 
     -- Users list
     users = {},

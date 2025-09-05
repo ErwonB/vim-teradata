@@ -9,7 +9,7 @@ The command starts always with TD:
 
 Default command TD to check the query syntax
 
-Default command TDO to run and output the result in a split buffer (dependency with [csv plugin](https://github.com/chrisbra/csv.vim) with @ as a delimiter)
+Default command TDO to run and output the result in a split buffer
 
 Default command TDH to populate a buffer with the latest queries and resultsets (no external dependency)
 

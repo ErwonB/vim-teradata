@@ -4,37 +4,213 @@ local bookmark = require('vim-teradata.bookmark')
 
 local M = {}
 
---- Opens a file in a new split window.
---- @param file_path string Path to the file.
---- @param filetype string | nil Optional filetype to set.
-local function open_in_split(file_path, filetype)
-    vim.cmd.set('splitbelow')
-    vim.cmd.split(vim.fn.fnameescape(file_path))
-    if filetype then
-        vim.bo.filetype = filetype
-    end
-end
-
---- Post-processes and displays a query result file using csv.vim.
+--- Post-processes and displays a query result file in a custom interactive buffer.
 --- @param file_path string Path to the result file.
 function M.display_output(file_path)
     local lines = vim.fn.readfile(file_path)
-    local new_lines = {}
-    for _, line in ipairs(lines) do
-        local parts = vim.fn.split(line, '@')
-        local trimmed_parts = vim.tbl_map(function(part)
-            return part:gsub('%s+$', '')
-        end, parts)
-        table.insert(new_lines, table.concat(trimmed_parts, '@'))
+    if #lines == 0 then
+        vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
+        return
     end
-    vim.fn.writefile(new_lines, file_path)
 
-    open_in_split(file_path, 'csv')
+    -- 1. Parse data
+    local regex_special_chars = "|.*+?^$(){}[]\\`~"
+    local separator = vim.fn.escape(config.options.sep, regex_special_chars)
+    local header = vim.fn.split(lines[1], separator)
+    local data = {}
+    for i = 2, #lines do
+        if lines[i] ~= '' then
+            table.insert(data, vim.fn.split(lines[i], separator))
+        end
+    end
 
-    vim.fn.call('csv#ArrangeCol', { 1, vim.fn.line('$'), 1, -1 })
+    -- Trim whitespace from all cells
+    header = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, header)
+    for i, row in ipairs(data) do
+        data[i] = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, row)
+    end
 
-    vim.cmd('write')
-    vim.cmd('setlocal nomodified')
+    -- 2. Create and setup new buffer
+    vim.cmd.set('splitbelow')
+    vim.cmd.split('Teradata Result')
+    vim.bo.buftype = 'nofile'
+    vim.bo.bufhidden = 'wipe'
+    vim.bo.swapfile = false
+    vim.opt_local.wrap = false
+
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    -- Store data in buffer variables
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_all_data', vim.deepcopy(data))
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_all_header', vim.deepcopy(header))
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(data))
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', vim.deepcopy(header))
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', {})
+
+    local populate_buffer
+    local get_column_from_cursor
+
+    -- 3. Render function
+    populate_buffer = function()
+        vim.bo.modifiable = true
+        local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
+        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+
+        if #displayed_header == 0 then
+            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "All columns removed. Press <BS> to restore." })
+            vim.bo.modifiable = false
+            return
+        end
+
+        local col_widths = {}
+        for i = 1, #displayed_header do
+            local max_width = #displayed_header[i]
+            for _, row in ipairs(displayed_data) do
+                if row[i] and #row[i] > max_width then
+                    max_width = #row[i]
+                end
+            end
+            table.insert(col_widths, max_width)
+        end
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_column_widths', col_widths)
+
+        local buffer_lines = {}
+        local visual_separator = ' | '
+
+        local header_parts = {}
+        for i, h in ipairs(displayed_header) do
+            if col_widths[i] < 100 then
+                table.insert(header_parts, string.format('%-' .. col_widths[i] .. 's', h))
+            else
+                table.insert(header_parts, util.formatString(h or '', col_widths[i]))
+            end
+        end
+        table.insert(buffer_lines, table.concat(header_parts, visual_separator))
+
+        local separator_parts = {}
+        for _, w in ipairs(col_widths) do
+            table.insert(separator_parts, string.rep('-', w))
+        end
+        table.insert(buffer_lines, table.concat(separator_parts, '-+-'))
+
+        for _, row in ipairs(displayed_data) do
+            local row_parts = {}
+            for i, cell in ipairs(row) do
+                if col_widths[i] < 100 then
+                    table.insert(row_parts, string.format('%-' .. col_widths[i] .. 's', cell or ''))
+                else
+                    table.insert(row_parts, util.formatString(cell or '', col_widths[i]))
+                end
+            end
+            table.insert(buffer_lines, table.concat(row_parts, visual_separator))
+        end
+
+        local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
+        local extmark = '<Enter> Filter | <-> Remove Col | <BS> Restore Col | <u> Unfilter'
+        table.insert(buffer_lines, '')
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
+        vim.api.nvim_buf_set_extmark(
+            bufnr,
+            ns_id,
+            #buffer_lines - 1,
+            0,
+            { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
+        )
+
+        vim.bo.modifiable = false
+    end
+
+    get_column_from_cursor = function()
+        local col = vim.fn.virtcol('.') - 1
+        local widths = vim.api.nvim_buf_get_var(bufnr, 'teradata_column_widths')
+        if not widths then return nil end
+        local current_pos = 0
+        local visual_separator = ' | '
+        for i, width in ipairs(widths) do
+            if col >= current_pos and col < current_pos + width then
+                return i
+            end
+            current_pos = current_pos + width + #visual_separator
+        end
+        return nil
+    end
+
+    -- 4. Set keymaps
+    vim.keymap.set('n', '<cr>', function()
+        local lnum = vim.fn.line('.')
+        if lnum <= 2 then return end
+        local col_idx = get_column_from_cursor()
+        if not col_idx then return end
+        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        local row_idx = lnum - 2
+        if not displayed_data[row_idx] then return end
+        local filter_value = displayed_data[row_idx][col_idx]
+        local new_displayed_data = {}
+        for _, row in ipairs(displayed_data) do
+            if row[col_idx] and row[col_idx] == filter_value then
+                table.insert(new_displayed_data, row)
+            end
+        end
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', new_displayed_data)
+        populate_buffer()
+    end, { buffer = bufnr, silent = true, nowait = true })
+
+    vim.keymap.set('n', '-', function()
+        local col_idx_to_remove = get_column_from_cursor()
+        if not col_idx_to_remove then return end
+        local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
+        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        local removed_columns = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
+        local removed_header = table.remove(displayed_header, col_idx_to_remove)
+        local removed_column_data = {}
+        for _, row in ipairs(displayed_data) do
+            table.insert(removed_column_data, table.remove(row, col_idx_to_remove))
+        end
+        table.insert(removed_columns, {
+            index = col_idx_to_remove,
+            header = removed_header,
+            data = removed_column_data
+        })
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
+        populate_buffer()
+    end, { buffer = bufnr, silent = true, nowait = true })
+
+    vim.keymap.set('n', '<bs>', function()
+        local removed_columns = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
+        if #removed_columns == 0 then
+            return vim.notify("No columns to restore.", vim.log.levels.WARN)
+        end
+        local col_to_restore = table.remove(removed_columns)
+        local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
+        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
+        for i, row in ipairs(displayed_data) do
+            table.insert(row, col_to_restore.index, col_to_restore.data[i] or '')
+        end
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
+        populate_buffer()
+    end, { buffer = bufnr, silent = true, nowait = true })
+
+    vim.keymap.set('n', 'u', function()
+        local all_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_all_data')
+        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+
+        if #displayed_data == #all_data then
+            vim.notify("No filters to reset.", vim.log.levels.INFO)
+            return
+        end
+
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(all_data))
+        populate_buffer()
+        vim.notify("Filters reset.", vim.log.levels.INFO)
+    end, { buffer = bufnr, silent = true, nowait = true })
+
+    -- 5. Initial population
+    populate_buffer()
 end
 
 --- Displays an error message from a BTEQ execution.
@@ -89,7 +265,7 @@ function M.open_query_result_pair(file_id)
 
     vim.cmd.edit(vim.fn.fnameescape(query_file))
     if vim.fn.filereadable(result_file) == 1 then
-        open_in_split(result_file, 'csv')
+        M.display_output(result_file)
         vim.cmd.wincmd('p')
     end
 end

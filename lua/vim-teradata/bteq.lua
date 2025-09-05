@@ -47,7 +47,7 @@ function M.build_script(sql, user_obj, options)
             '.set titledashes off',
             '.set WIDTH 30000',
             '.set retlimit ' .. config.options.retlimit,
-            '.set separator \'@\'',
+            '.set separator \'' .. config.options.sep .. '\'',
             '.EXPORT FILE = ' .. result_path .. ';',
         })
         vim.list_extend(body, vim.fn.split(sql, '\n'))
@@ -55,7 +55,7 @@ function M.build_script(sql, user_obj, options)
         vim.list_extend(body, {
             '.set titledashes off',
             '.set WIDTH 30000',
-            '.set separator \'@\'',
+            '.set separator \'' .. config.options.sep .. '\'',
             '.EXPORT FILE = ' .. util.get_temp_path('bteq_output_name') .. ';',
         })
         vim.list_extend(body, vim.fn.split(sql, '\n'))
