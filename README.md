@@ -15,6 +15,10 @@ Default command TDH to populate a buffer with the latest queries and resultsets 
 
 Default command TDU to access the users management buffer
 
+Default command TDB to access the bookmark management buffer
+
+Default command TDBAdd to add the visually selected query to the bookmark list
+
 Default command TDR to search for past queries (3 dependencies : [fzf.vim](https://github.com/junegunn/fzf.vim), [bat](https://github.com/sharkdp/bat) and [rg](https://github.com/BurntSushi/ripgrep))
 
 Use `TDHelp` command to get the help

@@ -1,5 +1,6 @@
 local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
+local bookmark = require('vim-teradata.bookmark')
 
 local M = {}
 
@@ -55,6 +56,8 @@ function M.display_help()
         'TDH: Show query history',
         'TDR: Search query history with FZF',
         'TDU: Manage users',
+        'TDB: Manage bookmarks',
+        'TDBAdd: Add bookmark from visual selection',
         'TDHelp: Display this help',
     }
 
@@ -95,6 +98,14 @@ end
 function M.show_queries()
     local queries_dir = util.get_history_path('queries_dir_name')
     local files = vim.fn.glob(queries_dir .. '/*', false, true)
+    local preview_winid = nil
+
+    local function close_preview_win()
+        if preview_winid and vim.api.nvim_win_is_valid(preview_winid) then
+            vim.api.nvim_win_close(preview_winid, true)
+        end
+        preview_winid = nil
+    end
 
     -- Sort files by modification time (newest first)
     table.sort(files, function(f1, f2)
@@ -114,6 +125,7 @@ function M.show_queries()
     vim.bo.modifiable = false
 
     vim.keymap.set('n', '<cr>', function()
+        close_preview_win()
         M.open_query_result_pair(vim.fn.getline('.'))
     end, { buffer = true, silent = true })
 
@@ -121,6 +133,7 @@ function M.show_queries()
     vim.api.nvim_create_autocmd('CursorHold', {
         buffer = 0,
         callback = function()
+            close_preview_win()
             local file_id = vim.fn.getline('.')
             local query_file = util.get_history_path('queries_dir_name') .. '/' .. file_id
 
@@ -136,7 +149,7 @@ function M.show_queries()
                 local row = cursor[1]
                 local col = cursor[2]
 
-                vim.api.nvim_open_win(buf, false, {
+                preview_winid = vim.api.nvim_open_win(buf, false, {
                     relative = 'win',
                     width = width,
                     height = height,
@@ -146,6 +159,14 @@ function M.show_queries()
                     border = 'rounded',
                 })
             end
+        end,
+    })
+
+    vim.api.nvim_create_autocmd('BufLeave', {
+        buffer = 0,
+        once = true,
+        callback = function()
+            close_preview_win()
         end,
     })
 end
@@ -297,6 +318,143 @@ function M.show_users()
             end)
         end)
     end, { buffer = true, silent = true })
+end
+
+--- Shows a browsable list of bookmarks.
+function M.show_bookmarks()
+    local original_bufnr = vim.api.nvim_get_current_buf()
+    local line_map = {} -- Maps line number to bookmark info
+    local preview_winid = nil
+
+    local function close_preview_win()
+        if preview_winid and vim.api.nvim_win_is_valid(preview_winid) then
+            vim.api.nvim_win_close(preview_winid, true)
+        end
+        preview_winid = nil
+    end
+
+
+    local function populate_buffer()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local bookmarks = bookmark.get_all()
+        local lines = {}
+        line_map = {}
+        local current_line = 1
+
+        table.insert(lines, '--- Global Bookmarks ---')
+        current_line = current_line + 1
+        if #bookmarks.global == 0 then
+            table.insert(lines, '(empty)')
+            current_line = current_line + 1
+        else
+            for _, name in ipairs(bookmarks.global) do
+                table.insert(lines, name)
+                line_map[current_line] = { name = name, type = 'global' }
+                current_line = current_line + 1
+            end
+        end
+
+        table.insert(lines, '') -- Separator
+        current_line = current_line + 1
+        table.insert(lines, '--- User Bookmarks ---')
+        current_line = current_line + 1
+        if #bookmarks.user == 0 then
+            table.insert(lines, '(empty)')
+            current_line = current_line + 1
+        else
+            for _, name in ipairs(bookmarks.user) do
+                table.insert(lines, name)
+                line_map[current_line] = { name = name, type = 'user' }
+                current_line = current_line + 1
+            end
+        end
+
+        -- Add help text at the bottom
+        local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
+        local extmark = '<d> Delete    <Enter> Insert (use TDBAdd command to add a bookmark)'
+
+        vim.bo.modifiable = true
+        table.insert(lines, '')
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_extmark(
+            bufnr,
+            ns_id,
+            #lines - 1,
+            0,
+            { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
+        )
+        vim.bo.modifiable = false
+    end
+
+    vim.cmd('belowright 10split')
+    vim.cmd.enew()
+    vim.bo.buftype = 'nofile'
+    vim.bo.bufhidden = 'delete'
+    vim.api.nvim_buf_set_name(0, 'Teradata Bookmarks')
+    populate_buffer()
+
+    vim.keymap.set('n', '<cr>', function()
+        close_preview_win()
+        local lnum = vim.fn.line('.')
+        local info = line_map[lnum]
+        if info then
+            bookmark.insert_into_buffer(info.name, info.type, original_bufnr)
+            vim.api.nvim_buf_delete(0, { force = true })
+        end
+    end, { buffer = true, silent = true })
+
+    vim.keymap.set('n', 'd', function()
+        close_preview_win()
+        local lnum = vim.fn.line('.')
+        local info = line_map[lnum]
+        if info then
+            vim.ui.select({ 'Yes', 'No' }, { prompt = 'Delete bookmark "' .. info.name .. '"?' }, function(choice)
+                if choice == 'Yes' then
+                    bookmark.delete(info.name, info.type)
+                    populate_buffer() -- Refresh the buffer
+                end
+            end)
+        end
+    end, { buffer = true, silent = true })
+
+    vim.cmd('setlocal updatetime=500')
+    vim.api.nvim_create_autocmd('CursorHold', {
+        buffer = 0,
+        callback = function()
+            close_preview_win()
+            local lnum = vim.fn.line('.')
+            local info = line_map[lnum]
+            if not info then return end
+
+            local content = bookmark.get_content(info.name, info.type)
+            if content then
+                local buf = vim.api.nvim_create_buf(false, true)
+                vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
+
+                local width = 80
+                local height = 10
+                local cursor = vim.api.nvim_win_get_cursor(0)
+
+                preview_winid = vim.api.nvim_open_win(buf, false, {
+                    relative = 'win',
+                    width = width,
+                    height = height,
+                    row = cursor[1] - 1,
+                    col = cursor[2] + 10,
+                    style = 'minimal',
+                    border = 'rounded',
+                })
+            end
+        end,
+    })
+
+    vim.api.nvim_create_autocmd('BufLeave', {
+        buffer = 0,
+        once = true,
+        callback = function()
+            close_preview_win()
+        end,
+    })
 end
 
 return M

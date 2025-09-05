@@ -8,6 +8,7 @@ M.defaults = {
     -- Uses standard Neovim cache and data directories
     temp_dir = vim.fn.stdpath('cache') .. '/teradata',
     history_dir = vim.fn.stdpath('data') .. '/teradata',
+    bookmarks_dir = vim.fn.stdpath('data') .. '/teradata/bookmarks',
 
     -- BTEQ script and output file names
     bteq_script_name = 'tdsql.bteq',
@@ -15,9 +16,11 @@ M.defaults = {
     bteq_log_name = 'tdsql.log',
     bteq_open_log_when_error = false,
 
-    -- History subdirectories
+    -- History and Bookmark subdirectories
     queries_dir_name = 'queries',
     resultsets_dir_name = 'resultsets',
+    global_bookmarks_dir_name = 'global',
+    user_bookmarks_dir_name = 'user',
 
     -- Query settings
     retlimit = 100,
@@ -43,6 +46,9 @@ function M.setup(opts)
         M.options.history_dir,
         M.options.history_dir .. '/' .. M.options.queries_dir_name,
         M.options.history_dir .. '/' .. M.options.resultsets_dir_name,
+        M.options.bookmarks_dir,
+        M.options.bookmarks_dir .. '/' .. M.options.global_bookmarks_dir_name,
+        M.options.bookmarks_dir .. '/' .. M.options.user_bookmarks_dir_name,
     }
     for _, path in ipairs(paths) do
         if vim.fn.isdirectory(path) == 0 then

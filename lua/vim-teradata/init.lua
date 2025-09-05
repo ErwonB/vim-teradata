@@ -3,6 +3,7 @@ local util = require('vim-teradata.util')
 local bteq = require('vim-teradata.bteq')
 local ui = require('vim-teradata.ui')
 local fzf = require('vim-teradata.fzf')
+local bookmark = require('vim-teradata.bookmark')
 local M = {}
 local function run_query(args, operation, handle_result)
     if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
@@ -107,6 +108,10 @@ function M.setup(user_config)
             vim.api.nvim_create_user_command('TDHelp', ui.display_help, { nargs = 0 })
             -- :TDU user management
             vim.api.nvim_create_user_command('TDU', ui.show_users, { nargs = 0 })
+            -- :TDB bookmark management
+            vim.api.nvim_create_user_command('TDB', ui.show_bookmarks, { nargs = 0 })
+            -- :TDBAdd add bookmark from selection
+            vim.api.nvim_create_user_command('TDBAdd', bookmark.add_from_range, { range = true })
         end
     })
 end
