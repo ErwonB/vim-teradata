@@ -1,7 +1,5 @@
 local config = require('vim-teradata.config')
-
 local M = {}
-
 --- Safely removes one or more files.
 --- @param ... string One or more file paths to delete.
 function M.remove_files(...)
@@ -60,6 +58,27 @@ function M.check_executables(commands)
         end
     end
     return true, ""
+end
+
+--- Loads the saved users configuration.
+function M.load_config()
+    local file = config.options.history_dir .. '/users.json'
+    if vim.fn.filereadable(file) == 1 then
+        local content = vim.fn.readfile(file)
+        local data = vim.fn.json_decode(table.concat(content, '\n'))
+        config.options.users = data.users or {}
+        config.options.current_user_index = data.current_user_index
+    end
+end
+
+--- Saves the current users configuration.
+function M.save_config()
+    local file = config.options.history_dir .. '/users.json'
+    local data = {
+        users = config.options.users,
+        current_user_index = config.options.current_user_index,
+    }
+    vim.fn.writefile({ vim.fn.json_encode(data) }, file)
 end
 
 return M

@@ -1,11 +1,7 @@
 local M = {}
-
 -- Default configuration values
 M.defaults = {
-    -- Connection parameters
-    -- log_mech = 'TD2',
-    -- user = 'USER',
-    -- tdpid = 'TDPID', -- Teradata server hostname or IP
+    -- Connection parameters moved to users list
     ft = { "sql", "teradata" },
 
     -- Path configuration
@@ -31,15 +27,16 @@ M.defaults = {
 
     -- csv separator for result query file
     sep = "|",
+
+    -- Users list
+    users = {},
+    current_user_index = nil,
 }
-
 M.options = {}
-
 --- Merges user-provided configuration with the defaults.
 --- @param opts table | nil User configuration table.
 function M.setup(opts)
     M.options = vim.tbl_deep_extend('force', {}, M.defaults, opts or {})
-
     -- Create necessary directories
     local paths = {
         M.options.temp_dir,
@@ -51,6 +48,14 @@ function M.setup(opts)
         if vim.fn.isdirectory(path) == 0 then
             vim.fn.mkdir(path, 'p')
         end
+    end
+    -- Load saved config if exists, otherwise initialize from provided
+    local config_file = M.options.history_dir .. '/users.json'
+    if vim.fn.filereadable(config_file) == 0 and #M.options.users > 0 then
+        M.options.current_user_index = 1
+        require('vim-teradata.util').save_config()
+    else
+        require('vim-teradata.util').load_config()
     end
 end
 

@@ -1,19 +1,17 @@
 local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
-
 local M = {}
-
 --- Builds the common BTEQ logon header.
 --- @param user string The username.
 --- @param tdpid string The Teradata server ID.
+--- @param log_mech string The log mechanism.
 --- @return table The list of BTEQ header commands.
-local function build_header(user, tdpid)
+local function build_header(user, tdpid, log_mech)
     return {
-        '.logmech ' .. config.options.log_mech,
+        '.logmech ' .. log_mech,
         '.logon ' .. tdpid .. '/' .. user .. ',$tdwallet(' .. user .. ');',
     }
 end
-
 --- Gets the next available query history number.
 --- @return number The next integer for naming query/result files.
 local function get_next_query_number()
@@ -32,23 +30,19 @@ local function get_next_query_number()
     end
     return max_num + 1
 end
-
 --- Builds a BTEQ script for a given operation.
 --- @param sql string The SQL query.
---- @param user string The username.
---- @param tdpid string The Teradata server ID.
+--- @param user_obj table The user object containing user, tdpid, log_mech.
 --- @param options table Additional options like operation type, pattern, etc.
 --- @return table A table containing the BTEQ script (as a list of strings) and context.
-function M.build_script(sql, user, tdpid, options)
-    local body = build_header(user, tdpid)
+function M.build_script(sql, user_obj, options)
+    local body = build_header(user_obj.user, user_obj.tdpid, user_obj.log_mech)
     local context = {}
-
     if options.operation == 'output' then
         context.query_num = get_next_query_number()
         local result_path = util.get_history_path('resultsets_dir_name') .. '/' .. context.query_num
         local query_path = util.get_history_path('queries_dir_name') .. '/' .. context.query_num
         vim.fn.writefile(vim.fn.split(sql, '\n'), query_path)
-
         vim.list_extend(body, {
             '.set titledashes off',
             '.set WIDTH 30000',
@@ -66,7 +60,6 @@ function M.build_script(sql, user, tdpid, options)
         })
         vim.list_extend(body, vim.fn.split(sql, '\n'))
     end
-
     vim.list_extend(body, { ';', '.LOGOFF', '.EXIT' })
     return { script = body, context = context }
 end
@@ -76,12 +69,10 @@ end
 function M.execute()
     local script_path = util.get_temp_path('bteq_script_name')
     local log_path = util.get_temp_path('bteq_log_name')
-
     local redirect_error = config.options.bteq_open_log_when_error and " 2>&1" or ""
     local command = string.format('bteq < %s > %s %s', vim.fn.fnameescape(script_path), vim.fn.fnameescape(log_path),
         redirect_error)
     local result = vim.fn.system(command)
-
     return {
         rc = vim.v.shell_error,
         msg = result,

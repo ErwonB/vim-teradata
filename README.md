@@ -9,9 +9,11 @@ The command starts always with TD:
 
 Default command TD to check the query syntax
 
-Default command TDO to run and output the result in a split buffer (dependency with ![csv plugin](https://github.com/chrisbra/csv.vim) with @ as a delimiter)
+Default command TDO to run and output the result in a split buffer (dependency with [csv plugin](https://github.com/chrisbra/csv.vim) with @ as a delimiter)
 
 Default command TDH to populate a buffer with the latest queries and resultsets (no external dependency)
+
+Default command TDU to access the users management buffer
 
 Default command TDR to search for past queries (3 dependencies : [fzf.vim](https://github.com/junegunn/fzf.vim), [bat](https://github.com/sharkdp/bat) and [rg](https://github.com/BurntSushi/ripgrep))
 
@@ -32,4 +34,4 @@ In lua/teradata/config.lua, some variables need to be instantiated :
 * Create BTEQ, SQL, SH+BTEQ,T PT snippet
 
 ## Thanks
-* Initial syntax from ![this repo](https://github.com/vim-scripts/Teradata-13.10-syntax/blob/master/syntax/teradata_13_10.vim)
+* Initial syntax from [this repo](https://github.com/vim-scripts/Teradata-13.10-syntax/blob/master/syntax/teradata_13_10.vim)

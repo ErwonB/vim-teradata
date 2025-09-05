@@ -3,17 +3,16 @@ local util = require('vim-teradata.util')
 local bteq = require('vim-teradata.bteq')
 local ui = require('vim-teradata.ui')
 local fzf = require('vim-teradata.fzf')
-
 local M = {}
-
 local function run_query(args, operation, handle_result)
+    if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
+        return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
+    end
+    local current_user = config.options.users[config.options.current_user_index]
     local opts = {
-        user = config.options.user,
-        tdpid = config.options.tdpid,
         operation = operation,
         pattern = '',
     }
-
     local sql
     if args.range > 0 then
         local start_pos = vim.api.nvim_buf_get_mark(0, "<")
@@ -25,16 +24,13 @@ local function run_query(args, operation, handle_result)
     else
         sql = vim.fn.getreg('"')
     end
-
     if not sql or sql:match('^%s*$') then
         return vim.notify('No SQL query provided in selection or register.', vim.log.levels.WARN)
     end
-
     local clean_sql = util.replace_env_vars(sql)
     if not clean_sql:find(';') then
         clean_sql = clean_sql .. ';'
     end
-
     if operation == 'syntax' then
         local parts = {}
         for part in clean_sql:gmatch("[^;]+") do
@@ -46,17 +42,13 @@ local function run_query(args, operation, handle_result)
         clean_sql = table.concat(parts, " ; ")
     end
 
-    local bteq_data = bteq.build_script(clean_sql, opts.user, opts.tdpid, opts)
+    local bteq_data = bteq.build_script(clean_sql, current_user, opts)
     local script_path = util.get_temp_path('bteq_script_name')
     vim.fn.writefile(bteq_data.script, script_path)
-
     local res = bteq.execute()
-
     handle_result(res, bteq_data)
-
     util.remove_files(script_path, util.get_temp_path('bteq_output_name'), res.log_path)
 end
-
 local function query_syntax(args)
     run_query(args, 'syntax', function(res)
         if res.rc == 0 then
@@ -66,7 +58,6 @@ local function query_syntax(args)
         end
     end)
 end
-
 local function query_output(args)
     run_query(args, 'output', function(res, bteq_data)
         if res.rc == 0 then
@@ -89,12 +80,9 @@ local function query_output(args)
         end
     end)
 end
-
-
 --- Sets up the plugin, creating commands.
 function M.setup(user_config)
     config.setup(user_config)
-
     vim.api.nvim_create_autocmd("FileType", {
         pattern = config.options.ft,
         callback = function()
@@ -104,7 +92,6 @@ function M.setup(user_config)
                 range = true,
                 bang = true,
             })
-
             -- :TDO command (shortcut for output)
             vim.api.nvim_create_user_command('TDO',
                 query_output, {
@@ -112,15 +99,14 @@ function M.setup(user_config)
                     range = true,
                     bang = true,
                 })
-
             -- :TDH command (history)
             vim.api.nvim_create_user_command('TDH', ui.show_queries, { nargs = 0 })
-
             -- :TDR command (search history)
             vim.api.nvim_create_user_command('TDR', fzf.find_query_by_content, { nargs = 0 })
-
             -- :TDHelp display help
             vim.api.nvim_create_user_command('TDHelp', ui.display_help, { nargs = 0 })
+            -- :TDU user management
+            vim.api.nvim_create_user_command('TDU', ui.show_users, { nargs = 0 })
         end
     })
 end
