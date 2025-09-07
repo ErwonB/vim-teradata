@@ -9,7 +9,7 @@ let b:current_syntax = s:current_syntax
 
 syntax region bteqBlock 
   \ matchgroup=bteqDelimiter 
-  \ start=/^bteq\s*<<\s*EOF$/ 
+  \ start=/^bteq.*<<\s*EOF$/ 
   \ end=/^EOF$/ 
   \ contains=@teradata 
   \ keepend
