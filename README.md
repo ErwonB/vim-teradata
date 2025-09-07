@@ -1,4 +1,4 @@
-# vim-teradata
+
 vim-teradata is a vim plugin to interact directly with the Teradata database and provide different functions.
 * Check query syntax (support checking of multiple queries)
 * Output a sample of a select queries
@@ -34,7 +34,6 @@ In lua/teradata/config.lua, some variables need to be instantiated :
 ![plugin demo](https://imgur.com/BPrDc3t.gif)
 
 ## TODO
-* Syntax SQL inside BTEQ from shell script
 * Create BTEQ, SQL, SH+BTEQ,T PT snippet
 
 ## Thanks
