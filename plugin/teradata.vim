@@ -4,4 +4,3 @@ endif
 let g:loaded_teradata = 1
 
 lua require('vim-teradata')
-

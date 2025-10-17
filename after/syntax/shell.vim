@@ -7,9 +7,10 @@ syntax include @teradata syntax/teradata.vim
 
 let b:current_syntax = s:current_syntax
 
+  "\ start=/(bteq|tdwallet)\s*<<\s*EOF$/ 
 syntax region bteqBlock 
   \ matchgroup=bteqDelimiter 
-  \ start=/.*bteq.*<<\s*EOF$/ 
+  \ start=/.*\(bteq\|tdwallet\).*<<\s*EOF$/ 
   \ end=/^EOF$/ 
   \ contains=@teradata 
   \ keepend

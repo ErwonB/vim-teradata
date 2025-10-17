@@ -4,6 +4,7 @@ local bteq = require('vim-teradata.bteq')
 local ui = require('vim-teradata.ui')
 local fzf = require('vim-teradata.fzf')
 local bookmark = require('vim-teradata.bookmark')
+
 local M = {}
 local function run_query(args, operation, handle_result)
     if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then

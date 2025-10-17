@@ -1,3 +1,6 @@
+if has('nvim') && luaeval("pcall(vim.treesitter.get_parser, 0, 'sql')")
+    finish
+endif
 "Overwrite supported languages
 "let language_list = ['sql', 'depl', 'bteq', 'tpt']
 if exists("b:current_syntax") 
