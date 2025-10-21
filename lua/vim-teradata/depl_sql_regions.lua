@@ -5,7 +5,6 @@ local function find_marker_rows(buf)
     local rows = {}
     for i, s in ipairs(lines) do
         if s:match("^========") then
-            print(s)
             rows[#rows + 1] = i - 1
         end
     end
