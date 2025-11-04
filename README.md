@@ -33,8 +33,5 @@ In lua/teradata/config.lua, some variables need to be instantiated :
 ## Plugin demo
 ![plugin demo](https://imgur.com/BPrDc3t.gif)
 
-## TODO
-* Create BTEQ, SQL, SH+BTEQ,T PT snippet
-
 ## Thanks
 * Initial syntax from [this repo](https://github.com/vim-scripts/Teradata-13.10-syntax/blob/master/syntax/teradata_13_10.vim)
