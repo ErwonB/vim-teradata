@@ -5,14 +5,9 @@ M.defaults = {
     ft = { "sql", "teradata" },
     -- Path configuration
     -- Uses standard Neovim cache and data directories
-    temp_dir = vim.fn.stdpath('cache') .. '/teradata',
     history_dir = vim.fn.stdpath('data') .. '/teradata',
     bookmarks_dir = vim.fn.stdpath('data') .. '/teradata/bookmarks',
-    -- BTEQ script and output file names
-    bteq_script_name = 'tdsql.bteq',
-    bteq_output_name = 'tdsql.out',
-    bteq_log_name = 'tdsql.log',
-    bteq_open_log_when_error = false,
+
     -- History and Bookmark subdirectories
     queries_dir_name = 'queries',
     resultsets_dir_name = 'resultsets',
@@ -36,7 +31,6 @@ function M.setup(opts)
     M.options = vim.tbl_deep_extend('force', {}, M.defaults, opts or {})
     -- Create necessary directories
     local paths = {
-        M.options.temp_dir,
         M.options.history_dir,
         M.options.history_dir .. '/' .. M.options.queries_dir_name,
         M.options.history_dir .. '/' .. M.options.resultsets_dir_name,

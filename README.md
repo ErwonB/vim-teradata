@@ -3,6 +3,9 @@ vim-teradata is a vim plugin to interact directly with the Teradata database and
 * Check query syntax (support checking of multiple queries)
 * Output a sample of a select queries
 * Keep your queries history and the associated resultsets
+* Bookmark your most used queries
+
+Queries are running asynchronously, preventing the UI to freeze while a query is running.
 
 ## Usage
 The command starts always with TD:
@@ -19,6 +22,8 @@ Default command TDB to access the bookmark management buffer
 
 Default command TDBAdd to add the visually selected query to the bookmark list
 
+Default command TDJ to access the jobs manager
+
 Default command TDR to search for past queries (3 dependencies : [fzf.vim](https://github.com/junegunn/fzf.vim), [bat](https://github.com/sharkdp/bat) and [rg](https://github.com/BurntSushi/ripgrep))
 
 Use `TDHelp` command to get the help
@@ -30,7 +35,7 @@ In lua/teradata/config.lua, some variables need to be instantiated :
 * tdpid : hostname or ip address of the TD machine
 * td_replace (optional) : list of variable that will be replaced at execution time
 
-## Plugin demo
+## Plugin demo (very old version)
 ![plugin demo](https://imgur.com/BPrDc3t.gif)
 
 ## Thanks

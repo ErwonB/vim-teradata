@@ -1,19 +1,18 @@
 local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
 local bookmark = require('vim-teradata.bookmark')
-
 local M = {}
 
 --- Post-processes and displays a query result file in a custom interactive buffer.
 --- @param file_path string Path to the result file.
-function M.display_output(file_path)
+--- @param query_id string|nil Optional query ID for buffer naming.
+function M.display_output(file_path, query_id)
     local lines = vim.fn.readfile(file_path)
     if #lines == 0 then
         vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
         return
     end
 
-    -- 1. Parse data
     local regex_special_chars = "|.*+?^$(){}[]\\`~"
     local separator = vim.fn.escape(config.options.sep, regex_special_chars)
     local header = vim.fn.split(lines[1], separator)
@@ -24,37 +23,30 @@ function M.display_output(file_path)
         end
     end
 
-    -- Trim whitespace from all cells
     header = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, header)
     for i, row in ipairs(data) do
         data[i] = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, row)
     end
 
-    -- 2. Create and setup new buffer
     vim.cmd.set('splitbelow')
-    vim.cmd.split('Teradata Result')
+    local buffer_name = query_id and 'Teradata Result - ' .. query_id or 'Teradata Result'
+    vim.cmd.split(buffer_name)
     vim.bo.buftype = 'nofile'
     vim.bo.bufhidden = 'wipe'
     vim.bo.swapfile = false
     vim.opt_local.wrap = false
-
     local bufnr = vim.api.nvim_get_current_buf()
 
-    -- Store data in buffer variables
     vim.api.nvim_buf_set_var(bufnr, 'teradata_all_data', vim.deepcopy(data))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_all_header', vim.deepcopy(header))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(data))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', vim.deepcopy(header))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', {})
 
-    local populate_buffer
-    local get_column_from_cursor
-
-    -- 3. Render function
-    populate_buffer = function()
-        vim.bo.modifiable = true
+    local function populate_buffer()
+        vim.bo.modifiable      = true
         local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        local displayed_data   = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
 
         if #displayed_header == 0 then
             vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "All columns removed. Press <BS> to restore." })
@@ -106,7 +98,7 @@ function M.display_output(file_path)
         end
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
-        local extmark = '<Enter> Filter | <-> Remove Col | <BS> Restore Col | <u> Unfilter'
+        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter'
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
         vim.api.nvim_buf_set_extmark(
@@ -120,7 +112,7 @@ function M.display_output(file_path)
         vim.bo.modifiable = false
     end
 
-    get_column_from_cursor = function()
+    local function get_column_from_cursor()
         local col = vim.fn.virtcol('.') - 1
         local widths = vim.api.nvim_buf_get_var(bufnr, 'teradata_column_widths')
         if not widths then return nil end
@@ -135,7 +127,6 @@ function M.display_output(file_path)
         return nil
     end
 
-    -- 4. Set keymaps
     vim.keymap.set('n', '<cr>', function()
         local lnum = vim.fn.line('.')
         if lnum <= 2 then return end
@@ -158,10 +149,11 @@ function M.display_output(file_path)
     vim.keymap.set('n', '-', function()
         local col_idx_to_remove = get_column_from_cursor()
         if not col_idx_to_remove then return end
-        local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-        local removed_columns = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
-        local removed_header = table.remove(displayed_header, col_idx_to_remove)
+        local displayed_header    = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
+        local displayed_data      = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        local removed_columns     = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
+
+        local removed_header      = table.remove(displayed_header, col_idx_to_remove)
         local removed_column_data = {}
         for _, row in ipairs(displayed_data) do
             table.insert(removed_column_data, table.remove(row, col_idx_to_remove))
@@ -182,9 +174,10 @@ function M.display_output(file_path)
         if #removed_columns == 0 then
             return vim.notify("No columns to restore.", vim.log.levels.WARN)
         end
-        local col_to_restore = table.remove(removed_columns)
+        local col_to_restore   = table.remove(removed_columns)
         local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        local displayed_data   = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+
         table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
         for i, row in ipairs(displayed_data) do
             table.insert(row, col_to_restore.index, col_to_restore.data[i] or '')
@@ -198,33 +191,24 @@ function M.display_output(file_path)
     vim.keymap.set('n', 'u', function()
         local all_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_all_data')
         local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-
         if #displayed_data == #all_data then
             vim.notify("No filters to reset.", vim.log.levels.INFO)
             return
         end
-
         vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(all_data))
         populate_buffer()
         vim.notify("Filters reset.", vim.log.levels.INFO)
     end, { buffer = bufnr, silent = true, nowait = true })
 
-    -- 5. Initial population
     populate_buffer()
 end
 
 --- Displays an error message from a BTEQ execution.
 --- @param msg string The error message.
---- @param log_path string The path to the log file for more details.
-function M.display_error(msg, log_path)
-    if config.options.bteq_open_log_when_error then
-        vim.cmd.vsplit(vim.fn.fnameescape(log_path))
-    else
-        vim.notify(msg, vim.log.levels.ERROR, { title = 'Teradata Error' })
-    end
+function M.display_error(msg)
+    vim.notify(msg, vim.log.levels.ERROR, { title = 'Teradata Error' })
 end
 
---- Displays the help message in a new buffer.
 function M.display_help()
     local help_text = {
         'TD: syntax checking',
@@ -234,9 +218,9 @@ function M.display_help()
         'TDU: Manage users',
         'TDB: Manage bookmarks',
         'TDBAdd: Add bookmark from visual selection',
+        'TDJ: Jobs Manager',
         'TDHelp: Display this help',
     }
-
     vim.cmd('belowright 10split')
     vim.cmd.enew()
     vim.bo.buftype = 'nofile'
@@ -249,31 +233,27 @@ end
 --- Opens a query and its corresponding result file.
 --- @param file_id string The numeric ID of the query.
 function M.open_query_result_pair(file_id)
-    local query_file = util.get_history_path('queries_dir_name') .. '/' .. file_id
-    local result_file = util.get_history_path('resultsets_dir_name') .. '/' .. file_id
-
-    -- Close existing history buffers to prevent clutter
-    local buflisted = vim.api.nvim_list_bufs()
-    for _, buf in ipairs(buflisted) do
-        if vim.api.nvim_buf_is_loaded(buf) then
-            local buf_name = vim.api.nvim_buf_get_name(buf)
-            if buf_name:find(config.options.history_dir, 1, true) then
-                vim.api.nvim_buf_delete(buf, { force = true })
-            end
-        end
+    local query_file  = util.get_history_path('queries_dir_name') .. '/' .. file_id .. '.sql'
+    local result_file = util.get_history_path('resultsets_dir_name') .. '/' .. file_id .. '.csv'
+    if vim.fn.filereadable(result_file) == 0 then
+        vim.notify('No result file found for query ' .. file_id, vim.log.levels.WARN)
+        return
     end
-
-    vim.cmd.edit(vim.fn.fnameescape(query_file))
-    if vim.fn.filereadable(result_file) == 1 then
-        M.display_output(result_file)
-        vim.cmd.wincmd('p')
-    end
+    vim.cmd.split(vim.fn.fnameescape(query_file))
+    M.display_output(vim.fn.fnameescape(result_file))
 end
 
---- Shows a browsable list of past queries.
 function M.show_queries()
     local queries_dir = util.get_history_path('queries_dir_name')
-    local files = vim.fn.glob(queries_dir .. '/*', false, true)
+    local files = vim.fn.glob(queries_dir .. '/*.sql', false, true)
+    local query_ids = {}
+    for _, file in ipairs(files) do
+        local id = vim.fn.fnamemodify(file, ':t:r')
+        table.insert(query_ids, id)
+    end
+    table.sort(query_ids, function(a, b) return a > b end)
+
+    local line_map = {}
     local preview_winid = nil
 
     local function close_preview_win()
@@ -283,26 +263,50 @@ function M.show_queries()
         preview_winid = nil
     end
 
-    -- Sort files by modification time (newest first)
-    table.sort(files, function(f1, f2)
-        return vim.fn.getftime(f1) > vim.fn.getftime(f2)
-    end)
-
-    local basenames = vim.tbl_map(function(f)
-        return vim.fn.fnamemodify(f, ':t')
-    end, files)
+    local function populate_buffer()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local lines = {}
+        line_map = {}
+        local current_line = 1
+        for _, id in ipairs(query_ids) do
+            table.insert(lines, id)
+            line_map[current_line] = id
+            current_line = current_line + 1
+        end
+        if #lines == 0 then
+            table.insert(lines, 'No queries found.')
+        end
+        local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
+        local extmark = '<Enter> Open Query/Result'
+        vim.bo.modifiable = true
+        table.insert(lines, '')
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_extmark(
+            bufnr,
+            ns_id,
+            #lines - 1,
+            0,
+            { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
+        )
+        vim.bo.modifiable = false
+    end
 
     vim.cmd('belowright 10split')
     vim.cmd.enew()
     vim.bo.buftype = 'nofile'
     vim.bo.bufhidden = 'delete'
+    local list_bufnr = vim.api.nvim_get_current_buf()
     vim.api.nvim_buf_set_name(0, 'Teradata Queries')
-    vim.api.nvim_buf_set_lines(0, 0, -1, false, basenames)
-    vim.bo.modifiable = false
+    populate_buffer()
 
     vim.keymap.set('n', '<cr>', function()
         close_preview_win()
-        M.open_query_result_pair(vim.fn.getline('.'))
+        local lnum = vim.fn.line('.')
+        local id = line_map[lnum]
+        if id then
+            M.open_query_result_pair(id)
+            vim.api.nvim_buf_delete(list_bufnr, { force = true })
+        end
     end, { buffer = true, silent = true })
 
     vim.cmd('setlocal updatetime=500')
@@ -310,34 +314,28 @@ function M.show_queries()
         buffer = 0,
         callback = function()
             close_preview_win()
-            local file_id = vim.fn.getline('.')
-            local query_file = util.get_history_path('queries_dir_name') .. '/' .. file_id
-
-            if vim.fn.filereadable(query_file) == 1 then
+            local lnum = vim.fn.line('.')
+            local id = line_map[lnum]
+            if not id then return end
+            local query_file = util.get_history_path('queries_dir_name') .. '/' .. id .. '.sql'
+            local content = vim.fn.readfile(query_file)
+            if content then
                 local buf = vim.api.nvim_create_buf(false, true)
-                local lines = vim.fn.readfile(query_file)
-                vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-
-                local width = 80
-                local height = 10
-
+                vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
+                local width, height = 80, 10
                 local cursor = vim.api.nvim_win_get_cursor(0)
-                local row = cursor[1]
-                local col = cursor[2]
-
                 preview_winid = vim.api.nvim_open_win(buf, false, {
                     relative = 'win',
                     width = width,
                     height = height,
-                    row = row - 1,
-                    col = col + 10,
+                    row = cursor[1] - 1,
+                    col = cursor[2] + 10,
                     style = 'minimal',
                     border = 'rounded',
                 })
             end
         end,
     })
-
     vim.api.nvim_create_autocmd('BufLeave', {
         buffer = 0,
         once = true,
@@ -347,7 +345,9 @@ function M.show_queries()
     })
 end
 
---- Shows a management window for users.
+-----------------------------------------------------------------------
+-- Users
+-----------------------------------------------------------------------
 function M.show_users()
     local function populate_buffer()
         local bufnr = vim.api.nvim_get_current_buf()
@@ -356,29 +356,28 @@ function M.show_users()
         local extmark
 
         if next(config.options.users) then
-            local user_col_width = #("user")
-            local tdpid_col_width = #("tdpid")
+            local user_col_width    = #("user")
+            local tdpid_col_width   = #("tdpid")
             local logmech_col_width = #("logon mechanism")
-
             for _, u in ipairs(config.options.users) do
-                user_col_width = math.max(user_col_width, #(u.user) + 1)
-                tdpid_col_width = math.max(tdpid_col_width, #(u.tdpid))
-                logmech_col_width = math.max(logmech_col_width, #(u.log_mech))
+                user_col_width    = math.max(user_col_width, # (u.user) + 1)
+                tdpid_col_width   = math.max(tdpid_col_width, # (u.tdpid))
+                logmech_col_width = math.max(logmech_col_width, # (u.log_mech))
             end
 
             table.insert(lines, string.format(
-                "%-" .. user_col_width .. "s| %-" .. tdpid_col_width .. "s| %-" .. logmech_col_width .. "s",
+                "%-" .. user_col_width .. "s | %-" .. tdpid_col_width .. "s | %-" .. logmech_col_width .. "s",
                 "user", "tdpid", "logon mechanism"
             ))
-
-            table.insert(lines, string.rep("-", user_col_width) .. "+"
-                .. string.rep("-", tdpid_col_width + 1) .. "+"
-                .. string.rep("-", logmech_col_width + 1))
+            table.insert(lines,
+                string.rep("-", user_col_width) .. "+"
+                .. string.rep("-", tdpid_col_width + 2) .. "+"
+                .. string.rep("-", logmech_col_width + 2))
 
             for i, u in ipairs(config.options.users) do
                 local prefix = (i == config.options.current_user_index) and '*' or ' '
                 table.insert(lines, string.format(
-                    "%s%-" .. (user_col_width - 1) .. "s| %-" .. tdpid_col_width .. "s| %-" .. logmech_col_width .. "s",
+                    "%s%-" .. (user_col_width - 1) .. "s | %-" .. tdpid_col_width .. "s | %-" .. logmech_col_width .. "s",
                     prefix, u.user, u.tdpid, u.log_mech
                 ))
             end
@@ -387,8 +386,9 @@ function M.show_users()
         if #lines == 0 then
             extmark = 'No users configured. Press "a" to add one.'
         else
-            extmark = '<a> Add    <d> Delete    <Enter> Current'
+            extmark = '<a> Add  <d> Delete  <Enter> Current'
         end
+
         vim.bo.modifiable = true
         table.insert(lines, '')
         vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
@@ -415,15 +415,12 @@ function M.show_users()
 
     vim.keymap.set('n', '<cr>', function()
         local index = vim.fn.line('.') - 2
-        if index > #config.options.users then
+        if index > #config.options.users or index <= 0 then
             return
         end
         config.options.current_user_index = index
         util.save_config()
-        vim.notify(
-            'Selected user: ' .. config.options.users[index].user,
-            vim.log.levels.INFO
-        )
+        vim.notify('Selected user: ' .. config.options.users[index].user, vim.log.levels.INFO)
         populate_buffer()
     end, { buffer = true, silent = true })
 
@@ -437,7 +434,7 @@ function M.show_users()
                 table.remove(config.options.users, index)
                 if config.options.current_user_index == index then
                     config.options.current_user_index = #config.options.users > 0 and 1 or nil
-                elseif config.options.current_user_index > index then
+                elseif config.options.current_user_index and config.options.current_user_index > index then
                     config.options.current_user_index = config.options.current_user_index - 1
                 end
                 util.save_config()
@@ -456,13 +453,9 @@ function M.show_users()
         end
 
         vim.ui.input({ prompt = 'Enter log_mech (default TD2):', default = 'TD2' }, function(log_mech)
-            if not log_mech then
-                return
-            end
+            if not log_mech then return end
             vim.ui.input({ prompt = 'Enter tdpid:' }, function(tdpid)
-                if not tdpid then
-                    return
-                end
+                if not tdpid then return end
 
                 local wallet_output = vim.fn.system('tdwallet list')
                 local wallet_users = vim.fn.split(wallet_output, '\n')
@@ -496,10 +489,12 @@ function M.show_users()
     end, { buffer = true, silent = true })
 end
 
---- Shows a browsable list of bookmarks.
+-----------------------------------------------------------------------
+-- Bookmarks
+-----------------------------------------------------------------------
 function M.show_bookmarks()
     local original_bufnr = vim.api.nvim_get_current_buf()
-    local line_map = {} -- Maps line number to bookmark info
+    local line_map = {}
     local preview_winid = nil
 
     local function close_preview_win()
@@ -508,7 +503,6 @@ function M.show_bookmarks()
         end
         preview_winid = nil
     end
-
 
     local function populate_buffer()
         local bufnr = vim.api.nvim_get_current_buf()
@@ -530,8 +524,9 @@ function M.show_bookmarks()
             end
         end
 
-        table.insert(lines, '') -- Separator
+        table.insert(lines, '')
         current_line = current_line + 1
+
         table.insert(lines, '--- User Bookmarks ---')
         current_line = current_line + 1
         if #bookmarks.user == 0 then
@@ -545,18 +540,13 @@ function M.show_bookmarks()
             end
         end
 
-        -- Add help text at the bottom
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
-        local extmark = '<d> Delete    <Enter> Insert (use TDBAdd command to add a bookmark)'
-
+        local extmark = '<d> Delete  <Enter> Insert (use TDBAdd to add a bookmark)'
         vim.bo.modifiable = true
         table.insert(lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
         vim.api.nvim_buf_set_extmark(
-            bufnr,
-            ns_id,
-            #lines - 1,
-            0,
+            bufnr, ns_id, #lines - 1, 0,
             { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
         )
         vim.bo.modifiable = false
@@ -587,7 +577,7 @@ function M.show_bookmarks()
             vim.ui.select({ 'Yes', 'No' }, { prompt = 'Delete bookmark "' .. info.name .. '"?' }, function(choice)
                 if choice == 'Yes' then
                     bookmark.delete(info.name, info.type)
-                    populate_buffer() -- Refresh the buffer
+                    populate_buffer()
                 end
             end)
         end
@@ -601,16 +591,12 @@ function M.show_bookmarks()
             local lnum = vim.fn.line('.')
             local info = line_map[lnum]
             if not info then return end
-
             local content = bookmark.get_content(info.name, info.type)
             if content then
                 local buf = vim.api.nvim_create_buf(false, true)
                 vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
-
-                local width = 80
-                local height = 10
+                local width, height = 80, 10
                 local cursor = vim.api.nvim_win_get_cursor(0)
-
                 preview_winid = vim.api.nvim_open_win(buf, false, {
                     relative = 'win',
                     width = width,
@@ -623,12 +609,158 @@ function M.show_bookmarks()
             end
         end,
     })
-
     vim.api.nvim_create_autocmd('BufLeave', {
         buffer = 0,
         once = true,
         callback = function()
             close_preview_win()
+        end,
+    })
+end
+
+-----------------------------------------------------------------------
+-- Jobs Manager
+-----------------------------------------------------------------------
+local function format_jobs_table(jobs)
+    local w = { id = 18, op = 8, st = 9, usr = 8, rows = 6, msg = 20 }
+    for _, j in ipairs(jobs) do
+        w.id   = math.max(w.id, #tostring(j.id))
+        w.op   = math.max(w.op, #tostring(j.operation))
+        w.st   = math.max(w.st, #tostring(j.status))
+        w.usr  = math.max(w.usr, #tostring(j.user or ''))
+        w.rows = math.max(w.rows, #tostring(j.rows or '-'))
+        w.msg  = math.max(w.msg, math.min(80, #tostring(j.message or '')))
+    end
+
+    local header = string.format(
+        "%-" .. w.id .. "s | %-" .. w.op .. "s | %-" .. w.st .. "s | %-" .. w.usr .. "s | %" .. w.rows .. "s | %s",
+        "job id", "operation", "status", "user", "rows", "message"
+    )
+    local sep = string.rep("-", #header)
+
+    local lines, line_ids = { header, sep }, {}
+    for _, j in ipairs(jobs) do
+        local msg = tostring(j.message or '')
+        if #msg > w.msg then msg = msg:sub(1, w.msg - 1) .. "…" end
+        table.insert(lines, string.format(
+            "%-" .. w.id .. "s | %-" .. w.op .. "s | %-" .. w.st .. "s | %-" .. w.usr .. "s | %" .. w.rows .. "s | %s",
+            tostring(j.id),
+            tostring(j.operation),
+            tostring(j.status),
+            tostring(j.user or ''),
+            tostring(j.rows or '-'),
+            msg
+        ))
+        table.insert(line_ids, j.id)
+    end
+    return lines, line_ids
+end
+
+function M.refresh_jobs_if_open()
+    local bufnr = vim.fn.bufnr('Teradata Jobs')
+    if bufnr == -1 or not vim.api.nvim_buf_is_loaded(bufnr) then return end
+    local win = nil
+    for _, w in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_get_buf(w) == bufnr then
+            win = w; break
+        end
+    end
+    if not win then return end
+    local jobs = util.jobs_all()
+    local lines, _ = format_jobs_table(jobs)
+    vim.bo[bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    local ns = vim.api.nvim_create_namespace("HelperBuffer")
+    local ext = '<Enter> Open  <k> Cancel  <d> Remove'
+    vim.api.nvim_buf_set_extmark(bufnr, ns, #lines - 1, 0, { virt_text = { { ext, "Comment" } }, virt_text_pos = "eol" })
+    vim.bo[bufnr].modifiable = false
+end
+
+function M.show_jobs()
+    vim.cmd('belowright 12split')
+    vim.cmd.enew()
+    vim.bo.buftype = 'nofile'
+    vim.bo.bufhidden = 'delete'
+    vim.bo.swapfile = false
+    vim.api.nvim_buf_set_name(0, 'Teradata Jobs')
+
+    local line_to_id = {}
+
+    local function populate()
+        local jobs = util.jobs_all()
+        local lines, ids = format_jobs_table(jobs)
+        line_to_id = {}
+        for i, id in ipairs(ids) do
+            line_to_id[i + 2] = id -- header + sep
+        end
+        local ns = vim.api.nvim_create_namespace("HelperBuffer")
+        local ext = '<Enter> Open  <k> Cancel  <d> Remove'
+        vim.bo.modifiable = true
+        table.insert(lines, '')
+        vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+        vim.api.nvim_buf_set_extmark(0, ns, #lines - 1, 0, { virt_text = { { ext, "Comment" } }, virt_text_pos = "eol" })
+        vim.bo.modifiable = false
+    end
+
+    populate()
+
+    -- <CR> open
+    vim.keymap.set('n', '<cr>', function()
+        local l = vim.fn.line('.')
+        local id = line_to_id[l]
+        if not id then return end
+        local job = util.jobs_get(id)
+        if not job then return end
+        if job.operation == 'output' then
+            if job.result_path and vim.fn.filereadable(job.result_path) == 1 then
+                M.display_output(job.result_path, job.id)
+            else
+                vim.notify('Result not available for job ' .. job.id, vim.log.levels.WARN)
+            end
+        end
+    end, { buffer = true, silent = true })
+
+    -- k cancel
+    vim.keymap.set('n', 'k', function()
+        local l = vim.fn.line('.')
+        local id = line_to_id[l]
+        if not id then return end
+        local job = util.jobs_get(id)
+        if not job then return end
+        if job.status ~= 'running' then
+            return vim.notify('Job is not running.', vim.log.levels.INFO)
+        end
+        local ok = util.jobs_cancel(id)
+        if ok then
+            vim.notify('Canceled job ' .. id, vim.log.levels.INFO)
+        else
+            vim.notify('Unable to cancel job ' .. id, vim.log.levels.WARN)
+        end
+        populate()
+    end, { buffer = true, silent = true })
+
+    -- d remove
+    vim.keymap.set('n', 'd', function()
+        local l = vim.fn.line('.')
+        local id = line_to_id[l]
+        if not id then return end
+        local job = util.jobs_get(id)
+        if not job then return end
+        if job.status == 'running' then
+            return vim.notify('Job is running. Cancel it first (k).', vim.log.levels.WARN)
+        end
+        util.remove_files(job.query_path or '')
+        util.remove_files(job.result_path or '')
+        util.jobs_remove(id)
+        vim.notify('Removed job ' .. id, vim.log.levels.INFO)
+        populate()
+    end, { buffer = true, silent = true })
+
+    vim.cmd('setlocal updatetime=600')
+    vim.api.nvim_create_autocmd('CursorHold', {
+        buffer = 0,
+        callback = function()
+            populate()
         end,
     })
 end

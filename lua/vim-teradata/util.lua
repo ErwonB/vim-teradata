@@ -1,20 +1,14 @@
 local config = require('vim-teradata.config')
 local M = {}
+
 --- Safely removes one or more files.
 --- @param ... string One or more file paths to delete.
 function M.remove_files(...)
     for _, file in ipairs({ ... }) do
-        if vim.fn.filereadable(file) == 1 then
+        if file and file ~= '' and vim.fn.filereadable(file) == 1 then
             vim.fn.delete(file)
         end
     end
-end
-
---- Gets the full path for a temporary file.
---- @param name string The name of the temp file (e.g., 'bteq_script_name').
---- @return string The full, absolute path.
-function M.get_temp_path(name)
-    return config.options.temp_dir .. '/' .. config.options[name]
 end
 
 --- Gets the full path for a history directory.
@@ -54,13 +48,12 @@ end
 function M.check_executables(commands)
     for _, cmd in ipairs(commands) do
         if vim.fn.executable(cmd) == 0 then
-            return false, string.format('Error: %s is not installed or not in your PATH.', cmd) --
+            return false, string.format('Error: %s is not installed or not in your PATH.', cmd)
         end
     end
     return true, ""
 end
 
---- Loads the saved users configuration.
 function M.load_config()
     local file = config.options.history_dir .. '/users.json'
     if vim.fn.filereadable(file) == 1 then
@@ -71,7 +64,6 @@ function M.load_config()
     end
 end
 
---- Saves the current users configuration.
 function M.save_config()
     local file = config.options.history_dir .. '/users.json'
     local data = {
@@ -81,15 +73,68 @@ function M.save_config()
     vim.fn.writefile({ vim.fn.json_encode(data) }, file)
 end
 
---- Format string if more than 100s of characters
 function M.formatString(s, width)
     local len = #s
     if len >= width then
         return s
     end
-
     local padding = string.rep(' ', width - len)
     return padding .. s
+end
+
+--- Generates a unique query ID based on timestamp and random number.
+--- @return string The unique ID.
+function M.get_unique_query_id()
+    return os.date('%Y%m%d%H%M%S_') .. math.random(1000, 9999)
+end
+
+-----------------------------------------------------------------------
+-- In-memory Jobs Registry
+-----------------------------------------------------------------------
+local _jobs = {}
+
+function M.jobs_add(job)
+    _jobs[job.id] = job
+    return job.id
+end
+
+function M.jobs_update(id, fields)
+    local j = _jobs[id]
+    if not j then return end
+    for k, v in pairs(fields) do
+        j[k] = v
+    end
+end
+
+function M.jobs_get(id)
+    return _jobs[id]
+end
+
+function M.jobs_all()
+    local arr = {}
+    for _, j in pairs(_jobs) do
+        table.insert(arr, j)
+    end
+    table.sort(arr, function(a, b)
+        return (a.started_at or 0) > (b.started_at or 0)
+    end)
+    return arr
+end
+
+function M.jobs_remove(id)
+    local j = _jobs[id]
+    _jobs[id] = nil
+    return j
+end
+
+function M.jobs_cancel(id)
+    local j = _jobs[id]
+    if not j or j.status ~= 'running' or not j.handle then return false end
+    local ok = pcall(function() j.handle:kill(15) end) -- SIGTERM
+    j.status = 'canceled'
+    j.finished_at = os.time()
+    j.message = 'Canceled'
+    return ok
 end
 
 return M

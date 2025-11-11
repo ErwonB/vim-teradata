@@ -31,7 +31,7 @@ function M.find_query_by_content()
         source = rg_command,
         sink = function(selected_line)
             local parts = vim.fn.split(selected_line, ':', true)
-            local filename = vim.fn.fnamemodify(parts[1], ':t')
+            local filename = vim.fn.fnamemodify(parts[1], ':t:r')
             ui.open_query_result_pair(filename)
         end,
         options = table.concat(fzf_options, ' '),

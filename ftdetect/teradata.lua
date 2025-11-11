@@ -18,7 +18,7 @@ vim.api.nvim_create_autocmd("FileType", {
 
         apply_regions()
 
-        vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufWritePost' }, {
+        vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufWritePost', 'TextChanged' }, {
             buffer = args.buf,
             callback = apply_regions,
             desc = 'Restrict SQL TS to marked regions in teradata buffers',
