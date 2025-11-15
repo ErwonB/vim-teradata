@@ -35,8 +35,8 @@ In lua/teradata/config.lua, some variables need to be instantiated :
 * tdpid : hostname or ip address of the TD machine
 * td_replace (optional) : list of variable that will be replaced at execution time
 
-## Plugin demo (very old version)
-![plugin demo](https://imgur.com/BPrDc3t.gif)
+## Plugin demo (including [sql-autocomplete](https://github.com/ErwonB/sql-autocomplete))
+[![asciicast](https://asciinema.org/a/tgvW6hVIY8p6oLjYQDwZIBSH4.svg)](https://asciinema.org/a/tgvW6hVIY8p6oLjYQDwZIBSH4)
 
 ## Thanks
 * Initial syntax from [this repo](https://github.com/vim-scripts/Teradata-13.10-syntax/blob/master/syntax/teradata_13_10.vim)
