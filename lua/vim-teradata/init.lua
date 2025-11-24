@@ -4,6 +4,7 @@ local bteq = require('vim-teradata.bteq')
 local ui = require('vim-teradata.ui')
 local fzf = require('vim-teradata.fzf')
 local bookmark = require('vim-teradata.bookmark')
+local ope = require('vim-teradata.td_ope')
 
 local M = {}
 
@@ -184,6 +185,38 @@ function M.setup(user_config)
             -- :TDBAdd add bookmark from selection
             vim.api.nvim_create_user_command('TDBAdd', bookmark.add_from_range, { range = true })
             vim.api.nvim_create_user_command('TDJ', ui.show_jobs, { nargs = 0 })
+            vim.api.nvim_create_user_command('TDF', ope.format_current_statement, { nargs = 0 })
+
+
+            --keymapping for code editing
+            for key, action in pairs(config.options.keymaps) do
+                local func_name
+                local args = {}
+                local description = ""
+
+                if type(action) == 'string' then
+                    func_name = action
+                    description = func_name:gsub('_', ' '):gsub('(%a)', string.upper, 1) .. " node"
+                elseif type(action) == 'table' then
+                    func_name = action[1]
+                    args = action[2] or {}
+                    description = func_name:gsub('_', ' '):gsub('(%a)', string.upper, 1) ..
+                        " surrounding " .. (args[1] or "node")
+                end
+
+                -- Create the keymap function wrapper
+                local keymap_func = function()
+                    local success, func = pcall(function() return ope[func_name] end)
+                    if success and type(func) == 'function' then
+                        func(args[1], args[2], args[3])
+                    else
+                        vim.notify('Teradata OPE function "' .. func_name .. '" not found.', vim.log.levels.WARN)
+                    end
+                end
+
+                -- Use 'n' mode for all OPE commands
+                vim.keymap.set('n', key, keymap_func, { desc = description, buffer = true })
+            end
         end
     })
 end
