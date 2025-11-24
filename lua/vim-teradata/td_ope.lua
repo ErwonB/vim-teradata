@@ -105,7 +105,9 @@ local function is_major_clause(type)
         type == "group_by" or
         type == "order_by" or
         type == "having" or
-        type == "select"
+        type == "select" or
+        type == "update" or
+        type == "temporal_modifier"
 end
 
 local function is_create_table_section(type)
@@ -198,6 +200,72 @@ format_node = function(node, buf, indent_lvl, context)
                 -- Ignore, we inject manually
             else
                 -- Comments or modifiers
+                table.insert(parts, txt)
+            end
+        end
+        return table.concat(parts, "")
+    end
+
+    -- UPDATE STATEMENT
+    if type == "update" then
+        local parts = {}
+        local inside_set = false
+
+        for child in node:iter_children() do
+            local c_type = child:type()
+            local txt = format_node(child, buf, indent_lvl)
+
+            if c_type == "keyword_update" then
+                table.insert(parts, txt)
+            elseif c_type == "keyword_set" then
+                inside_set = true
+                table.insert(parts, "\n" .. current_indent .. txt)
+            elseif c_type == "keyword_from" then
+                inside_set = false
+                table.insert(parts, "\n" .. current_indent .. txt)
+            elseif c_type == "where" then
+                inside_set = false
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl, "where"))
+            elseif c_type == "assignment" then
+                -- Handle Assignments (field = value)
+                -- If previous sibling was SET, we space it out.
+                -- If previous was a comma (which we handled by inserting a newline), we append.
+                local prev = child:prev_sibling()
+                if prev and prev:type() == "," then
+                    table.insert(parts, " " .. txt)
+                else
+                    table.insert(parts, " " .. txt)
+                end
+            elseif c_type == "," then
+                if inside_set then
+                    -- Leading comma style for SET clause
+                    table.insert(parts, "\n" .. current_indent .. INDENT_STR .. ",")
+                else
+                    -- Normal comma (likely inside table list in FROM)
+                    table.insert(parts, ",")
+                end
+            elseif c_type == "relation" then
+                -- Check if this relation is part of the FROM clause
+                local prev = child:prev_sibling()
+                if prev and prev:type() == "keyword_from" then
+                    -- First table in FROM -> Indent
+                    table.insert(parts, "\n" .. current_indent .. INDENT_STR .. txt)
+                elseif prev and prev:type() == "," then
+                    -- Subsequent tables in FROM (e.g., Implicit Joins) -> Indent + Newline
+                    -- Note: The comma logic above appends ",". We might need a newline here.
+                    -- If we aren't inside SET, the comma just printed ",".
+                    -- Let's force a newline for clarity in table lists.
+                    table.insert(parts, "\n" .. current_indent .. INDENT_STR .. txt)
+                else
+                    -- Target table (after UPDATE)
+                    table.insert(parts, " " .. txt)
+                end
+            else
+                -- Fallback for other nodes
+                local prev_part = parts[#parts]
+                if prev_part and not prev_part:match("%s$") and not prev_part:match("\n$") and c_type ~= "," then
+                    table.insert(parts, " ")
+                end
                 table.insert(parts, txt)
             end
         end
@@ -496,7 +564,17 @@ format_node = function(node, buf, indent_lvl, context)
         return table.concat(parts, "")
     end
 
-    -- 12. GENERIC FALLBACK
+    if type == "temporal_modifier" then
+        local parts = {}
+        for child in node:iter_children() do
+            local txt = get_node_text(child, buf) -- Use get_node_text to preserve case
+            table.insert(parts, txt)
+        end
+        local modifier_text = table.concat(parts, " ")
+        return modifier_text .. "\n" .. string.rep(INDENT_STR, indent_lvl)
+    end
+
+    -- GENERIC FALLBACK
     local parts = {}
     for child in node:iter_children() do
         -- CRITICAL: Pass 'context' down here so nested binary_expressions know they are in WHERE
