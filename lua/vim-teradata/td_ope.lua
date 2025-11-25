@@ -129,16 +129,36 @@ local function get_node_range_with_delimiters(target_node_type, buf)
         local prev = node:prev_sibling()
         local next = node:next_sibling()
 
-        -- Check previous sibling for comma
+        -- Check previous sibling for and/or
         if prev and (prev:type() == "keyword_and" or prev:type() == "keyword_or") then
             local cs_row, cs_col, _, _ = prev:range()
             s_row = cs_row
             s_col = cs_col
-            -- Check next sibling for comma if previous didn't match
+            -- Check next sibling for and/or if previous didn't match
         elseif next and (next:type() == "keyword_and" or next:type() == "keyword_or") then
             local _, _, ce_row, ce_col = next:range()
             e_row = ce_row
             e_col = ce_col
+        end
+
+
+        -- Edge case: only one binary_expression in WHERE
+        local parent = node:parent()
+        if parent and parent:type() == "where" then
+            local binary_count = 0
+            for child in parent:iter_children() do
+                if child:type() == "binary_expression" then
+                    binary_count = binary_count + 1
+                end
+            end
+
+            if binary_count == 1 then
+                local ws_row, ws_col, we_row, we_col = parent:range()
+                s_row = ws_row
+                s_col = ws_col
+                e_row = we_row
+                e_col = we_col
+            end
         end
     elseif target_node_type == NODE.STATEMENT then
         local next = node:next_sibling()
@@ -151,6 +171,7 @@ local function get_node_range_with_delimiters(target_node_type, buf)
 
     return s_row, s_col, e_row, e_col
 end
+
 
 --- Extract text and apply casing rules
 local function get_formatted_text(node, buf)
