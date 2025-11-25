@@ -27,6 +27,7 @@ local NODE = {
     COLUMN = "column",
     CREATE_TABLE = "create_table",
     LIST = "list",
+    LOCK = "lock_clause",
     SUBQUERY = "subquery",
     BINARY_EXPR = "binary_expression",
     SELECT_EXPR = "select_expression",
@@ -51,6 +52,7 @@ local MAJOR_CLAUSES = {
     [NODE.SELECT] = true,
     [NODE.UPDATE] = true,
     [NODE.TEMP_MODIFIER] = true,
+    [NODE.LOCK] = true,
 }
 
 local CREATE_TABLE_SECTIONS = {
@@ -336,7 +338,7 @@ local function format_merge_when(node, buf, indent_lvl, current_indent)
         else
             -- After THEN: handle UPDATE/INSERT blocks
             if c_type == "keyword_update" then
-                table.insert(parts, "\n" .. indent_then .. format_node(child, buf, indent_lvl))
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
             elseif c_type == "keyword_set" then
                 inside_set = true
                 table.insert(parts, " " .. format_node(child, buf, indent_lvl))
@@ -349,7 +351,7 @@ local function format_merge_when(node, buf, indent_lvl, current_indent)
             elseif c_type == NODE.ASSIGNMENT then
                 table.insert(parts, " " .. format_node(child, buf, indent_lvl))
             elseif c_type == "keyword_insert" then
-                table.insert(parts, "\n" .. indent_then .. format_node(child, buf, indent_lvl))
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
             elseif c_type == NODE.LIST then
                 -- Decide whether this LIST is a column list (after INSERT) or a VALUES list
                 local col_parts = {}
@@ -380,7 +382,7 @@ local function format_merge_when(node, buf, indent_lvl, current_indent)
                     current_indent .. "(\n" .. table.concat(col_parts, "") .. "\n" .. current_indent .. ")"
                 table.insert(parts, column_list_text)
             elseif c_type == "keyword_values" then
-                table.insert(parts, "\n" .. indent_then .. format_node(child, buf, indent_lvl))
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
             else
                 table.insert(parts, " " .. format_node(child, buf, indent_lvl))
             end
@@ -763,6 +765,29 @@ format_node = function(node, buf, indent_lvl, context)
             table.insert(parts, get_formatted_text(child, buf))
         end
         return table.concat(parts, " ") .. "\n" .. string.rep(INDENT_STR, indent_lvl)
+    end
+
+    if type == NODE.LOCK then
+        local parts = {}
+        local is_first_lock_keyword = true
+
+        for child in node:iter_children() do
+            local c_type = child:type()
+            local txt = get_formatted_text(child, buf)
+
+            if c_type == "keyword_lock" or c_type == "keyword_locking" then
+                if is_first_lock_keyword then
+                    table.insert(parts, txt)
+                    is_first_lock_keyword = false
+                else
+                    table.insert(parts, "\n" .. current_indent .. txt)
+                end
+            else
+                table.insert(parts, " " .. txt)
+            end
+        end
+
+        return table.concat(parts, "")
     end
 
     -- Generic Fallback
