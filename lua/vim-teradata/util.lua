@@ -88,6 +88,65 @@ function M.get_unique_query_id()
     return os.date('%Y%m%d%H%M%S_') .. math.random(1000, 9999)
 end
 
+---------------
+---tree-sitter helper
+---------------
+-- Helper: Find ancestor or self by type
+function M.find_node_by_type(start_node, target_type)
+    local node = start_node
+    while node do
+        if node:type() == target_type then
+            return node
+        end
+        node = node:parent()
+    end
+    return nil
+end
+
+--- Find the next sibling node of a specific type
+-- @param target_type string The node type to look for (e.g., "statement")
+-- @return TSNode|nil The next node of that type, or nil if not found
+function M.find_next_node_by_type(target_type)
+    local buf = vim.api.nvim_get_current_buf()
+    local current_node = vim.treesitter.get_node({ bufnr = buf })
+    if not current_node then return nil end
+
+    local node = M.find_node_by_type(current_node, target_type)
+    if not node then return nil end
+
+    local next_node = node:next_sibling()
+    while next_node do
+        if next_node:type() == target_type then
+            return next_node
+        end
+        next_node = next_node:next_sibling()
+    end
+
+    return nil
+end
+
+--- Find the previous sibling node of a specific type
+-- @param target_type string The node type to look for (e.g., "statement")
+-- @return TSNode|nil The previous node of that type, or nil if not found
+function M.find_prev_node_by_type(target_type)
+    local buf = vim.api.nvim_get_current_buf()
+    local current_node = vim.treesitter.get_node({ bufnr = buf })
+    if not current_node then return nil end
+
+    local node = M.find_node_by_type(current_node, target_type)
+    if not node then return nil end
+
+    local prev_node = node:prev_sibling()
+    while prev_node do
+        if prev_node:type() == target_type then
+            return prev_node
+        end
+        prev_node = prev_node:prev_sibling()
+    end
+
+    return nil
+end
+
 -----------------------------------------------------------------------
 -- In-memory Jobs Registry
 -----------------------------------------------------------------------

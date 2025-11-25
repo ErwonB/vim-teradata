@@ -27,7 +27,12 @@ local function run_query(args, operation, handle_result)
             '\n'
         )
     else
-        sql = vim.fn.getreg('"')
+        local buf = vim.api.nvim_get_current_buf()
+        local current_node = vim.treesitter.get_node({ bufnr = buf })
+        local stmt_node = util.find_node_by_type(current_node, "statement")
+        if stmt_node then
+            sql = vim.treesitter.get_node_text(stmt_node, buf)
+        end
     end
     if not sql or sql:match('^%s*$') then
         return vim.notify('No SQL query provided in selection or register.', vim.log.levels.WARN)

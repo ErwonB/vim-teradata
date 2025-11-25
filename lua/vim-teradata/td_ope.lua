@@ -1,3 +1,4 @@
+local util = require('vim-teradata.util')
 local M = {}
 local api = vim.api
 local ts = vim.treesitter
@@ -75,61 +76,6 @@ local function ensure_parser(buf)
     return parser
 end
 
--- Helper: Find ancestor or self by type
-local function find_node_by_type(start_node, target_type)
-    local node = start_node
-    while node do
-        if node:type() == target_type then
-            return node
-        end
-        node = node:parent()
-    end
-    return nil
-end
-
---- Find the next sibling node of a specific type
--- @param target_type string The node type to look for (e.g., "statement")
--- @return TSNode|nil The next node of that type, or nil if not found
-local function find_next_node_by_type(target_type)
-    local buf = api.nvim_get_current_buf()
-    local current_node = ts.get_node({ bufnr = buf })
-    if not current_node then return nil end
-
-    local node = find_node_by_type(current_node, target_type)
-    if not node then return nil end
-
-    local next_node = node:next_sibling()
-    while next_node do
-        if next_node:type() == target_type then
-            return next_node
-        end
-        next_node = next_node:next_sibling()
-    end
-
-    return nil
-end
-
---- Find the previous sibling node of a specific type
--- @param target_type string The node type to look for (e.g., "statement")
--- @return TSNode|nil The previous node of that type, or nil if not found
-local function find_prev_node_by_type(target_type)
-    local buf = api.nvim_get_current_buf()
-    local current_node = ts.get_node({ bufnr = buf })
-    if not current_node then return nil end
-
-    local node = find_node_by_type(current_node, target_type)
-    if not node then return nil end
-
-    local prev_node = node:prev_sibling()
-    while prev_node do
-        if prev_node:type() == target_type then
-            return prev_node
-        end
-        prev_node = prev_node:prev_sibling()
-    end
-
-    return nil
-end
 
 
 
@@ -149,7 +95,7 @@ local function get_node_range_with_delimiters(target_node_type, buf)
     local current_node = ts.get_node({ bufnr = buf })
     if not current_node then return end
 
-    local node = find_node_by_type(current_node, target_node_type)
+    local node = util.find_node_by_type(current_node, target_node_type)
     if not node then
         vim.notify("Node '" .. target_node_type .. "' not found.", LOG_LEVELS.WARN)
         return
@@ -870,7 +816,7 @@ function M.format_current_statement()
     local node = root:named_descendant_for_range(row, col, row, col)
 
     -- Traverse up to find the statement
-    node = find_node_by_type(node, NODE.STATEMENT)
+    node = util.find_node_by_type(node, NODE.STATEMENT)
 
     if not node then
         vim.notify("Cursor is not inside a valid SQL statement.", LOG_LEVELS.WARN)
@@ -980,7 +926,7 @@ end
 --- Moves cursor to the next node of the given type
 -- @param target_node_type string (e.g. "statement")
 function M.jump_to_next(target_node_type)
-    local node = find_next_node_by_type(target_node_type)
+    local node = util.find_next_node_by_type(target_node_type)
     if node then
         local r, c, _, _ = node:range()
         api.nvim_win_set_cursor(0, { r + 1, c })
@@ -992,7 +938,7 @@ end
 --- Moves cursor to the previous node of the given type
 -- @param target_node_type string (e.g. "statement")
 function M.jump_to_prev(target_node_type)
-    local node = find_prev_node_by_type(target_node_type)
+    local node = util.find_prev_node_by_type(target_node_type)
     if node then
         local r, c, _, _ = node:range()
         api.nvim_win_set_cursor(0, { r + 1, c })
