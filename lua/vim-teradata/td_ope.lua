@@ -87,6 +87,51 @@ local function find_node_by_type(start_node, target_type)
     return nil
 end
 
+--- Find the next sibling node of a specific type
+-- @param target_type string The node type to look for (e.g., "statement")
+-- @return TSNode|nil The next node of that type, or nil if not found
+local function find_next_node_by_type(target_type)
+    local buf = api.nvim_get_current_buf()
+    local current_node = ts.get_node({ bufnr = buf })
+    if not current_node then return nil end
+
+    local node = find_node_by_type(current_node, target_type)
+    if not node then return nil end
+
+    local next_node = node:next_sibling()
+    while next_node do
+        if next_node:type() == target_type then
+            return next_node
+        end
+        next_node = next_node:next_sibling()
+    end
+
+    return nil
+end
+
+--- Find the previous sibling node of a specific type
+-- @param target_type string The node type to look for (e.g., "statement")
+-- @return TSNode|nil The previous node of that type, or nil if not found
+local function find_prev_node_by_type(target_type)
+    local buf = api.nvim_get_current_buf()
+    local current_node = ts.get_node({ bufnr = buf })
+    if not current_node then return nil end
+
+    local node = find_node_by_type(current_node, target_type)
+    if not node then return nil end
+
+    local prev_node = node:prev_sibling()
+    while prev_node do
+        if prev_node:type() == target_type then
+            return prev_node
+        end
+        prev_node = prev_node:prev_sibling()
+    end
+
+    return nil
+end
+
+
 
 -- Detects whether a statement is a MERGE statement
 local function is_merge_statement(node)
@@ -929,6 +974,30 @@ function M.uncomment_node()
         end
 
         api.nvim_buf_set_text(buf, sr, sc, er, ec, lines)
+    end
+end
+
+--- Moves cursor to the next node of the given type
+-- @param target_node_type string (e.g. "statement")
+function M.jump_to_next(target_node_type)
+    local node = find_next_node_by_type(target_node_type)
+    if node then
+        local r, c, _, _ = node:range()
+        api.nvim_win_set_cursor(0, { r + 1, c })
+    else
+        vim.notify("No next " .. target_node_type .. " found.", LOG_LEVELS.INFO)
+    end
+end
+
+--- Moves cursor to the previous node of the given type
+-- @param target_node_type string (e.g. "statement")
+function M.jump_to_prev(target_node_type)
+    local node = find_prev_node_by_type(target_node_type)
+    if node then
+        local r, c, _, _ = node:range()
+        api.nvim_win_set_cursor(0, { r + 1, c })
+    else
+        vim.notify("No previous " .. target_node_type .. " found.", LOG_LEVELS.INFO)
     end
 end
 
