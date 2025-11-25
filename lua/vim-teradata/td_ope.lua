@@ -125,6 +125,21 @@ local function get_node_range_with_delimiters(target_node_type, buf)
             e_row = ce_row
             e_col = ce_col
         end
+    elseif target_node_type == NODE.BINARY_EXPR then
+        local prev = node:prev_sibling()
+        local next = node:next_sibling()
+
+        -- Check previous sibling for comma
+        if prev and (prev:type() == "keyword_and" or prev:type() == "keyword_or") then
+            local cs_row, cs_col, _, _ = prev:range()
+            s_row = cs_row
+            s_col = cs_col
+            -- Check next sibling for comma if previous didn't match
+        elseif next and (next:type() == "keyword_and" or next:type() == "keyword_or") then
+            local _, _, ce_row, ce_col = next:range()
+            e_row = ce_row
+            e_col = ce_col
+        end
     elseif target_node_type == NODE.STATEMENT then
         local next = node:next_sibling()
         if next and next:type() == ";" then
