@@ -16,6 +16,7 @@ local NODE = {
     INSERT = "insert",
     FROM = "from",
     WHERE = "where",
+    WHEN = "when_clause",
     GROUP_BY = "group_by",
     ORDER_BY = "order_by",
     HAVING = "having",
@@ -23,6 +24,7 @@ local NODE = {
     CASE = "case",
     COLUMN_DEFS = "column_definitions",
     COL_DEF = "column_definition",
+    COLUMN = "column",
     CREATE_TABLE = "create_table",
     LIST = "list",
     SUBQUERY = "subquery",
@@ -34,6 +36,8 @@ local NODE = {
     OBJECT_REF = "object_reference",
     FIELD = "field",
     INVOCATION = "invocation",
+    PAR_EXPR = "parenthesized_expression",
+    LITERAL = "literal",
     COMMENT = "comment",
     MARGINALIA = "marginalia",
 }
@@ -56,6 +60,9 @@ local CREATE_TABLE_SECTIONS = {
     ["partition_by"] = true,
 }
 
+-- Forward declaration
+local format_node
+
 -- Helper: Check if parser is available
 local function ensure_parser(buf)
     local ok, parser = pcall(ts.get_parser, buf, "sql")
@@ -76,6 +83,18 @@ local function find_node_by_type(start_node, target_type)
         node = node:parent()
     end
     return nil
+end
+
+
+-- Detects whether a statement is a MERGE statement
+local function is_merge_statement(node)
+    if not node or node:type() ~= NODE.STATEMENT then return false end
+    for child in node:iter_children() do
+        if child:type() == "keyword_merge" then
+            return true
+        end
+    end
+    return false
 end
 
 --- Selects a node and adjusts range to include delimiters (commas/semicolons)
@@ -135,7 +154,7 @@ local function get_formatted_text(node, buf)
 
         -- Exception A: Aliases (e.g., "AS z")
         local alias_nodes = parent:field("alias")
-        if #alias_nodes > 0 and alias_nodes[1]:id() == node:id() then
+        if #alias_nodes > 0 then
             -- If parent is NOT a term, it's a regular alias -> lowercase
             if ptype ~= NODE.TERM then
                 return string.lower(text)
@@ -166,8 +185,6 @@ local function get_formatted_text(node, buf)
     return text
 end
 
--- Forward declaration
-local format_node
 
 -- Specialized Formatters
 local function format_select_expression(node, buf, indent_lvl, current_indent)
@@ -247,6 +264,139 @@ local function format_update(node, buf, indent_lvl, current_indent)
     end
     return table.concat(parts, "")
 end
+
+
+-- Formats a single WHEN clause (WHEN MATCHED / WHEN NOT MATCHED ...)
+local function format_merge_when(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local indent_then = current_indent .. INDENT_STR
+    local indent_deeper = indent_then .. INDENT_STR
+    local column_list_text = ""
+
+    -- Accumulate "WHEN ..." header until keyword_then
+    local seen_then = false
+    local inside_set = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if not seen_then then
+            if c_type == "keyword_then" then
+                seen_then = true
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            elseif c_type:match("^keyword_") then
+                -- WHEN / NOT / MATCHED: append with spaces
+                local txt = format_node(child, buf, indent_lvl)
+                if #parts == 0 then
+                    -- start on the same line as base_indent already emitted by caller
+                    table.insert(parts, txt)
+                else
+                    table.insert(parts, " " .. txt)
+                end
+            else
+                -- Any predicate after WHEN (rare), append with space
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            end
+        else
+            -- After THEN: handle UPDATE/INSERT blocks
+            if c_type == "keyword_update" then
+                table.insert(parts, "\n" .. indent_then .. format_node(child, buf, indent_lvl))
+            elseif c_type == "keyword_set" then
+                inside_set = true
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            elseif c_type == "," then
+                if inside_set then
+                    table.insert(parts, "\n" .. indent_then .. ",")
+                else
+                    table.insert(parts, ",")
+                end
+            elseif c_type == NODE.ASSIGNMENT then
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            elseif c_type == "keyword_insert" then
+                table.insert(parts, "\n" .. indent_then .. format_node(child, buf, indent_lvl))
+            elseif c_type == NODE.LIST then
+                -- Decide whether this LIST is a column list (after INSERT) or a VALUES list
+                local col_parts = {}
+                local is_first_col = true
+                for col_child in child:iter_children() do
+                    if col_child:type() == NODE.COLUMN then
+                        local identifier_node = col_child:named_child(0)
+                        if identifier_node then
+                            local identifier_txt = format_node(identifier_node, buf, indent_lvl)
+                            if is_first_col then
+                                table.insert(col_parts, indent_deeper .. identifier_txt)
+                                is_first_col = false
+                            else
+                                table.insert(col_parts, "\n" .. indent_deeper .. ", " .. identifier_txt)
+                            end
+                        end
+                    elseif col_child:type() == NODE.FIELD then
+                        local identifier_txt = format_node(col_child, buf, indent_lvl)
+                        if is_first_col then
+                            table.insert(col_parts, indent_deeper .. identifier_txt)
+                            is_first_col = false
+                        else
+                            table.insert(col_parts, "\n" .. indent_deeper .. ", " .. identifier_txt)
+                        end
+                    end
+                end
+                column_list_text = "\n" ..
+                    current_indent .. "(\n" .. table.concat(col_parts, "") .. "\n" .. current_indent .. ")"
+                table.insert(parts, column_list_text)
+            elseif c_type == "keyword_values" then
+                table.insert(parts, "\n" .. indent_then .. format_node(child, buf, indent_lvl))
+            else
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+-- Formats the whole MERGE statement (detected inside a 'statement' node)
+local function format_merge(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local kw_indent = current_indent
+    local indent_1 = kw_indent .. INDENT_STR
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+        local txt = format_node(child, buf, indent_lvl)
+
+        if c_type == "keyword_merge" or c_type == "keyword_into" then
+            -- MERGE INTO ...
+            table.insert(parts, txt)
+            table.insert(parts, " ")
+        elseif c_type == NODE.OBJECT_REF or c_type == NODE.IDENTIFIER then
+            -- target table & alias
+            table.insert(parts, txt)
+            table.insert(parts, " ")
+        elseif c_type == "keyword_using" then
+            -- USING ... (start on new line)
+            table.insert(parts, "\n" .. kw_indent .. txt .. " ")
+        elseif c_type == NODE.RELATION or c_type == NODE.OBJECT_REF or c_type == NODE.SUBQUERY then
+            -- relation after USING
+            table.insert(parts, txt)
+            table.insert(parts, " ")
+        elseif c_type == "keyword_on" then
+            -- ON clause header on new line
+            table.insert(parts, "\n" .. indent_1 .. txt)
+        elseif c_type == NODE.PAR_EXPR then
+            -- predicate in parentheses appended after ON with a space
+            table.insert(parts, " " .. txt)
+        elseif c_type == NODE.WHEN then
+            -- Each WHEN clause starts on a new line at indent_1
+            table.insert(parts, "\n" .. indent_1 .. format_merge_when(child, buf, indent_lvl, indent_1))
+        else
+            -- Pass-through (punctuation like ';', comments, or other nodes)
+            table.insert(parts, txt)
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
 
 local function format_column_definitions(node, buf, indent_lvl, current_indent)
     local parts = {}
@@ -338,21 +488,21 @@ end
 
 local function format_insert(node, buf, indent_lvl, current_indent)
     local parts = {}
-    local header_parts = {}
     local column_list_text = ""
 
     for child in node:iter_children() do
         local c_type = child:type()
 
         if c_type == "keyword_insert" or c_type == "keyword_into" or c_type == NODE.OBJECT_REF then
-            table.insert(header_parts, format_node(child, buf, indent_lvl))
+            table.insert(parts, " " .. format_node(child, buf, indent_lvl))
         elseif c_type == NODE.LIST then
             local col_parts = {}
             local col_indent = string.rep(INDENT_STR, indent_lvl + 1)
             local is_first_col = true
+            local is_first_value = true
 
             for col_child in child:iter_children() do
-                if col_child:type() == "column" then
+                if col_child:type() == NODE.COLUMN then
                     local identifier_node = col_child:named_child(0)
                     if identifier_node then
                         local identifier_txt = format_node(identifier_node, buf, indent_lvl)
@@ -363,9 +513,18 @@ local function format_insert(node, buf, indent_lvl, current_indent)
                             table.insert(col_parts, "\n" .. col_indent .. ", " .. identifier_txt)
                         end
                     end
+                elseif col_child:type() == NODE.LITERAL then
+                    local literal_txt = ts.get_node_text(col_child, buf)
+                    if is_first_value then
+                        table.insert(col_parts, col_indent .. literal_txt)
+                        is_first_value = false
+                    else
+                        table.insert(col_parts, "\n" .. col_indent .. ", " .. literal_txt)
+                    end
                 end
             end
             column_list_text = "\n(\n" .. table.concat(col_parts, "") .. "\n" .. current_indent .. ")"
+            table.insert(parts, column_list_text)
         else
             local rest_txt = format_node(child, buf, indent_lvl)
             if rest_txt ~= "" and rest_txt ~= "," then
@@ -374,8 +533,6 @@ local function format_insert(node, buf, indent_lvl, current_indent)
         end
     end
 
-    table.insert(parts, 1, table.concat(header_parts, " "))
-    table.insert(parts, 2, column_list_text)
     return table.concat(parts, "")
 end
 
@@ -391,6 +548,10 @@ format_node = function(node, buf, indent_lvl, context)
 
     -- Handlers for specific node types
     if type == NODE.STATEMENT or type == NODE.SELECT then
+        if type == NODE.STATEMENT and is_merge_statement(node) then
+            return format_merge(node, buf, indent_lvl, current_indent)
+        end
+
         local parts = {}
         local is_first = true
 
