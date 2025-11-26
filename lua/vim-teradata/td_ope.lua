@@ -63,6 +63,7 @@ local CREATE_TABLE_SECTIONS = {
     ["primary_index_clause"] = true,
     ["index_definition"] = true,
     ["partition_by"] = true,
+    ["partition_by_clause"] = true,
 }
 
 -- Forward declaration
@@ -435,12 +436,19 @@ local function format_column_definitions(node, buf, indent_lvl, current_indent)
     local col_indent = string.rep(INDENT_STR, indent_lvl + 1)
     local max_name_len = 0
 
-    -- Pass 1: Calculate max length
+    -- Helper to detect if a definition is actually a PERIOD FOR clause
+    local function is_period_clause(n)
+        for child in n:iter_children() do
+            if child:type() == "keyword_period" then return true end
+        end
+        return false
+    end
+
+    -- Pass 1: Calculate max length (Skip PERIOD FOR clauses)
     for child in node:iter_children() do
-        if child:type() == NODE.COL_DEF then
+        if child:type() == NODE.COL_DEF and not is_period_clause(child) then
             local name_node = child:field("name")
             if #name_node == 0 then
-                -- Fallback for specific grammar versions
                 local first_child = child:child(0)
                 if first_child then
                     for grandchild in first_child:iter_children() do
@@ -470,45 +478,61 @@ local function format_column_definitions(node, buf, indent_lvl, current_indent)
         elseif c_type == ")" then
             table.insert(parts, "\n" .. current_indent .. ")")
         elseif c_type == NODE.COL_DEF then
-            local col_parts = {}
-            local name_txt = ""
-            local last_r, last_c = -1, -1
+            if is_period_clause(child) then
+                local period_parts = {}
+                for grandchild in child:iter_children() do
+                    table.insert(period_parts, format_node(grandchild, buf, indent_lvl + 1))
+                end
+                local line = table.concat(period_parts, " ")
 
-            for grandchild in child:iter_children() do
-                local gc_txt = format_node(grandchild, buf, indent_lvl)
-                local gc_type = grandchild:type()
-                local _, _, er, ec = grandchild:range()
-                last_r, last_c = er, ec
-
-                if gc_type == NODE.IDENTIFIER and name_txt == "" then
-                    name_txt = gc_txt
+                if is_first_col then
+                    table.insert(parts, col_indent .. " " .. line)
+                    is_first_col = false
                 else
-                    table.insert(col_parts, gc_txt)
+                    table.insert(parts, "\n" .. col_indent .. ", " .. line)
                 end
-            end
-
-            -- Capture missing text (whitespace/modifiers not in tree explicitly)
-            local _, _, parent_er, parent_ec = child:range()
-            if last_r ~= -1 and (parent_ec > last_c or parent_er > last_r) then
-                local missing_text = api.nvim_buf_get_text(buf, last_r, last_c, parent_er, parent_ec, {})
-                local joined = table.concat(missing_text, " ")
-                if joined:match("%S") then
-                    table.insert(col_parts, joined)
-                end
-            end
-
-            local padding = ""
-            if max_name_len > 0 then
-                padding = string.rep(" ", max_name_len - #name_txt)
-            end
-
-            local final_line = name_txt .. padding .. " " .. table.concat(col_parts, " ")
-
-            if is_first_col then
-                table.insert(parts, col_indent .. " " .. final_line)
-                is_first_col = false
             else
-                table.insert(parts, "\n" .. col_indent .. ", " .. final_line)
+                -- STANDARD COLUMN ALIGNMENT LOGIC
+                local col_parts = {}
+                local name_txt = ""
+                local last_r, last_c = -1, -1
+
+                for grandchild in child:iter_children() do
+                    local gc_txt = format_node(grandchild, buf, indent_lvl)
+                    local gc_type = grandchild:type()
+                    local _, _, er, ec = grandchild:range()
+                    last_r, last_c = er, ec
+
+                    if gc_type == NODE.IDENTIFIER and name_txt == "" then
+                        name_txt = gc_txt
+                    else
+                        table.insert(col_parts, gc_txt)
+                    end
+                end
+
+                -- Capture missing text
+                local _, _, parent_er, parent_ec = child:range()
+                if last_r ~= -1 and (parent_ec > last_c or parent_er > last_r) then
+                    local missing_text = api.nvim_buf_get_text(buf, last_r, last_c, parent_er, parent_ec, {})
+                    local joined = table.concat(missing_text, " ")
+                    if joined:match("%S") then
+                        table.insert(col_parts, joined)
+                    end
+                end
+
+                local padding = ""
+                if max_name_len > 0 then
+                    padding = string.rep(" ", max_name_len - #name_txt)
+                end
+
+                local final_line = name_txt .. padding .. " " .. table.concat(col_parts, " ")
+
+                if is_first_col then
+                    table.insert(parts, col_indent .. " " .. final_line)
+                    is_first_col = false
+                else
+                    table.insert(parts, "\n" .. col_indent .. ", " .. final_line)
+                end
             end
         elseif c_type == NODE.CONSTRAINTS then
             for constraint_node in child:iter_children() do
@@ -582,7 +606,7 @@ format_node = function(node, buf, indent_lvl, context)
     local current_indent = string.rep(INDENT_STR, indent_lvl)
 
     -- Base case: Leaf nodes
-    if node:child_count() == 0 then
+    if node:child_count() == 0 or type == NODE.LITERAL then
         return get_formatted_text(node, buf)
     end
 
@@ -811,6 +835,23 @@ format_node = function(node, buf, indent_lvl, context)
 
         local result = table.concat(parts, "")
         return result
+    end
+
+    if type == "partition_by_clause" then
+        local parts = {}
+        for child in node:iter_children() do
+            local c_type = child:type()
+            local txt = format_node(child, buf, indent_lvl)
+
+            if c_type == "keyword_partition" then
+                table.insert(parts, txt)
+            elseif c_type == "keyword_by" then
+                table.insert(parts, " " .. txt)
+            else
+                table.insert(parts, "\n" .. current_indent .. INDENT_STR .. format_node(child, buf, indent_lvl + 1))
+            end
+        end
+        return table.concat(parts, "")
     end
 
     -- Generic Fallback
