@@ -26,6 +26,8 @@ local NODE = {
     COLUMN_DEFS = "column_definitions",
     COL_DEF = "column_definition",
     COLUMN = "column",
+    CONSTRAINTS = "constraints",
+    CONSTRAINT = "constraint",
     CREATE_TABLE = "create_table",
     LIST = "list",
     LOCK = "lock_clause",
@@ -508,6 +510,15 @@ local function format_column_definitions(node, buf, indent_lvl, current_indent)
             else
                 table.insert(parts, "\n" .. col_indent .. ", " .. final_line)
             end
+        elseif c_type == NODE.CONSTRAINTS then
+            for constraint_node in child:iter_children() do
+                if constraint_node:type() == NODE.CONSTRAINT then
+                    local constraint_text = format_node(constraint_node, buf, indent_lvl + 1)
+                    constraint_text = constraint_text:gsub("^%s*", col_indent .. ", ")
+                    constraint_text = constraint_text:gsub("\n%s*", "\n" .. col_indent .. "  ")
+                    table.insert(parts, "\n" .. constraint_text)
+                end
+            end
         elseif c_type:match("comment") then
             table.insert(parts, " " .. format_node(child, buf, indent_lvl))
         end
@@ -779,6 +790,27 @@ format_node = function(node, buf, indent_lvl, context)
         end
 
         return table.concat(parts, "")
+    end
+
+    if type == NODE.CONSTRAINT then
+        local parts = {}
+        local indent = string.rep(INDENT_STR, indent_lvl + 1)
+
+        for child in node:iter_children() do
+            local c_type = child:type()
+            local txt = format_node(child, buf, indent_lvl + 1)
+
+            if c_type == NODE.BINARY_EXPR then
+                local expr = format_node(child, buf, indent_lvl + 2)
+                expr = expr:gsub("\n", "\n" .. indent .. "   ")
+                table.insert(parts, expr)
+            else
+                table.insert(parts, " " .. txt)
+            end
+        end
+
+        local result = table.concat(parts, "")
+        return result
     end
 
     -- Generic Fallback
