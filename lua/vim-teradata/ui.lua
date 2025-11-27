@@ -98,7 +98,7 @@ function M.display_output(file_path, query_id)
         end
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
-        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter'
+        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort'
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
         vim.api.nvim_buf_set_extmark(
@@ -198,6 +198,51 @@ function M.display_output(file_path, query_id)
         vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(all_data))
         populate_buffer()
         vim.notify("Filters reset.", vim.log.levels.INFO)
+    end, { buffer = bufnr, silent = true, nowait = true })
+
+    local function sort_column(ascending)
+        -- local lnum = vim.fn.line('.')
+        -- if lnum == 2 then return end
+
+        local col_idx = get_column_from_cursor()
+        if not col_idx then return end
+
+        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+
+        table.sort(displayed_data, function(a, b)
+            local val_a = a[col_idx] or ""
+            local val_b = b[col_idx] or ""
+
+            local num_a = tonumber(val_a)
+            local num_b = tonumber(val_b)
+
+            if num_a and num_b then
+                if ascending then
+                    return num_a < num_b
+                else
+                    return num_a > num_b
+                end
+            end
+
+            if ascending then
+                return val_a < val_b
+            else
+                return val_a > val_b
+            end
+        end)
+
+        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
+        populate_buffer()
+        local dir = ascending and "ascending" or "descending"
+        vim.notify("Sorted column " .. col_idx .. " " .. dir, vim.log.levels.INFO)
+    end
+
+    vim.keymap.set('n', '<Up>', function()
+        sort_column(true)
+    end, { buffer = bufnr, silent = true, nowait = true })
+
+    vim.keymap.set('n', '<Down>', function()
+        sort_column(false)
     end, { buffer = bufnr, silent = true, nowait = true })
 
     populate_buffer()
