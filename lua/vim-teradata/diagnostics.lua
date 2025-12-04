@@ -141,6 +141,7 @@ local QUERIES = {
     alias_use = parse_query("sql",
         [[ (select_expression (term value: (field (object_reference name: (identifier) @alias_usage)))) ]]),
     union_select = parse_query("sql", [[ (set_operation (select (select_expression) @select_expr)) ]]),
+    union_block = parse_query("sql", [[ (set_operation) @union_block ]]),
     relation = parse_query("sql", [[ (relation) @relation ]]),
     statement = parse_query("sql", [[ (statement) @stmt ]]),
 
@@ -293,38 +294,48 @@ local function get_columns_from_select_expr(expr_node, bufnr)
     return number_fields, cols
 end
 
+
 local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
-    local select_exprs = {}
-    for _, node in QUERIES.union_select:iter_captures(stmt_node, bufnr, 0, -1) do
-        table.insert(select_exprs, node)
-    end
+    for _, union_node in QUERIES.union_block:iter_captures(stmt_node, bufnr, 0, -1) do
+        local select_exprs = {}
+        for _, node in QUERIES.union_select:iter_captures(union_node, bufnr, 0, -1) do
+            table.insert(select_exprs, node)
+        end
 
-    if #select_exprs < 2 then return end
+        if #select_exprs < 2 then goto continue end
 
-    local first_number_fields, first_cols = get_columns_from_select_expr(select_exprs[1], bufnr)
-    if first_number_fields == 0 then return end
+        local first_number_fields, first_cols = get_columns_from_select_expr(select_exprs[1], bufnr)
+        if first_number_fields == 0 then goto continue end
 
-    for i = 2, #select_exprs do
-        local current_number_fields, current_cols = get_columns_from_select_expr(select_exprs[i], bufnr)
+        for i = 2, #select_exprs do
+            local current_number_fields, current_cols = get_columns_from_select_expr(select_exprs[i], bufnr)
 
-        if first_number_fields ~= current_number_fields then
-            local msg = string.format("UNION: expected %d columns but got %d in SELECT #%d", #first_cols, #current_cols,
-                i)
-            for _, col_info in ipairs(current_cols) do
-                add_diagnostic(diagnostics, col_info.node, bufnr, SEVERITY.ERROR, msg)
-            end
-        else
-            for j, col_info in ipairs(current_cols) do
-                local expected = first_cols[j].name
-                if col_info.name:upper() ~= expected:upper() then
-                    local msg = string.format('UNION column %d: "%s" does not match first SELECT\'s "%s"', j,
-                        col_info.name, expected)
-                    add_diagnostic(diagnostics, col_info.node, bufnr, SEVERITY.WARN, msg)
+            if first_number_fields ~= current_number_fields then
+                local msg = string.format(
+                    "UNION: expected %d columns but got %d in SELECT #%d",
+                    #first_cols, #current_cols, i
+                )
+                for _, col_info in ipairs(current_cols) do
+                    add_diagnostic(diagnostics, col_info.node, bufnr, SEVERITY.ERROR, msg)
+                end
+            else
+                for j, col_info in ipairs(current_cols) do
+                    local expected = first_cols[j].name
+                    if col_info.name:upper() ~= expected:upper() then
+                        local msg = string.format(
+                            'UNION column %d: "%s" does not match first SELECT\'s "%s"',
+                            j, col_info.name, expected
+                        )
+                        add_diagnostic(diagnostics, col_info.node, bufnr, SEVERITY.WARN, msg)
+                    end
                 end
             end
         end
+
+        ::continue::
     end
 end
+
 
 -- =============================================================================
 -- Logic: Schema Analysis (Scoped with boundary check)
