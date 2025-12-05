@@ -716,7 +716,7 @@ function M.refresh_jobs_if_open()
     vim.bo[bufnr].modifiable = true
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     local ns = vim.api.nvim_create_namespace("HelperBuffer")
-    local ext = '<Enter> Open  <k> Cancel  <d> Remove'
+    local ext = '<Enter> Open  <x> Cancel  <d> Remove'
     vim.api.nvim_buf_set_extmark(bufnr, ns, #lines - 1, 0, { virt_text = { { ext, "Comment" } }, virt_text_pos = "eol" })
     vim.bo[bufnr].modifiable = false
 end
@@ -765,8 +765,8 @@ function M.show_jobs()
         end
     end, { buffer = true, silent = true })
 
-    -- k cancel
-    vim.keymap.set('n', 'k', function()
+    -- x cancel
+    vim.keymap.set('n', 'x', function()
         local l = vim.fn.line('.')
         local id = line_to_id[l]
         if not id then return end
