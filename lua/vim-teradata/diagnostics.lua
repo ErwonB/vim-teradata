@@ -1,4 +1,5 @@
 local util = require('vim-teradata.util')
+local utils = require('sql-autocomplete.utils')
 local M = {}
 
 -- =============================================================================
@@ -19,114 +20,30 @@ local SEVERITY = {
 -- Schema Loading & Caching
 -- =============================================================================
 
-local Schema = {
-    cache = {
-        databases = {},
-        tables = {},
-        loaded = false
-    },
-    loading = false,
-    callbacks = {},
-    config = nil
-}
-
-local function background_parser(path)
-    local function clean(str)
-        return str:gsub("%s+", ""):upper()
-    end
-
-    local dbs = {}
-    local tables = {}
-
-    local db_file = io.open(path .. "/data.csv", "r")
-    if db_file then
-        for line in db_file:lines() do
-            local db_name = line:match("([^,]+)")
-            if db_name then
-                db_name = clean(db_name)
-                dbs[db_name] = true
-                tables[db_name] = {}
-            end
-        end
-        db_file:close()
-    end
-
-    for db_name, _ in pairs(dbs) do
-        local t_file = io.open(path .. "/" .. db_name .. ".csv", "r")
-        if t_file then
-            for line in t_file:lines() do
-                local t_name, f_name = line:match("([^,]+),(.+)")
-                if t_name and f_name then
-                    t_name = clean(t_name)
-                    f_name = clean(f_name)
-
-                    if not tables[db_name][t_name] then
-                        tables[db_name][t_name] = {}
-                    end
-                    tables[db_name][t_name][f_name] = true
-                end
-            end
-            t_file:close()
-        end
-    end
-
-    return vim.json.encode({ dbs = dbs, tables = tables })
+local function normalize(str)
+    return str:upper()
 end
 
-local work_handler = vim.uv.new_work(background_parser, function(json_result)
-    Schema.loading = false
-    if not json_result then return end
-
-    local ok, data = pcall(vim.json.decode, json_result)
-    if not ok or not data then
-        vim.notify("Schema Load Error: Failed to decode JSON", vim.log.levels.ERROR)
-        return
-    end
-
-    Schema.cache.databases = data.dbs
-    Schema.cache.tables = data.tables
-    Schema.cache.loaded = true
-    for _, callback in ipairs(Schema.callbacks) do
-        pcall(callback)
-    end
-
-    Schema.callbacks = {}
-end)
-
-function Schema.get_path()
-    if not Schema.config then
-        local ok, config = pcall(require, "sql-autocomplete.config")
-        if ok and config and config.options then
-            Schema.config = config.options
-        else
-            return nil
-        end
-    end
-    local dir = Schema.config.data_dir
-    local sub = Schema.config.data_completion_dir
-    if dir and sub then
-        return dir:gsub("/+$", "") .. "/" .. sub:gsub("^/+", "")
-    end
-    return nil
+local function normalize_col(str)
+    return str:gsub("%s+$", ""):upper()
 end
 
-function Schema.load_async(on_complete)
-    if Schema.cache.loaded then
-        if on_complete then on_complete() end
-        return
-    end
+local function has_db(db_name)
+    return utils.is_a_db(db_name)
+end
 
-    if on_complete then
-        table.insert(Schema.callbacks, on_complete)
-    end
+local function has_table(db, tb)
+    local db_norm = normalize(db)
+    local tb_norm = normalize(tb)
+    return utils.is_a_table(db_norm, tb_norm)
+end
 
-    if not Schema.loading then
-        local path = Schema.get_path()
-        if path then
-            Schema.loading = true
-            work_handler:queue(path)
-        end
-    end
+
+local function has_column(db, tb, col)
+    local db_norm = normalize(db)
+    local tb_norm = normalize(tb)
+    local col_norm = normalize_col(col)
+    return utils.is_a_column(db_norm, tb_norm, col_norm)
 end
 
 -- =============================================================================
@@ -145,7 +62,6 @@ local QUERIES = {
     relation = parse_query("sql", [[ (relation) @relation ]]),
     statement = parse_query("sql", [[ (statement) @stmt ]]),
 
-    -- New: Capture output aliases in the SELECT clause (e.g. "col AS alias")
     select_output_alias = parse_query("sql", [[
     (select_expression
       (term
@@ -294,7 +210,6 @@ local function get_columns_from_select_expr(expr_node, bufnr)
     return number_fields, cols
 end
 
-
 local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
     for _, union_node in QUERIES.union_block:iter_captures(stmt_node, bufnr, 0, -1) do
         local select_exprs = {}
@@ -321,7 +236,7 @@ local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
             else
                 for j, col_info in ipairs(current_cols) do
                     local expected = first_cols[j].name
-                    if col_info.name:upper() ~= expected:upper() then
+                    if normalize(expected) ~= normalize(col_info.name) then
                         local msg = string.format(
                             'UNION column %d: "%s" does not match first SELECT\'s "%s"',
                             j, col_info.name, expected
@@ -336,7 +251,6 @@ local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
     end
 end
 
-
 -- =============================================================================
 -- Logic: Schema Analysis (Scoped with boundary check)
 -- =============================================================================
@@ -344,6 +258,8 @@ end
 local function analyze_relations(scope_nodes, bufnr, diagnostics)
     local relation_map = {}
     local active_tables_list = {}
+    local temp_rels = {}
+    local has_unqualified = false
 
     for _, node in ipairs(scope_nodes) do
         for _, rel_node in QUERIES.relation:iter_captures(node, bufnr, 0, -1) do
@@ -374,64 +290,79 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics)
                 end
 
                 local db_name, table_name
-                local is_valid = true
-
                 if #parts == 2 then
-                    db_name = util.replace_env_vars(parts[1]:upper()):upper()
-                    table_name = parts[2]:upper()
+                    db_name = util.replace_env_vars(parts[1]):upper()
+                    table_name = parts[2]
                 elseif #parts == 1 then
-                    table_name = parts[1]:upper()
+                    table_name = parts[1]
                 end
 
-                if Schema.cache.loaded then
-                    if db_name and not Schema.cache.databases[db_name] then
-                        add_diagnostic(diagnostics, obj_ref, bufnr, SEVERITY.ERROR,
-                            'Unknown database: "' .. db_name .. '"')
-                        is_valid = false
-                    elseif table_name then
-                        if db_name then
-                            if not (Schema.cache.tables[db_name] and Schema.cache.tables[db_name][table_name]) then
-                                add_diagnostic(diagnostics, obj_ref, bufnr, SEVERITY.ERROR,
-                                    'Table "' .. table_name .. '" not found in ' .. db_name)
-                                is_valid = false
-                            end
-                        else
-                            local found = false
-                            for _, tables in pairs(Schema.cache.tables) do
-                                if tables[table_name] then
-                                    found = true; break
-                                end
-                            end
-                            if not found then
-                                add_diagnostic(diagnostics, obj_ref, bufnr, SEVERITY.ERROR,
-                                    'Unknown table: "' .. table_name .. '"')
-                                is_valid = false
-                            end
-                        end
-                    end
-                end
+                local alias_node = rel_node:field("alias")[1]
+                local alias = alias_node and get_text(alias_node, bufnr)
 
-                if is_valid and table_name then
-                    local alias_node = rel_node:field("alias")[1]
-                    local alias = alias_node and get_text(alias_node, bufnr):upper()
-                    local def = { db = db_name, table = table_name, derived = false }
+                local def = { db = db_name, table = table_name, derived = false }
 
-                    if alias then relation_map[alias] = def end
-                    relation_map[table_name] = def
-                    table.insert(active_tables_list, def)
-                end
+                table.insert(temp_rels, { def = def, node = obj_ref, alias = alias })
             elseif is_derived then
                 local alias_node = rel_node:field("alias")[1]
                 if alias_node then
-                    local alias = get_text(alias_node, bufnr):upper()
-                    relation_map[alias] = { derived = true }
+                    local alias = get_text(alias_node, bufnr)
+                    relation_map[normalize(alias)] = { derived = true }
                 end
             end
 
             ::continue::
         end
     end
-    return relation_map, active_tables_list
+
+    local used_dbs = {}
+    for _, item in ipairs(temp_rels) do
+        if item.def.db then
+            used_dbs[item.def.db] = true
+        end
+    end
+
+    for _, item in ipairs(temp_rels) do
+        local def = item.def
+        local node = item.node
+        local alias = item.alias
+        local is_valid = true
+
+        if def.db then
+            if not has_db(def.db) then
+                add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR, 'Unknown database: "' .. def.db .. '"')
+                is_valid = false
+            else
+                if not has_table(def.db, def.table) then
+                    add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR,
+                        'Table "' .. def.table .. '" not found in ' .. def.db)
+                    is_valid = false
+                end
+            end
+        else
+            has_unqualified = true
+            local found = false
+            for db in pairs(used_dbs) do
+                if has_table(db, def.table) then
+                    found = true
+                    break
+                end
+            end
+            if next(used_dbs) ~= nil and not found then
+                add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR,
+                    'Unknown table: "' .. def.table .. '" (not found in used databases)')
+                is_valid = false
+            end
+        end
+
+        if is_valid then
+            relation_map[normalize(def.table)] = def
+            if alias then relation_map[normalize(alias)] = def end
+            table.insert(active_tables_list, def)
+        end
+    end
+
+    return relation_map, active_tables_list, has_unqualified
 end
 
 -- Capture output aliases (AS xxx) from the SELECT list to treat them as valid columns
@@ -442,7 +373,7 @@ local function get_output_aliases(scope_nodes, bufnr)
             if not is_nested_in_subquery(alias_node, node) then
                 local text = get_text(alias_node, bufnr)
                 if text then
-                    output_aliases[text:upper()] = true
+                    output_aliases[normalize(text)] = true
                 end
             end
         end
@@ -450,8 +381,9 @@ local function get_output_aliases(scope_nodes, bufnr)
     return output_aliases
 end
 
-local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagnostics)
-    if not Schema.cache.loaded then return end
+local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagnostics, has_unqualified)
+    if has_unqualified then return end
+
     if #active_tables < 2 then return end
 
     for _, node in ipairs(scope_nodes) do
@@ -467,7 +399,7 @@ local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagno
             end
 
             if not is_qualified then
-                local col_name = get_text(col_node, bufnr):upper()
+                local col_name = get_text(col_node, bufnr)
                 local found_in = {}
 
                 for _, rel in ipairs(active_tables) do
@@ -478,15 +410,7 @@ local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagno
                     local has_col = false
 
                     if d_name then
-                        if Schema.cache.tables[d_name] and Schema.cache.tables[d_name][t_name] and Schema.cache.tables[d_name][t_name][col_name] then
-                            has_col = true
-                        end
-                    else
-                        for _, db_tables in pairs(Schema.cache.tables) do
-                            if db_tables[t_name] and db_tables[t_name][col_name] then
-                                has_col = true; break
-                            end
-                        end
+                        has_col = has_column(d_name, t_name, col_name)
                     end
 
                     if has_col then table.insert(found_in, t_name) end
@@ -504,14 +428,9 @@ local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagno
     end
 end
 
-local function check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics)
-    if not Schema.cache.loaded then return end
-
-    -- New: Get list of output aliases (e.g. "select a AS b") to whitelist "b" in this scope
-    local output_aliases = get_output_aliases(scope_nodes, bufnr)
-
+local function check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified,
+                                    output_aliases)
     for _, node in ipairs(scope_nodes) do
-        -- 1. Qualified Fields
         for _, field_node in QUERIES.qualified_field:iter_captures(node, bufnr, 0, -1) do
             if is_nested_in_subquery(field_node, node) then goto continue end
 
@@ -527,25 +446,16 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             end
 
             if qualifier_node and col_node then
-                local qualifier = get_text(qualifier_node, bufnr):upper()
-                local col_name = get_text(col_node, bufnr):upper()
-                local rel_def = relation_map[qualifier]
+                local qualifier = get_text(qualifier_node, bufnr)
+                local col_name = get_text(col_node, bufnr)
+                local rel_def = relation_map[normalize(qualifier)]
 
                 if rel_def then
                     if rel_def.derived then goto continue end
 
                     local found = false
                     if rel_def.db then
-                        local db_tables = Schema.cache.tables[rel_def.db]
-                        if db_tables and db_tables[rel_def.table] and db_tables[rel_def.table][col_name] then
-                            found = true
-                        end
-                    else
-                        for _, db_tables in pairs(Schema.cache.tables) do
-                            if db_tables[rel_def.table] and db_tables[rel_def.table][col_name] then
-                                found = true; break
-                            end
-                        end
+                        found = has_column(rel_def.db, rel_def.table, col_name)
                     end
 
                     if not found then
@@ -557,7 +467,6 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             ::continue::
         end
 
-        -- 2. Bare Fields
         for _, col_node in QUERIES.bare_field:iter_captures(node, bufnr, 0, -1) do
             if is_nested_in_subquery(col_node, node) then goto continue end
 
@@ -578,39 +487,33 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             end
 
             if not is_qualified and #active_tables > 0 and not has_derived then
-                local col_name = get_text(col_node, bufnr):upper()
+                local col_name = get_text(col_node, bufnr)
+                local col_norm = normalize_col(col_name)
 
-                -- Check if it's an output alias (whitelisted)
-                if output_aliases[col_name] then goto continue end
+                if output_aliases[col_norm] then goto continue end
 
                 local found_anywhere = false
                 local searched_in = {}
 
                 for _, rel in ipairs(active_tables) do
                     if not rel.derived then
-                        table.insert(searched_in, rel.table)
                         local t_name = rel.table
                         local d_name = rel.db
-
+                        table.insert(searched_in, d_name and (d_name .. "." .. t_name) or ("unqualified." .. t_name))
+                        local has_col = false
                         if d_name then
-                            if Schema.cache.tables[d_name] and Schema.cache.tables[d_name][t_name] and Schema.cache.tables[d_name][t_name][col_name] then
-                                found_anywhere = true
-                            end
-                        else
-                            for _, db_tables in pairs(Schema.cache.tables) do
-                                if db_tables[t_name] and db_tables[t_name][col_name] then
-                                    found_anywhere = true; break
-                                end
-                            end
+                            has_col = has_column(d_name, t_name, col_name)
                         end
+                        if has_col then found_anywhere = true end
                     end
-                    if found_anywhere then break end
                 end
 
                 if not found_anywhere and #searched_in > 0 then
-                    local tables_str = table.concat(searched_in, ", ")
-                    add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
-                        string.format('Column "%s" not found in any active table (%s)', col_name, tables_str))
+                    if not has_unqualified then
+                        local tables_str = table.concat(searched_in, ", ")
+                        add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
+                            string.format('Column "%s" not found in any active table (%s)', col_name, tables_str))
+                    end
                 end
             end
             ::continue::
@@ -624,7 +527,7 @@ local function check_undefined_alias(scope_nodes, bufnr, diagnostics)
         for _, cap in QUERIES.alias_def:iter_captures(node, bufnr, 0, -1) do
             if not is_nested_in_subquery(cap, node) then
                 local text = get_text(cap, bufnr)
-                if text then defined_aliases[text:upper()] = true end
+                if text then defined_aliases[normalize(text)] = true end
             end
         end
     end
@@ -633,7 +536,7 @@ local function check_undefined_alias(scope_nodes, bufnr, diagnostics)
         for _, cap in QUERIES.alias_use:iter_captures(node, bufnr, 0, -1) do
             if not is_nested_in_subquery(cap, node) then
                 local text = get_text(cap, bufnr)
-                if text and not defined_aliases[text:upper()] then
+                if text and not defined_aliases[normalize(text)] then
                     add_diagnostic(diagnostics, cap, bufnr, SEVERITY.ERROR,
                         'Alias "' .. text .. '" does not exist in query')
                 end
@@ -710,9 +613,11 @@ local function process_statement(stmt_node, bufnr, diagnostics)
     local scopes = get_query_scopes(stmt_node)
 
     for _, scope_nodes in ipairs(scopes) do
-        local relation_map, active_tables = analyze_relations(scope_nodes, bufnr, diagnostics)
-        check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics)
-        check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagnostics)
+        local relation_map, active_tables, has_unqualified = analyze_relations(scope_nodes, bufnr, diagnostics)
+        local output_aliases = get_output_aliases(scope_nodes, bufnr)
+        check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified,
+            output_aliases)
+        check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagnostics, has_unqualified)
         check_undefined_alias(scope_nodes, bufnr, diagnostics)
     end
 end
@@ -723,16 +628,6 @@ end
 
 function M.update_diagnostics(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-    if not Schema.cache.loaded then
-        Schema.load_async(function()
-            vim.schedule(function()
-                if vim.api.nvim_buf_is_valid(bufnr) then
-                    M.update_diagnostics(bufnr)
-                end
-            end)
-        end)
-    end
 
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "sql")
     if not ok or not parser then return end
