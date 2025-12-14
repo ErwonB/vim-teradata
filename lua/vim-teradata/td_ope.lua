@@ -917,6 +917,18 @@ function M.format_current_statement()
     end
 end
 
+--- copy the nearest ancestor node matching the given type
+-- @param target_node_type string
+function M.copy_node(target_node_type)
+    local buf = api.nvim_get_current_buf()
+    local s_row, s_col, e_row, e_col = get_node_range_with_delimiters(target_node_type, buf)
+    if s_row and s_col and e_row and e_col then
+        local lines = vim.api.nvim_buf_get_text(buf, s_row, s_col, e_row, e_col, {})
+        local text = table.concat(lines, '\n')
+        vim.fn.setreg('"', text)
+    end
+end
+
 --- Deletes the nearest ancestor node matching the given type
 -- @param target_node_type string
 function M.delete_node(target_node_type)
