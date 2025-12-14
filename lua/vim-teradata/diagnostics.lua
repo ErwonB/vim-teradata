@@ -61,6 +61,12 @@ local QUERIES = {
     union_block = parse_query("sql", [[ (set_operation) @union_block ]]),
     relation = parse_query("sql", [[ (relation) @relation ]]),
     statement = parse_query("sql", [[ (statement) @stmt ]]),
+    cte_def = parse_query("sql", [[
+        (cte
+            (identifier) @cte_name
+            (statement) @cte_body
+        ) @cte
+    ]]),
 
     select_output_alias = parse_query("sql", [[
     (select_expression
@@ -152,12 +158,15 @@ local function get_syntax_error_message(err_node, bufnr)
     return "Syntax error."
 end
 
---- Checks if a captured node is actually inside a nested subquery
+--- Checks if a captured node is actually inside a nested subquery or set operation
+--- This prevents the outer scope (e.g. INSERT statement) from seeing tables inside the UNION parts
 local function is_nested_in_subquery(node, root_container)
     local parent = node:parent()
     while parent do
         if parent == root_container then return false end
-        if parent:type() == "subquery" then return true end
+        local type = parent:type()
+        -- Treat set_operation as a boundary just like subquery
+        if type == "subquery" or type == "set_operation" then return true end
         parent = parent:parent()
     end
     return false
@@ -252,10 +261,64 @@ local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
 end
 
 -- =============================================================================
+-- Logic: CTE Analysis
+-- =============================================================================
+
+--- Extracts CTE definitions (name and output columns) from a statement node.
+--- @param stmt_node TSNode The root statement node (which may contain a WITH clause).
+--- @param bufnr number The buffer number.
+--- @return table A map of normalized CTE name to its definition.
+local function get_cte_definitions(stmt_node, bufnr)
+    local cte_defs = {}
+
+    for _, cte_def_match, _ in QUERIES.cte_def:iter_matches(stmt_node, bufnr, 0, -1) do
+        local cte_name_node
+        local cte_body_node
+        for capid, n in pairs(cte_def_match) do
+            if QUERIES.cte_def.captures[capid] == "cte_name" then cte_name_node = n[1] end
+            if QUERIES.cte_def.captures[capid] == "cte_body" then cte_body_node = n[1] end
+        end
+
+        local cte_name = get_text(cte_name_node, bufnr)
+
+        if cte_name and cte_body_node then
+            local select_node = nil
+            for child in cte_body_node:iter_children() do
+                if child:type() == "select" then
+                    select_node = child
+                    break
+                end
+            end
+
+            if not select_node then return cte_defs end
+            local select_expr = nil
+            for child in select_node:iter_children() do
+                if child:type() == "select_expression" then
+                    select_expr = child
+                    break
+                end
+            end
+
+            local cols = {}
+            if select_expr then
+                _, cols = get_columns_from_select_expr(select_expr, bufnr)
+            end
+
+            cte_defs[normalize(cte_name)] = {
+                name = cte_name,
+                columns = cols,
+                node = cte_name_node,
+            }
+        end
+    end
+    return cte_defs
+end
+
+-- =============================================================================
 -- Logic: Schema Analysis (Scoped with boundary check)
 -- =============================================================================
 
-local function analyze_relations(scope_nodes, bufnr, diagnostics)
+local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
     local relation_map = {}
     local active_tables_list = {}
     local temp_rels = {}
@@ -339,23 +402,35 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics)
                     is_valid = false
                 end
             end
-        else
-            has_unqualified = true
-            local found = false
-            for db in pairs(used_dbs) do
-                if has_table(db, def.table) then
-                    found = true
-                    break
+        else -- Unqualified table/alias
+            local cte_def = cte_defs[normalize(def.table)]
+
+            if cte_def then
+                -- It's a CTE. Mark as derived/CTE and add columns.
+                def.derived = true
+                def.is_cte = true -- Custom flag to distinguish CTE from generic derived
+                def.columns = cte_def.columns
+                is_valid = true   -- It's a valid reference.
+            else
+                -- Not a CTE, so it must be an unqualified base table.
+                has_unqualified = true
+                local found = false
+                for db in pairs(used_dbs) do
+                    if has_table(db, def.table) then
+                        found = true
+                        break
+                    end
                 end
-            end
-            if next(used_dbs) ~= nil and not found then
-                add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR,
-                    'Unknown table: "' .. def.table .. '" (not found in used databases)')
-                is_valid = false
+                if next(used_dbs) ~= nil and not found then
+                    add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR,
+                        'Unknown table: "' .. def.table .. '" (not found in used databases)')
+                    is_valid = false
+                end
             end
         end
 
         if is_valid then
+            -- Note: 'def' is now either a valid base table OR a valid CTE definition.
             relation_map[normalize(def.table)] = def
             if alias then relation_map[normalize(alias)] = def end
             table.insert(active_tables_list, def)
@@ -403,13 +478,22 @@ local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagno
                 local found_in = {}
 
                 for _, rel in ipairs(active_tables) do
-                    if rel.derived then goto next_rel end
+                    if rel.derived and not rel.is_cte then goto next_rel end
 
                     local t_name = rel.table
                     local d_name = rel.db
                     local has_col = false
 
-                    if d_name then
+                    if rel.is_cte then
+                        -- Check column in CTE
+                        for _, cte_col in ipairs(rel.columns) do
+                            if normalize_col(cte_col.name) == normalize_col(col_name) then
+                                has_col = true
+                                break
+                            end
+                        end
+                    elseif d_name then
+                        -- Check column in base table
                         has_col = has_column(d_name, t_name, col_name)
                     end
 
@@ -448,19 +532,28 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             if qualifier_node and col_node then
                 local qualifier = get_text(qualifier_node, bufnr)
                 local col_name = get_text(col_node, bufnr)
+                local col_norm = normalize_col(col_name)
                 local rel_def = relation_map[normalize(qualifier)]
 
                 if rel_def then
-                    if rel_def.derived then goto continue end
-
                     local found = false
-                    if rel_def.db then
+                    if rel_def.is_cte then
+                        -- Check against CTE columns
+                        for _, cte_col in ipairs(rel_def.columns) do
+                            if normalize_col(cte_col.name) == col_norm then
+                                found = true
+                                break
+                            end
+                        end
+                    elseif rel_def.derived then
+                        goto continue -- Derived tables (not CTEs) are not checked for columns.
+                    elseif rel_def.db then
                         found = has_column(rel_def.db, rel_def.table, col_name)
                     end
 
                     if not found then
                         add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
-                            string.format('Column "%s" not found in table "%s"', col_name, rel_def.table))
+                            string.format('Column "%s" not found in table "%s"', col_name, rel_def.table or rel_def.name))
                     end
                 end
             end
@@ -480,7 +573,7 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
 
             local has_derived = false
             for _, t in pairs(relation_map) do
-                if t.derived then
+                if t.derived and not t.is_cte then
                     has_derived = true
                     break
                 end
@@ -496,16 +589,27 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
                 local searched_in = {}
 
                 for _, rel in ipairs(active_tables) do
-                    if not rel.derived then
+                    local is_base_table = not rel.derived
+                    local has_col = false
+
+                    if rel.is_cte then
+                        for _, cte_col in ipairs(rel.columns) do
+                            if normalize_col(cte_col.name) == col_norm then
+                                has_col = true
+                                break
+                            end
+                        end
+                        table.insert(searched_in, rel.table .. " (CTE)")
+                    elseif is_base_table then
                         local t_name = rel.table
                         local d_name = rel.db
                         table.insert(searched_in, d_name and (d_name .. "." .. t_name) or ("unqualified." .. t_name))
-                        local has_col = false
                         if d_name then
                             has_col = has_column(d_name, t_name, col_name)
                         end
-                        if has_col then found_anywhere = true end
                     end
+
+                    if has_col then found_anywhere = true end
                 end
 
                 if not found_anywhere and #searched_in > 0 then
@@ -608,12 +712,15 @@ local function get_query_scopes(root_node)
 end
 
 local function process_statement(stmt_node, bufnr, diagnostics)
+    local cte_defs = get_cte_definitions(stmt_node, bufnr)
+
     check_union_column_compatibility(stmt_node, bufnr, diagnostics)
 
     local scopes = get_query_scopes(stmt_node)
 
     for _, scope_nodes in ipairs(scopes) do
-        local relation_map, active_tables, has_unqualified = analyze_relations(scope_nodes, bufnr, diagnostics)
+        -- Pass CTE definitions to analyze_relations
+        local relation_map, active_tables, has_unqualified = analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
         local output_aliases = get_output_aliases(scope_nodes, bufnr)
         check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified,
             output_aliases)
