@@ -1,14 +1,14 @@
 # vim-teradata
 
 The **core Neovim plugin** for Teradata SQL development.  
-It provides orchestration, syntax highlighting, diagnostics, and integration with other components.
+It provides orchestration, syntax highlighting, diagnostics, and SQL autocompletion.
 
 ---
 
 ## Features
 - Teradata SQL syntax support
 - Diagnostics and linting
-- Orchestration of the Teradata-Nvim ecosystem
+- SQL autocompletion
 
 ---
 
@@ -29,7 +29,6 @@ For complete setup instructions, configuration options, and advanced usage:
 ---
 
 ## Related Components
-- [sql-autocomplete](https://github.com/ErwonB/sql-autocomplete) → Smart SQL autocompletion
 - [teradata-nvim.com](https://teradata-nvim.com) → Official documentation
 
 ---

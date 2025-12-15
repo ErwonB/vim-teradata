@@ -8,6 +8,34 @@ local ope = require('vim-teradata.td_ope')
 
 local M = {}
 
+local function register_td_provider()
+    local ok, blink = pcall(require, 'blink.cmp')
+    if not ok then return end
+
+    local blink_config = require('blink.cmp.config')
+    local provider_lib = require('blink.cmp.sources.lib.provider')
+    local sources_lib = require('blink.cmp.sources.lib')
+
+    local id = 'td_sql_completion'
+    local cfg = {
+        name = 'TD SQL Completion',
+        module = 'vim-teradata.sql-autocomplete.blink',
+        score_offset = 0,
+    }
+
+    blink_config.sources.providers[id] = cfg
+
+    local default = blink_config.sources.default or {}
+    if not vim.tbl_contains(default, id) then
+        table.insert(default, id)
+    end
+    blink_config.sources.default = default
+
+    sources_lib.providers[id] = provider_lib.new(id, cfg)
+
+    if blink.reload then blink.reload(id) end
+end
+
 local function run_query(args, operation, handle_result)
     if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
@@ -191,6 +219,17 @@ function M.setup(user_config)
             vim.api.nvim_create_user_command('TDBAdd', bookmark.add_from_range, { range = true })
             vim.api.nvim_create_user_command('TDJ', ui.show_jobs, { nargs = 0 })
             vim.api.nvim_create_user_command('TDF', ope.format_current_statement, { nargs = 0 })
+            -- register this plugin as a blink provider
+            register_td_provider()
+            -- Set up a keybinding to trigger completion
+            vim.api.nvim_buf_set_keymap(0, 'i', '<C-x><C-u>',
+                '<cmd>lua require("vim-teradata.sql-autocomplete.completion").trigger_fzf()<CR>', {
+                    noremap = true,
+                    silent = true
+                })
+
+            -- Define :TDSync command
+            vim.api.nvim_create_user_command('TDSync', util.export_db_data, { nargs = 0 })
 
 
             --keymapping for code editing

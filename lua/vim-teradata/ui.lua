@@ -264,9 +264,11 @@ function M.display_help()
         'TDB: Manage bookmarks',
         'TDBAdd: Add bookmark from visual selection',
         'TDJ: Jobs Manager',
+        'TDF: Format current statement',
+        'TDSync: export ddl for autocompletion',
         'TDHelp: Display this help',
     }
-    vim.cmd('belowright 10split')
+    vim.cmd('belowright 12split')
     vim.cmd.enew()
     vim.bo.buftype = 'nofile'
     vim.bo.bufhidden = 'wipe'

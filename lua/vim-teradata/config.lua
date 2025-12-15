@@ -1,18 +1,27 @@
 local M = {}
 -- Default configuration values
+local tpt_script = vim.api.nvim_get_runtime_file("lua/vim-teradata/sql-autocomplete/tpt/export_db.tpt", true)
 M.defaults = {
     -- Connection parameters moved to users list
     ft = { "sql", "teradata" },
     -- Path configuration
-    -- Uses standard Neovim cache and data directories
+    -- Uses standard Neovim data directories
     history_dir = vim.fn.stdpath('data') .. '/teradata',
     bookmarks_dir = vim.fn.stdpath('data') .. '/teradata/bookmarks',
+    data_dir = vim.fn.stdpath('data') .. '/teradata/sql-autocomplete',
+    data_completion_dir = 'data',
 
     -- History and Bookmark subdirectories
     queries_dir_name = 'queries',
     resultsets_dir_name = 'resultsets',
     global_bookmarks_dir_name = 'global',
     user_bookmarks_dir_name = 'user',
+
+    -- tpt_script
+    tpt_script = tpt_script[1],
+
+    -- pattern to filter result from database autocompletion
+    filter_db = nil,
 
     -- Query settings
     retlimit = 100,
@@ -37,6 +46,8 @@ function M.setup(opts)
         M.options.bookmarks_dir,
         M.options.bookmarks_dir .. '/' .. M.options.global_bookmarks_dir_name,
         M.options.bookmarks_dir .. '/' .. M.options.user_bookmarks_dir_name,
+        M.options.data_dir,
+        M.options.data_dir .. '/' .. M.options.data_completion_dir,
     }
     for _, path in ipairs(paths) do
         if vim.fn.isdirectory(path) == 0 then
