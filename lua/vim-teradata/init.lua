@@ -213,6 +213,8 @@ function M.setup(user_config)
             vim.api.nvim_create_user_command('TDHelp', ui.display_help, { nargs = 0 })
             -- :TDU user management
             vim.api.nvim_create_user_command('TDU', ui.show_users, { nargs = 0 })
+            -- :TDS Settings management
+            vim.api.nvim_create_user_command('TDS', ui.show_settings, { nargs = 0 })
             -- :TDB bookmark management
             vim.api.nvim_create_user_command('TDB', ui.show_bookmarks, { nargs = 0 })
             -- :TDBAdd add bookmark from selection

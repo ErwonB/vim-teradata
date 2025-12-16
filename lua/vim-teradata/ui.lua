@@ -812,4 +812,153 @@ function M.show_jobs()
     })
 end
 
+-----------------------------------------------------------------------
+-- Configuration / Settings UI
+-----------------------------------------------------------------------
+function M.show_settings()
+    local line_map = {}
+
+    local function populate_buffer()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local lines = {}
+        line_map = {}
+        local current_line = 1
+
+        -- 1. Simple Integers / Strings
+        table.insert(lines, '--- General Options ---')
+        current_line = current_line + 1
+
+        local retlimit = config.options.retlimit or 100
+        table.insert(lines, string.format("retlimit  : %d", retlimit))
+        line_map[current_line] = { type = 'retlimit' }
+        current_line = current_line + 1
+
+        local filter_db = config.options.filter_db or ""
+        table.insert(lines, string.format("filter_db : %s", filter_db))
+        line_map[current_line] = { type = 'filter_db' }
+        current_line = current_line + 1
+
+        table.insert(lines, '')
+        current_line = current_line + 1
+
+        -- 2. Replacements Table
+        table.insert(lines, '--- Replacements ---')
+        current_line = current_line + 1
+
+        -- Sort keys for stable display
+        local keys = {}
+        for k, _ in pairs(config.options.replacements or {}) do
+            table.insert(keys, k)
+        end
+        table.sort(keys)
+
+        if #keys == 0 then
+            table.insert(lines, '(no replacements defined)')
+            line_map[current_line] = { type = 'empty_replacements' }
+            current_line = current_line + 1
+        else
+            for _, k in ipairs(keys) do
+                local v = config.options.replacements[k]
+                table.insert(lines, string.format("%s = %s", k, v))
+                line_map[current_line] = { type = 'replacement', key = k, value = v }
+                current_line = current_line + 1
+            end
+        end
+
+        local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
+        local extmark = '<Enter> Edit  <a> Add Replacement  <d> Delete Replacement'
+
+        vim.bo.modifiable = true
+        table.insert(lines, '')
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_extmark(
+            bufnr,
+            ns_id,
+            #lines - 1,
+            0,
+            { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
+        )
+        vim.bo.modifiable = false
+    end
+
+    vim.cmd('belowright 12split')
+    vim.cmd.enew()
+    vim.bo.buftype = 'nofile'
+    vim.bo.bufhidden = 'delete'
+    vim.api.nvim_buf_set_name(0, 'Teradata Settings')
+    populate_buffer()
+
+    -- ACTION: Add new replacement
+    vim.keymap.set('n', 'a', function()
+        vim.ui.input({ prompt = 'New Replacement Key (e.g. ${DB_NAME}): ' }, function(key)
+            if not key or key == '' then return end
+            vim.ui.input({ prompt = 'Value for ' .. key .. ': ' }, function(val)
+                if not val then return end
+                if not config.options.replacements then config.options.replacements = {} end
+                config.options.replacements[key] = val
+                util.save_config()
+                populate_buffer()
+                vim.notify("Added " .. key, vim.log.levels.INFO)
+            end)
+        end)
+    end, { buffer = true, silent = true })
+
+    -- ACTION: Delete replacement
+    vim.keymap.set('n', 'd', function()
+        local lnum = vim.fn.line('.')
+        local item = line_map[lnum]
+        if item and item.type == 'replacement' then
+            vim.ui.select({ 'Yes', 'No' }, { prompt = 'Delete replacement "' .. item.key .. '"?' }, function(choice)
+                if choice == 'Yes' then
+                    config.options.replacements[item.key] = nil
+                    util.save_config()
+                    populate_buffer()
+                end
+            end)
+        else
+            vim.notify("Cursor is not on a replacement.", vim.log.levels.WARN)
+        end
+    end, { buffer = true, silent = true })
+
+    -- ACTION: Edit existing value
+    vim.keymap.set('n', '<cr>', function()
+        local lnum = vim.fn.line('.')
+        local item = line_map[lnum]
+
+        if not item then return end
+
+        if item.type == 'retlimit' then
+            local current = config.options.retlimit or 100
+            vim.ui.input({ prompt = 'Set Result Row Limit: ', default = tostring(current) }, function(input)
+                if not input then return end
+                local num = tonumber(input)
+                if num then
+                    config.options.retlimit = num
+                    util.save_config()
+                    populate_buffer()
+                else
+                    vim.notify("Invalid number", vim.log.levels.ERROR)
+                end
+            end)
+        elseif item.type == 'filter_db' then
+            local current = config.options.filter_db or ""
+            vim.ui.input({ prompt = 'Set Filter DB: ', default = current }, function(input)
+                if input then
+                    config.options.filter_db = input
+                    util.save_config()
+                    populate_buffer()
+                end
+            end)
+        elseif item.type == 'replacement' then
+            vim.ui.input({ prompt = 'Edit Value for ' .. item.key .. ': ', default = item.value }, function(input)
+                if input then
+                    config.options.replacements[item.key] = input
+                    util.save_config()
+                    populate_buffer()
+                end
+            end)
+        end
+    end, { buffer = true, silent = true })
+end
+
 return M
