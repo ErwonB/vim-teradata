@@ -261,6 +261,7 @@ function M.display_help()
         'TDH: Show query history',
         'TDR: Search query history with FZF',
         'TDU: Manage users',
+        'TDS: Manage settings',
         'TDB: Manage bookmarks',
         'TDBAdd: Add bookmark from visual selection',
         'TDJ: Jobs Manager',
@@ -268,7 +269,7 @@ function M.display_help()
         'TDSync: export ddl for autocompletion',
         'TDHelp: Display this help',
     }
-    vim.cmd('belowright 12split')
+    vim.cmd('belowright 13split')
     vim.cmd.enew()
     vim.bo.buftype = 'nofile'
     vim.bo.bufhidden = 'wipe'
