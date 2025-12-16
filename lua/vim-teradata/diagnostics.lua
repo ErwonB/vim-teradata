@@ -738,20 +738,21 @@ function M.update_diagnostics(bufnr)
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "sql")
     if not ok or not parser then return end
 
-    local tree = parser:parse()[1]
-    if not tree then return end
+    local trees = parser:parse()
+    if not trees then return end
 
-    local root = tree:root()
     local diagnostics = {}
+    for _, tree in ipairs(trees) do
+        local root = tree:root()
 
-    for _, node in QUERIES.syntax_error:iter_captures(root, bufnr, 0, -1) do
-        add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR, get_syntax_error_message(node, bufnr))
+        for _, node in QUERIES.syntax_error:iter_captures(root, bufnr, 0, -1) do
+            add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR, get_syntax_error_message(node, bufnr))
+        end
+
+        for _, stmt_node in QUERIES.statement:iter_captures(root, bufnr, 0, -1) do
+            process_statement(stmt_node, bufnr, diagnostics)
+        end
     end
-
-    for _, stmt_node in QUERIES.statement:iter_captures(root, bufnr, 0, -1) do
-        process_statement(stmt_node, bufnr, diagnostics)
-    end
-
     vim.diagnostic.reset(NAMESPACE, bufnr)
     vim.diagnostic.set(NAMESPACE, bufnr, diagnostics)
 end
