@@ -58,6 +58,7 @@ local QUERIES = {
         [[ (select_expression (term value: (field (object_reference name: (identifier) @alias_usage)))) ]]),
     union_select = parse_query("sql", [[ (set_operation (select (select_expression) @select_expr)) ]]),
     union_block = parse_query("sql", [[ (set_operation) @union_block ]]),
+    subquery_select = parse_query("sql", [[ (subquery (select (select_expression) @sub_select_expr)) ]]),
     relation = parse_query("sql", [[ (relation) @relation ]]),
     statement = parse_query("sql", [[ (statement) @stmt ]]),
     cte_def = parse_query("sql", [[
@@ -172,7 +173,7 @@ local function is_nested_in_subquery(node, root_container)
 end
 
 -- =============================================================================
--- Logic: Union Compatibility
+-- Logic: Union & Subquery Compatibility
 -- =============================================================================
 
 local function get_columns_from_select_expr(expr_node, bufnr)
@@ -256,6 +257,23 @@ local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
         end
 
         ::continue::
+    end
+end
+
+local function check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
+    for _, select_expr_node in QUERIES.subquery_select:iter_captures(stmt_node, bufnr, 0, -1) do
+        local _, cols = get_columns_from_select_expr(select_expr_node, bufnr)
+        for _, col in ipairs(cols) do
+            if col.name == "" then
+                add_diagnostic(
+                    diagnostics,
+                    col.node,
+                    bufnr,
+                    SEVERITY.ERROR,
+                    "Subquery field must have a name or an alias."
+                )
+            end
+        end
     end
 end
 
@@ -714,6 +732,8 @@ local function process_statement(stmt_node, bufnr, diagnostics)
     local cte_defs = get_cte_definitions(stmt_node, bufnr)
 
     check_union_column_compatibility(stmt_node, bufnr, diagnostics)
+
+    check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
 
     local scopes = get_query_scopes(stmt_node)
 
