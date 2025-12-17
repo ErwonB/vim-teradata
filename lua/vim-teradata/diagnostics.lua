@@ -262,6 +262,7 @@ end
 
 local function check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
     for _, select_expr_node in QUERIES.subquery_select:iter_captures(stmt_node, bufnr, 0, -1) do
+        local seen_cols = {}
         local _, cols = get_columns_from_select_expr(select_expr_node, bufnr)
         for _, col in ipairs(cols) do
             if col.name == "" then
@@ -272,6 +273,18 @@ local function check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
                     SEVERITY.ERROR,
                     "Subquery field must have a name or an alias."
                 )
+            else
+                local col_norm = normalize(col.name)
+                if seen_cols[col_norm] then
+                    add_diagnostic(
+                        diagnostics,
+                        col.node,
+                        bufnr,
+                        SEVERITY.ERROR,
+                        "Duplication of column " .. col_norm .. " in a derived table"
+                    )
+                end
+                seen_cols[col_norm] = true
             end
         end
     end
