@@ -880,13 +880,8 @@ end
 --- Formats the SQL statement under the cursor
 function M.format_current_statement()
     local buf = api.nvim_get_current_buf()
-    local cursor = api.nvim_win_get_cursor(0)
-    local row, col = cursor[1] - 1, cursor[2]
 
     if not ensure_parser(buf) then return end
-
-    -- local root = ts.get_parser(buf, "sql"):parse()[1]:root()
-    -- local node = root:named_descendant_for_range(row, col, row, col)
 
     local node = ts.get_node({ bufnr = buf, ignore_injections = false })
 
