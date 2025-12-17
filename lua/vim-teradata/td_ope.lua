@@ -885,8 +885,10 @@ function M.format_current_statement()
 
     if not ensure_parser(buf) then return end
 
-    local root = ts.get_parser(buf, "sql"):parse()[1]:root()
-    local node = root:named_descendant_for_range(row, col, row, col)
+    -- local root = ts.get_parser(buf, "sql"):parse()[1]:root()
+    -- local node = root:named_descendant_for_range(row, col, row, col)
+
+    local node = ts.get_node({ bufnr = buf, ignore_injections = false })
 
     -- Traverse up to find the statement
     node = util.find_node_by_type(node, NODE.STATEMENT)
