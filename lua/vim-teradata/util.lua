@@ -394,6 +394,18 @@ local function find_first_descendant_by_type(node, target_type)
     return nil
 end
 
+---Finds a direct child of a specific type.
+---@param node TSNode|nil
+---@param type_name string
+---@return TSNode|nil
+function M.get_child_by_type(node, type_name)
+    if not node then return nil end
+    for child in node:iter_children() do
+        if child:type() == type_name then return child end
+    end
+    return nil
+end
+
 -- Helper: Find ancestor or self by type
 function M.find_node_by_type(start_node, target_type)
     local node = start_node

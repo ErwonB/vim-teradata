@@ -416,7 +416,33 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
                 local alias_node = rel_node:field("alias")[1]
                 if alias_node then
                     local alias = get_text(alias_node, bufnr)
-                    relation_map[normalize(alias)] = { derived = true }
+                    local cols = {}
+
+                    local subquery_node = nil
+                    for child in rel_node:iter_children() do
+                        if child:type() == NODE.SUBQUERY then
+                            subquery_node = child
+                            break
+                        end
+                    end
+
+                    if subquery_node then
+                        local select_node = util.get_child_by_type(subquery_node, NODE.SELECT)
+                        local select_expr = util.get_child_by_type(select_node, NODE.SELECT_EXPR)
+
+                        if select_expr then
+                            _, cols = get_columns_from_select_expr(select_expr, bufnr)
+                        end
+                    end
+
+                    local def = {
+                        derived = true,
+                        columns = cols,
+                        table = normalize(alias),
+                        is_cte = false
+                    }
+                    relation_map[normalize(alias)] = def
+                    table.insert(active_tables_list, def)
                 end
             end
 
@@ -609,27 +635,19 @@ local function check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_
                 local found_in = {}
 
                 for _, rel in ipairs(active_tables) do
-                    if rel.derived and not rel.is_cte then goto next_rel end
-
-                    local t_name = rel.table
-                    local d_name = rel.db
                     local has_col = false
-
-                    if rel.is_cte then
-                        -- Check column in CTE
-                        for _, cte_col in ipairs(rel.columns) do
-                            if normalize_col(cte_col.name) == normalize_col(col_name) then
+                    if rel.is_cte or (rel.derived and rel.columns) then
+                        for _, col in ipairs(rel.columns) do
+                            if normalize_col(col.name) == normalize_col(col_name) then
                                 has_col = true
                                 break
                             end
                         end
-                    elseif d_name then
-                        -- Check column in base table
-                        has_col = has_column(d_name, t_name, col_name)
+                    elseif rel.db then
+                        has_col = has_column(rel.db, rel.table, col_name)
                     end
 
-                    if has_col then table.insert(found_in, t_name) end
-                    ::next_rel::
+                    if has_col then table.insert(found_in, rel.table or "subquery") end
                 end
 
                 if #found_in > 1 then
@@ -668,23 +686,24 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
 
                 if rel_def then
                     local found = false
-                    if rel_def.is_cte then
-                        -- Check against CTE columns
-                        for _, cte_col in ipairs(rel_def.columns) do
-                            if normalize_col(cte_col.name) == col_norm then
+                    -- Check against columns if it's a CTE OR a derived table with columns
+                    if rel_def.is_cte or (rel_def.derived and rel_def.columns) then
+                        for _, col in ipairs(rel_def.columns) do
+                            if normalize_col(col.name) == col_norm then
                                 found = true
                                 break
                             end
                         end
-                    elseif rel_def.derived then
-                        goto continue -- Derived tables (not CTEs) are not checked for columns.
                     elseif rel_def.db then
                         found = has_column(rel_def.db, rel_def.table, col_name)
                     end
 
                     if not found then
                         add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
-                            string.format('Column "%s" not found in table "%s"', col_name, rel_def.table or rel_def.name))
+                            string.format('Column "%s" not found in %s "%s"',
+                                col_name,
+                                rel_def.derived and "derived table" or "table",
+                                rel_def.table or rel_def.name))
                     end
                 end
             end
@@ -720,24 +739,22 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
                 local searched_in = {}
 
                 for _, rel in ipairs(active_tables) do
-                    local is_base_table = not rel.derived
                     local has_col = false
 
-                    if rel.is_cte then
-                        for _, cte_col in ipairs(rel.columns) do
-                            if normalize_col(cte_col.name) == col_norm then
+                    if rel.is_cte or (rel.derived and rel.columns) then
+                        for _, col in ipairs(rel.columns) do
+                            if normalize_col(col.name) == col_norm then
                                 has_col = true
                                 break
                             end
                         end
-                        table.insert(searched_in, rel.table .. " (CTE)")
-                    elseif is_base_table then
+                        local label = rel.is_cte and "CTE" or "derived"
+                        table.insert(searched_in, string.format("%s (%s)", rel.table, label))
+                    elseif not rel.derived and rel.db then
                         local t_name = rel.table
                         local d_name = rel.db
-                        table.insert(searched_in, d_name and (d_name .. "." .. t_name) or ("unqualified." .. t_name))
-                        if d_name then
-                            has_col = has_column(d_name, t_name, col_name)
-                        end
+                        table.insert(searched_in, d_name .. "." .. t_name)
+                        has_col = has_column(d_name, t_name, col_name)
                     end
 
                     if has_col then found_anywhere = true end
