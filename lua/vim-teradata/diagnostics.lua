@@ -15,6 +15,18 @@ local SEVERITY = {
     INFO = vim.diagnostic.severity.INFO,
 }
 
+local NODE = {
+    EXISTS = "exists",
+    SELECT = "select",
+    SELECT_EXPR = "select_expression",
+    SUBQUERY = "subquery",
+    OBJ_REF = "object_reference",
+    IDENTIFIER = "identifier",
+    SET_OPE = "set_operation",
+    TERM = "term",
+    FIELD = "field",
+}
+
 -- =============================================================================
 -- Schema Loading & Caching
 -- =============================================================================
@@ -180,7 +192,7 @@ local function get_columns_from_select_expr(expr_node, bufnr)
     local cols = {}
     local number_fields = 0
     for term_node in expr_node:iter_children() do
-        if term_node:type() == "term" then
+        if term_node:type() == NODE.TERM then
             local final_name = nil
             local start_row, start_col
             number_fields = number_fields + 1
@@ -192,16 +204,16 @@ local function get_columns_from_select_expr(expr_node, bufnr)
                 if alias_node then
                     final_name = get_text(alias_node, bufnr)
                 else
-                    if field_node:type() == "field" then
+                    if field_node:type() == NODE.FIELD then
                         local child = field_node:child(0)
-                        if child and child:type() == "object_reference" then
+                        if child and child:type() == NODE.OBJ_REF then
                             local name_nodes = field_node:field("name")
                             if #name_nodes > 0 then
                                 final_name = get_text(name_nodes[1], bufnr)
                             end
                         else
                             local name_node = field_node:field("name")[1]
-                            if name_node and name_node:type() == "identifier" then
+                            if name_node and name_node:type() == NODE.IDENTIFIER then
                                 final_name = get_text(name_node, bufnr)
                             end
                         end
@@ -263,28 +275,32 @@ end
 local function check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
     for _, select_expr_node in QUERIES.subquery_select:iter_captures(stmt_node, bufnr, 0, -1) do
         local seen_cols = {}
-        local _, cols = get_columns_from_select_expr(select_expr_node, bufnr)
-        for _, col in ipairs(cols) do
-            if col.name == "" then
-                add_diagnostic(
-                    diagnostics,
-                    col.node,
-                    bufnr,
-                    SEVERITY.ERROR,
-                    "Subquery field must have a name or an alias."
-                )
-            else
-                local col_norm = normalize(col.name)
-                if seen_cols[col_norm] then
+        local exists_node = util.find_node_by_type(select_expr_node, NODE.EXISTS)
+        local sel_expr_txt = get_text(select_expr_node, bufnr)
+        if not exists_node and sel_expr_txt ~= "*" then
+            local _, cols = get_columns_from_select_expr(select_expr_node, bufnr)
+            for _, col in ipairs(cols) do
+                if col.name == "" then
                     add_diagnostic(
                         diagnostics,
                         col.node,
                         bufnr,
                         SEVERITY.ERROR,
-                        "Duplication of column " .. col_norm .. " in a derived table"
+                        "Subquery field must have a name or an alias."
                     )
+                else
+                    local col_norm = normalize(col.name)
+                    if seen_cols[col_norm] then
+                        add_diagnostic(
+                            diagnostics,
+                            col.node,
+                            bufnr,
+                            SEVERITY.ERROR,
+                            "Duplication of column " .. col_norm .. " in a derived table"
+                        )
+                    end
+                    seen_cols[col_norm] = true
                 end
-                seen_cols[col_norm] = true
             end
         end
     end
@@ -314,7 +330,7 @@ local function get_cte_definitions(stmt_node, bufnr)
         if cte_name and cte_body_node then
             local select_node = nil
             for child in cte_body_node:iter_children() do
-                if child:type() == "select" then
+                if child:type() == NODE.SELECT then
                     select_node = child
                     break
                 end
@@ -323,7 +339,7 @@ local function get_cte_definitions(stmt_node, bufnr)
             if not select_node then return cte_defs end
             local select_expr = nil
             for child in select_node:iter_children() do
-                if child:type() == "select_expression" then
+                if child:type() == NODE.SELECT_EXPR then
                     select_expr = child
                     break
                 end
@@ -360,7 +376,7 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
 
             local is_derived = false
             for child in rel_node:iter_children() do
-                if child:type() == "subquery" then
+                if child:type() == NODE.SUBQUERY then
                     is_derived = true
                     break
                 end
@@ -369,7 +385,7 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
             local obj_ref = nil
             if not is_derived then
                 for child in rel_node:iter_children() do
-                    if child:type() == "object_reference" then
+                    if child:type() == NODE.OBJ_REF then
                         obj_ref = child
                         break
                     end
@@ -379,7 +395,7 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
             if obj_ref then
                 local parts = {}
                 for part in obj_ref:iter_children() do
-                    if part:type() == "identifier" then table.insert(parts, get_text(part, bufnr)) end
+                    if part:type() == NODE.IDENTIFIER then table.insert(parts, get_text(part, bufnr)) end
                 end
 
                 local db_name, table_name
@@ -498,7 +514,7 @@ local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagno
             local field_node = col_node:parent()
             local is_qualified = false
             for child in field_node:iter_children() do
-                if child:type() == "object_reference" then
+                if child:type() == NODE.IDENTIFIER then
                     is_qualified = true; break
                 end
             end
@@ -552,9 +568,9 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             local col_node = nil
 
             for child in field_node:iter_children() do
-                if child:type() == "object_reference" then
+                if child:type() == NODE.OBJ_REF then
                     qualifier_node = child:named_child(child:named_child_count() - 1)
-                elseif child:type() == "identifier" and child:parent():field("name")[1] == child then
+                elseif child:type() == NODE.IDENTIFIER and child:parent():field("name")[1] == child then
                     col_node = child
                 end
             end
@@ -596,7 +612,7 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             local field_node = col_node:parent()
             local is_qualified = false
             for child in field_node:iter_children() do
-                if child:type() == "object_reference" then
+                if child:type() == NODE.OBJ_REF then
                     is_qualified = true; break
                 end
             end
@@ -693,7 +709,7 @@ local function get_query_scopes(root_node)
         if is_container then
             local has_set_op = false
             for child in node:iter_children() do
-                if child:type() == 'set_operation' then
+                if child:type() == NODE.SET_OPE then
                     has_set_op = true
                     break
                 end
@@ -716,7 +732,7 @@ local function get_query_scopes(root_node)
                 if c_type == 'select' then
                     local has_select = false
                     for _, n in ipairs(current_scope) do
-                        if n:type() == 'select' then
+                        if n:type() == NODE.SELECT then
                             has_select = true
                             break
                         end
