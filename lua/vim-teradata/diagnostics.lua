@@ -476,7 +476,6 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
         end
 
         if is_valid then
-            -- Note: 'def' is now either a valid base table OR a valid CTE definition.
             relation_map[normalize(def.table)] = def
             if alias then relation_map[normalize(alias)] = def end
             table.insert(active_tables_list, def)
@@ -502,7 +501,7 @@ local function get_output_aliases(scope_nodes, bufnr)
     return output_aliases
 end
 
-local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagnostics, has_unqualified)
+local function check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified)
     if has_unqualified then return end
 
     if #active_tables < 2 then return end
@@ -512,6 +511,92 @@ local function check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagno
             if is_nested_in_subquery(col_node, node) then goto continue end
 
             local field_node = col_node:parent()
+            if not field_node then goto continue end
+
+            local parent = field_node:parent()
+            if parent and parent:type() == "assignment" then
+                local left = parent:field("left")[1]
+                -- Check if this node is the LHS of the assignment
+                if left and left:id() == field_node:id() then
+                    local update_node = parent:parent()
+                    -- Ensure we are in an UPDATE statement context
+                    if update_node and update_node:type() == "update" then
+                        -- 1. Extract the Update Target Name
+                        local target_parts = {}
+                        for child in update_node:iter_children() do
+                            if child:type() == NODE.OBJ_REF then
+                                for part in child:iter_children() do
+                                    if part:type() == NODE.IDENTIFIER then
+                                        table.insert(target_parts, get_text(part, bufnr))
+                                    end
+                                end
+                                break
+                            end
+                        end
+
+                        -- 2. Normalize Target (DB.TABLE or TABLE/ALIAS)
+                        local t_db, t_name
+                        if #target_parts == 2 then
+                            t_db = util.replace_env_vars(target_parts[1]):upper()
+                            t_name = target_parts[2]:upper()
+                        elseif #target_parts == 1 then
+                            t_name = target_parts[1]:upper()
+                        end
+
+                        if t_name then
+                            -- 3. Find the matching relation in active_tables
+                            local target_rel = relation_map[t_name]
+
+                            if not target_rel then
+                                for _, rel in ipairs(active_tables) do
+                                    local r_alias = rel.alias and normalize(rel.alias)
+                                    local r_table = normalize(rel.table)
+                                    local r_db    = rel.db and normalize(rel.db)
+
+                                    local match   = false
+                                    if t_db then
+                                        -- Match Qualified (DB.TABLE)
+                                        if r_db == t_db and r_table == t_name then match = true end
+                                    else
+                                        -- Match Unqualified (Alias or Table Name)
+                                        if (r_alias == t_name) or (not r_alias and r_table == t_name) then match = true end
+                                    end
+
+                                    if match then
+                                        target_rel = rel
+                                        break
+                                    end
+                                end
+                            end
+
+                            -- 4. Validate existence in Target Table ONLY
+                            if target_rel then
+                                local col_name = get_text(col_node, bufnr)
+                                local has_col = false
+
+                                if target_rel.is_cte then
+                                    for _, c in ipairs(target_rel.columns) do
+                                        if normalize_col(c.name) == normalize_col(col_name) then
+                                            has_col = true
+                                            break
+                                        end
+                                    end
+                                elseif target_rel.db then
+                                    has_col = has_column(target_rel.db, target_rel.table, col_name)
+                                end
+
+                                if not has_col then
+                                    add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
+                                        string.format('Column "%s" not found in update target "%s"', col_name, t_name))
+                                end
+
+                                goto continue
+                            end
+                        end
+                    end
+                end
+            end
+
             local is_qualified = false
             for child in field_node:iter_children() do
                 if child:type() == NODE.IDENTIFIER then
@@ -772,7 +857,7 @@ local function process_statement(stmt_node, bufnr, diagnostics)
         local output_aliases = get_output_aliases(scope_nodes, bufnr)
         check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified,
             output_aliases)
-        check_ambiguous_columns(scope_nodes, bufnr, active_tables, diagnostics, has_unqualified)
+        check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified)
         check_undefined_alias(scope_nodes, bufnr, diagnostics)
     end
 end
