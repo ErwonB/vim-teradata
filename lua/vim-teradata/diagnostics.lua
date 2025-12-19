@@ -372,7 +372,7 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
 
     for _, node in ipairs(scope_nodes) do
         for _, rel_node in QUERIES.relation:iter_captures(node, bufnr, 0, -1) do
-            -- if is_nested_in_subquery(rel_node, node) then goto continue end
+            if is_nested_in_subquery(rel_node, node) then goto continue end
 
             local is_derived = false
             for child in rel_node:iter_children() do
@@ -536,7 +536,7 @@ local function check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_
 
     for _, node in ipairs(scope_nodes) do
         for _, col_node in QUERIES.bare_field:iter_captures(node, bufnr, 0, -1) do
-            -- if is_nested_in_subquery(col_node, node) then goto continue end
+            if is_nested_in_subquery(col_node, node) then goto continue end
 
             local field_node = col_node:parent()
             if not field_node then goto continue end
@@ -667,7 +667,7 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
                                     output_aliases)
     for _, node in ipairs(scope_nodes) do
         for _, field_node in QUERIES.qualified_field:iter_captures(node, bufnr, 0, -1) do
-            -- if is_nested_in_subquery(field_node, node) then goto continue end
+            if is_nested_in_subquery(field_node, node) then goto continue end
 
             local qualifier_node = nil
             local col_node = nil
@@ -713,7 +713,7 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
         end
 
         for _, col_node in QUERIES.bare_field:iter_captures(node, bufnr, 0, -1) do
-            -- if is_nested_in_subquery(col_node, node) then goto continue end
+            if is_nested_in_subquery(col_node, node) then goto continue end
 
             local field_node = col_node:parent()
             local is_qualified = false
