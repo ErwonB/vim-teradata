@@ -184,6 +184,10 @@ local function is_nested_in_subquery(node, root_container)
     return false
 end
 
+-- forward declaration
+local get_query_scopes
+local analyze_relations
+
 -- =============================================================================
 -- Logic: Union & Subquery Compatibility
 -- =============================================================================
@@ -347,7 +351,23 @@ local function get_cte_definitions(stmt_node, bufnr)
 
             local cols = {}
             if select_expr then
-                _, cols = get_columns_from_select_expr(select_expr, bufnr)
+                if get_text(select_expr, bufnr) == "*" then
+                    -- Expansion logic for CTEs
+                    local inner_scopes = get_query_scopes(cte_body_node)
+                    if #inner_scopes > 0 then
+                        local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs)
+                        for _, rel in ipairs(inner_active) do
+                            if rel.db and rel.table then
+                                local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or {}
+                                for _, c in ipairs(schema_cols) do table.insert(cols, { name = c }) end
+                            elseif rel.columns then
+                                for _, c in ipairs(rel.columns) do table.insert(cols, { name = c.name }) end
+                            end
+                        end
+                    end
+                else
+                    _, cols = get_columns_from_select_expr(select_expr, bufnr)
+                end
             end
 
             cte_defs[normalize(cte_name)] = {
@@ -364,7 +384,7 @@ end
 -- Logic: Schema Analysis (Scoped with boundary check)
 -- =============================================================================
 
-local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
+function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
     local relation_map = {}
     local active_tables_list = {}
     local temp_rels = {}
@@ -426,14 +446,41 @@ local function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
                         end
                     end
 
-
                     if subquery_node then
                         local select_node = util.find_first_descendant_by_type(subquery_node, NODE.SELECT)
                         local select_expr = select_node and
                             util.find_first_descendant_by_type(select_node, NODE.SELECT_EXPR)
 
                         if select_expr then
-                            _, cols = get_columns_from_select_expr(select_expr, bufnr)
+                            local expr_text = get_text(select_expr, bufnr)
+                            -- CASE: SELECT *
+                            if expr_text == "*" then
+                                -- We look at the relations inside the subquery to expand the *
+                                local inner_scopes = get_query_scopes(subquery_node)
+                                if #inner_scopes > 0 then
+                                    -- Run a "silent" analysis on the inner scope to find its source tables
+                                    -- We pass an empty table for diagnostics to avoid duplicate reporting
+                                    local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs)
+                                    for _, rel in ipairs(inner_active) do
+                                        if rel.db and rel.table then
+                                            -- Base Table: fetch real columns from schema
+                                            local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or
+                                                {}
+                                            for _, cname in ipairs(schema_cols) do
+                                                table.insert(cols, { name = cname })
+                                            end
+                                        elseif rel.columns then
+                                            -- Nested derived table or CTE: use its already resolved columns
+                                            for _, c in ipairs(rel.columns) do
+                                                table.insert(cols, { name = c.name })
+                                            end
+                                        end
+                                    end
+                                end
+                            else
+                                -- CASE: Explicit column list
+                                _, cols = get_columns_from_select_expr(select_expr, bufnr)
+                            end
                         end
                     end
 
@@ -803,7 +850,7 @@ end
 -- Main Processing Logic (Scope Builder)
 -- =============================================================================
 
-local function get_query_scopes(root_node)
+function get_query_scopes(root_node)
     local scopes = {}
 
     local function traverse(node)
