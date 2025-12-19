@@ -377,7 +377,7 @@ end
 -- @param node TSNode The node to start searching from
 -- @param target_type string The node type to look for
 -- @return TSNode|nil The first matching descendant, or nil
-local function find_first_descendant_by_type(node, target_type)
+function M.find_first_descendant_by_type(node, target_type)
     if not node then return nil end
 
     -- Check children
@@ -386,7 +386,7 @@ local function find_first_descendant_by_type(node, target_type)
             return child
         end
         -- Recurse into the child
-        local found = find_first_descendant_by_type(child, target_type)
+        local found = M.find_first_descendant_by_type(child, target_type)
         if found then
             return found
         end
@@ -454,7 +454,7 @@ function M.find_next_node_by_type(target_type)
             end
 
             -- 2. Check the sibling's DESCENDANTS
-            local descendant = find_first_descendant_by_type(sibling, target_type)
+            local descendant = M.find_first_descendant_by_type(sibling, target_type)
             if descendant then
                 return descendant
             end
@@ -511,7 +511,7 @@ function M.find_prev_node_by_type(target_type)
             -- For simplicity and performance, we use the 'find_first_descendant_by_type'
             -- or the more common 'query-based search' for finding the nearest ancestor/descendant.
             -- Since a query is overkill, we use the simple recursive check.
-            local descendant = find_first_descendant_by_type(sibling, target_type)
+            local descendant = M.find_first_descendant_by_type(sibling, target_type)
             if descendant then
                 return descendant
             end
