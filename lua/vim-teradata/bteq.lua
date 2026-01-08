@@ -21,6 +21,7 @@ function M.build_script(sql, user_obj, options, output_path)
     local body = build_header(user_obj.user, user_obj.tdpid, user_obj.log_mech)
     vim.list_extend(body, {
         '.set titledashes off',
+        '.set session charset \'UTF8\'',
         '.set separator \'' .. config.options.sep .. '\'',
         '.EXPORT FILE = ' .. output_path .. ';',
         '.set WIDTH 1048575',
