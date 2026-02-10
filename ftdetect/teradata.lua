@@ -6,24 +6,39 @@ vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
 })
 
 
+-- Normal teradata files → just SQL highlighting
 vim.api.nvim_create_autocmd("FileType", {
     pattern = "teradata",
-    callback = function(args)
+    callback = function(ev)
         vim.treesitter.language.register("sql", "teradata")
-        pcall(vim.treesitter.start, args.buf)
+        pcall(vim.treesitter.start, ev.buf)
+    end,
+})
 
-        local function apply_regions()
-            require('vim-teradata.depl_sql_regions').restrict_sql_regions(args.buf)
+-- Only *.depl → SQL + region restriction
+vim.api.nvim_create_autocmd("FileType", {
+    pattern = "teradata",
+    callback = function(ev)
+        -- Quick exit if not .depl
+        if vim.fn.expand("%:e") ~= "depl" then
+            return
         end
 
-        apply_regions()
+        local function restrict()
+            require('vim-teradata.depl_sql_regions').restrict_sql_regions(ev.buf)
+        end
 
-        vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufWritePost', 'TextChanged' }, {
-            buffer = args.buf,
-            callback = apply_regions,
-            desc = 'Restrict SQL TS to marked regions in teradata buffers',
+        restrict()
+
+        vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost", "TextChanged", "TextChangedI" }, {
+            buffer = ev.buf,
+            callback = restrict,
+            desc = "Update depl SQL regions on change",
+            group = vim.api.nvim_create_augroup("DeplRegionUpdate", {}),
         })
     end,
+    -- Make sure this runs after the generic teradata handler
+    nested = true,
 })
 
 local group = vim.api.nvim_create_augroup("VimTeradataDiagnostics", { clear = true })
