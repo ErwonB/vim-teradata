@@ -28,7 +28,7 @@ function M.build_script(sql, user_obj, options, output_path)
     })
     if options.operation == 'output' then
         vim.list_extend(body, {
-            '.set retlimit ' .. config.options.retlimit,
+            '.set retlimit ' .. config.options.retlimit .. ' 2048',
         })
     end
     vim.list_extend(body, vim.fn.split(sql, '\n'))
