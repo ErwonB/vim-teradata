@@ -211,13 +211,23 @@ local function handle_fzf_selection(selected, context)
         end
         final_text = table.concat(prefixed_items, separator)
     else
-        final_text = table.concat(selected, "\n")
+        final_text = table.concat(selected, "")
     end
 
     vim.api.nvim_buf_set_text(context.buf, context.start_row, context.start_col, context.end_row, context.end_col,
         { final_text })
-    vim.api.nvim_win_set_cursor(0, { context.start_row + 1, context.start_col + #final_text })
-    vim.api.nvim_feedkeys('i', 'n', false)
+
+    local current_line = vim.api.nvim_buf_get_lines(context.buf, context.start_row, context.start_row + 1, false)[1]
+    local target_col = context.start_col + #final_text
+
+    -- Check if we are at the end of the line
+    if target_col >= #current_line and #current_line > 0 then
+        vim.api.nvim_win_set_cursor(0, { context.start_row + 1, #current_line - 1 })
+        vim.api.nvim_feedkeys('a', 'n', false)
+    else
+        vim.api.nvim_win_set_cursor(0, { context.start_row + 1, target_col })
+        vim.api.nvim_feedkeys('i', 'n', false)
+    end
 end
 
 
