@@ -5,6 +5,7 @@ local ui = require('vim-teradata.ui')
 local picker = require('vim-teradata.pick')
 local bookmark = require('vim-teradata.bookmark')
 local ope = require('vim-teradata.td_ope')
+local code_actions = require('vim-teradata.code_actions')
 
 local M = {}
 
@@ -245,6 +246,8 @@ function M.setup(user_config)
 
             -- Define :TDSync command
             vim.api.nvim_create_user_command('TDSync', util.export_db_data, { nargs = 0 })
+            -- Define :TDCodeAction command
+            vim.api.nvim_create_user_command('TDCodeAction', code_actions.run, { nargs = 0 })
 
 
             --keymapping for code editing
