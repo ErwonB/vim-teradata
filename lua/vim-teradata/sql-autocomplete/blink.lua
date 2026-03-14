@@ -5,7 +5,7 @@ function M.new()
 end
 
 function M:get_completions(_, callback)
-    local raw_items = require('vim-teradata.sql-autocomplete.completion').complete_blink()
+    local raw_items = require('vim-teradata.sql-autocomplete.completion').complete_items()
 
     local items = raw_items or {}
 

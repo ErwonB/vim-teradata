@@ -34,6 +34,16 @@ local function register_td_provider()
     sources_lib.providers[id] = provider_lib.new(id, cfg)
 
     if blink.reload then blink.reload(id) end
+    return true
+end
+
+local function register_cmp_provider()
+    local ok, cmp = pcall(require, 'cmp')
+    if not ok then return false end
+
+    local source = require('vim-teradata.sql-autocomplete.cmp').new()
+    cmp.register_source('td_sql_completion', source)
+    return true
 end
 
 local function run_query(args, operation, handle_result)
@@ -221,8 +231,11 @@ function M.setup(user_config)
             vim.api.nvim_create_user_command('TDBAdd', bookmark.add_from_range, { range = true })
             vim.api.nvim_create_user_command('TDJ', ui.show_jobs, { nargs = 0 })
             vim.api.nvim_create_user_command('TDF', ope.format_current_statement, { nargs = 0 })
-            -- register this plugin as a blink provider
-            register_td_provider()
+            -- register this plugin as a completion provider
+            local registered = register_td_provider()
+            if not registered then
+                register_cmp_provider()
+            end
             -- Set up a keybinding to trigger completion
             vim.api.nvim_buf_set_keymap(0, 'i', '<C-x><C-u>',
                 '<cmd>lua require("vim-teradata.sql-autocomplete.completion").trigger_completion()<CR>', {

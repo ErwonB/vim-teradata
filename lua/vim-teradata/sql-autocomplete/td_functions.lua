@@ -2,7 +2,7 @@ return {
     {
         label = "abortlistsessions",
         sortText = "3_abortlistsessions",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -15,7 +15,7 @@ return {
     {
         label = "abortsessions",
         sortText = "3_abortsessions",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -28,7 +28,7 @@ return {
     {
         label = "agggeom",
         sortText = "3_agggeom",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -41,7 +41,7 @@ return {
     {
         label = "agggeomintersection",
         sortText = "3_agggeomintersection",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -55,7 +55,7 @@ return {
     {
         label = "agggeomunion",
         sortText = "3_agggeomunion",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -69,7 +69,7 @@ return {
     {
         label = "aivector",
         sortText = "3_aivector",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -82,7 +82,7 @@ return {
     {
         label = "anova_contract",
         sortText = "3_anova_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -95,7 +95,7 @@ return {
     {
         label = "antiselect",
         sortText = "3_antiselect",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -108,7 +108,7 @@ return {
     {
         label = "antiselect_contract",
         sortText = "3_antiselect_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -121,7 +121,7 @@ return {
     {
         label = "api_request",
         sortText = "3_api_request",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -134,7 +134,7 @@ return {
     {
         label = "api_request_contract",
         sortText = "3_api_request_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -147,7 +147,7 @@ return {
     {
         label = "apply",
         sortText = "3_apply",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -160,7 +160,7 @@ return {
     {
         label = "apply_contract",
         sortText = "3_apply_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -173,7 +173,7 @@ return {
     {
         label = "array_add",
         sortText = "3_array_add",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -187,7 +187,7 @@ return {
     {
         label = "array_agg",
         sortText = "3_array_agg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -201,7 +201,7 @@ return {
     {
         label = "array_avg",
         sortText = "3_array_avg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -215,7 +215,7 @@ return {
     {
         label = "array_compare",
         sortText = "3_array_compare",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -231,7 +231,7 @@ return {
     {
         label = "array_concat",
         sortText = "3_array_concat",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -245,7 +245,7 @@ return {
     {
         label = "array_count_distinct",
         sortText = "3_array_count_distinct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -261,7 +261,7 @@ return {
     {
         label = "array_div",
         sortText = "3_array_div",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -275,7 +275,7 @@ return {
     {
         label = "array_eq",
         sortText = "3_array_eq",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -289,7 +289,7 @@ return {
     {
         label = "array_ge",
         sortText = "3_array_ge",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -303,7 +303,7 @@ return {
     {
         label = "array_get",
         sortText = "3_array_get",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -316,7 +316,7 @@ return {
     {
         label = "array_gt",
         sortText = "3_array_gt",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -330,7 +330,7 @@ return {
     {
         label = "array_le",
         sortText = "3_array_le",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -344,7 +344,7 @@ return {
     {
         label = "array_lt",
         sortText = "3_array_lt",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -358,7 +358,7 @@ return {
     {
         label = "array_max",
         sortText = "3_array_max",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -372,7 +372,7 @@ return {
     {
         label = "array_min",
         sortText = "3_array_min",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -386,7 +386,7 @@ return {
     {
         label = "array_mod",
         sortText = "3_array_mod",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -400,7 +400,7 @@ return {
     {
         label = "array_mul",
         sortText = "3_array_mul",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -414,7 +414,7 @@ return {
     {
         label = "array_ne",
         sortText = "3_array_ne",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -428,7 +428,7 @@ return {
     {
         label = "array_sub",
         sortText = "3_array_sub",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -442,7 +442,7 @@ return {
     {
         label = "array_sum",
         sortText = "3_array_sum",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -456,7 +456,7 @@ return {
     {
         label = "array_to_json",
         sortText = "3_array_to_json",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -469,7 +469,7 @@ return {
     {
         label = "array_update",
         sortText = "3_array_update",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -484,7 +484,7 @@ return {
     {
         label = "array_update_stride",
         sortText = "3_array_update_stride",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -499,7 +499,7 @@ return {
     {
         label = "arrayvec",
         sortText = "3_arrayvec",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -512,7 +512,7 @@ return {
     {
         label = "as_shred_generate_sql",
         sortText = "3_as_shred_generate_sql",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -525,7 +525,7 @@ return {
     {
         label = "as_shred_gettables",
         sortText = "3_as_shred_gettables",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -538,7 +538,7 @@ return {
     {
         label = "as_shredtb",
         sortText = "3_as_shredtb",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -551,7 +551,7 @@ return {
     {
         label = "ascii",
         sortText = "3_ascii",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -564,7 +564,7 @@ return {
     {
         label = "attribution",
         sortText = "3_attribution",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -577,7 +577,7 @@ return {
     {
         label = "attribution_contract",
         sortText = "3_attribution_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -590,7 +590,7 @@ return {
     {
         label = "avro_check",
         sortText = "3_avro_check",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -603,7 +603,7 @@ return {
     {
         label = "avrocontainersplit",
         sortText = "3_avrocontainersplit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -616,7 +616,7 @@ return {
     {
         label = "bitand",
         sortText = "3_bitand",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (11 variants)",
         documentation = {
             kind = "markdown",
@@ -639,7 +639,7 @@ return {
     {
         label = "bitnot",
         sortText = "3_bitnot",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -656,7 +656,7 @@ return {
     {
         label = "bitor",
         sortText = "3_bitor",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (9 variants)",
         documentation = {
             kind = "markdown",
@@ -677,7 +677,7 @@ return {
     {
         label = "bitxor",
         sortText = "3_bitxor",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (9 variants)",
         documentation = {
             kind = "markdown",
@@ -698,7 +698,7 @@ return {
     {
         label = "bson_check",
         sortText = "3_bson_check",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -712,7 +712,7 @@ return {
     {
         label = "byomcachemgr",
         sortText = "3_byomcachemgr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -725,7 +725,7 @@ return {
     {
         label = "byomcachemgr_contract",
         sortText = "3_byomcachemgr_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -738,7 +738,7 @@ return {
     {
         label = "byte2int",
         sortText = "3_byte2int",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -751,7 +751,7 @@ return {
     {
         label = "calc_timebucket",
         sortText = "3_calc_timebucket",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -766,7 +766,7 @@ return {
     {
         label = "calcmatrix",
         sortText = "3_calcmatrix",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -779,7 +779,7 @@ return {
     {
         label = "calcmatrix_contract",
         sortText = "3_calcmatrix_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -792,7 +792,7 @@ return {
     {
         label = "camset",
         sortText = "3_camset",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -805,7 +805,7 @@ return {
     {
         label = "camset_l",
         sortText = "3_camset_l",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -818,7 +818,7 @@ return {
     {
         label = "cardinality",
         sortText = "3_cardinality",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -832,7 +832,7 @@ return {
     {
         label = "ceil",
         sortText = "3_ceil",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -845,7 +845,7 @@ return {
     {
         label = "ceiling",
         sortText = "3_ceiling",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -858,7 +858,7 @@ return {
     {
         label = "chisq_contract",
         sortText = "3_chisq_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -871,7 +871,7 @@ return {
     {
         label = "chisquaremap",
         sortText = "3_chisquaremap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -884,7 +884,7 @@ return {
     {
         label = "chisquaremap_contract",
         sortText = "3_chisquaremap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -897,7 +897,7 @@ return {
     {
         label = "chisquarereduce",
         sortText = "3_chisquarereduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -910,7 +910,7 @@ return {
     {
         label = "chisquarereduce_contract",
         sortText = "3_chisquarereduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -923,7 +923,7 @@ return {
     {
         label = "chr",
         sortText = "3_chr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -936,7 +936,7 @@ return {
     {
         label = "coalesce",
         sortText = "3_coalesce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -949,7 +949,7 @@ return {
     {
         label = "colsummap",
         sortText = "3_colsummap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -962,7 +962,7 @@ return {
     {
         label = "colsummap_contract",
         sortText = "3_colsummap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -975,7 +975,7 @@ return {
     {
         label = "colsumreduce",
         sortText = "3_colsumreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -988,7 +988,7 @@ return {
     {
         label = "colsumreduce_contract",
         sortText = "3_colsumreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1001,7 +1001,7 @@ return {
     {
         label = "contiguousmapamps",
         sortText = "3_contiguousmapamps",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1014,7 +1014,7 @@ return {
     {
         label = "countset",
         sortText = "3_countset",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (10 variants)",
         documentation = {
             kind = "markdown",
@@ -1036,7 +1036,7 @@ return {
     {
         label = "createdataset",
         sortText = "3_createdataset",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1049,7 +1049,7 @@ return {
     {
         label = "createxml",
         sortText = "3_createxml",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1062,7 +1062,7 @@ return {
     {
         label = "csv",
         sortText = "3_csv",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (8 variants)",
         documentation = {
             kind = "markdown",
@@ -1082,7 +1082,7 @@ return {
     {
         label = "csv_to_avro",
         sortText = "3_csv_to_avro",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1095,7 +1095,7 @@ return {
     {
         label = "csv_to_json",
         sortText = "3_csv_to_json",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1108,7 +1108,7 @@ return {
     {
         label = "csvld",
         sortText = "3_csvld",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1121,7 +1121,7 @@ return {
     {
         label = "csvsplit",
         sortText = "3_csvsplit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1134,7 +1134,7 @@ return {
     {
         label = "dataikupredict",
         sortText = "3_dataikupredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1147,7 +1147,7 @@ return {
     {
         label = "dataikupredict_contract",
         sortText = "3_dataikupredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1160,7 +1160,7 @@ return {
     {
         label = "datarobotpredict",
         sortText = "3_datarobotpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1173,7 +1173,7 @@ return {
     {
         label = "datarobotpredict_contract",
         sortText = "3_datarobotpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1186,7 +1186,7 @@ return {
     {
         label = "dataset_keys",
         sortText = "3_dataset_keys",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1199,7 +1199,7 @@ return {
     {
         label = "dataset_publish",
         sortText = "3_dataset_publish",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1212,7 +1212,7 @@ return {
     {
         label = "dataset_table",
         sortText = "3_dataset_table",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1225,7 +1225,7 @@ return {
     {
         label = "datasize",
         sortText = "3_datasize",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1238,7 +1238,7 @@ return {
     {
         label = "daynumber_of_calendar",
         sortText = "3_daynumber_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -1253,7 +1253,7 @@ return {
     {
         label = "daynumber_of_month",
         sortText = "3_daynumber_of_month",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -1268,7 +1268,7 @@ return {
     {
         label = "daynumber_of_week",
         sortText = "3_daynumber_of_week",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -1283,7 +1283,7 @@ return {
     {
         label = "daynumber_of_year",
         sortText = "3_daynumber_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -1298,7 +1298,7 @@ return {
     {
         label = "dayoccurrence_of_month",
         sortText = "3_dayoccurrence_of_month",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -1313,7 +1313,7 @@ return {
     {
         label = "dbqldecodeobj",
         sortText = "3_dbqldecodeobj",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1326,7 +1326,7 @@ return {
     {
         label = "dbqlrowconcat",
         sortText = "3_dbqlrowconcat",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1339,7 +1339,7 @@ return {
     {
         label = "dbsdatarelatederrors_tbf",
         sortText = "3_dbsdatarelatederrors_tbf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1352,7 +1352,7 @@ return {
     {
         label = "dbsretryableerrors_tbf",
         sortText = "3_dbsretryableerrors_tbf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1365,7 +1365,7 @@ return {
     {
         label = "decamset",
         sortText = "3_decamset",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1378,7 +1378,7 @@ return {
     {
         label = "decamset_l",
         sortText = "3_decamset_l",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1391,7 +1391,7 @@ return {
     {
         label = "decisionforestpred_i",
         sortText = "3_decisionforestpred_i",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1404,7 +1404,7 @@ return {
     {
         label = "decisionforestpred_i_contract",
         sortText = "3_decisionforestpred_i_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1417,7 +1417,7 @@ return {
     {
         label = "decisionforestpredict",
         sortText = "3_decisionforestpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1430,7 +1430,7 @@ return {
     {
         label = "decisionforestpredict_contract",
         sortText = "3_decisionforestpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1443,7 +1443,7 @@ return {
     {
         label = "decisiontreepredict",
         sortText = "3_decisiontreepredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1456,7 +1456,7 @@ return {
     {
         label = "decisiontreepredict_contract",
         sortText = "3_decisiontreepredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1469,7 +1469,7 @@ return {
     {
         label = "decode",
         sortText = "3_decode",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (20 variants)",
         documentation = {
             kind = "markdown",
@@ -1501,7 +1501,7 @@ return {
     {
         label = "dsmainmanage",
         sortText = "3_dsmainmanage",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1514,7 +1514,7 @@ return {
     {
         label = "editdistance",
         sortText = "3_editdistance",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -1528,7 +1528,7 @@ return {
     {
         label = "empty_blob",
         sortText = "3_empty_blob",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1541,7 +1541,7 @@ return {
     {
         label = "empty_clob",
         sortText = "3_empty_clob",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1554,7 +1554,7 @@ return {
     {
         label = "escinsert",
         sortText = "3_escinsert",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1567,7 +1567,7 @@ return {
     {
         label = "escrepeat",
         sortText = "3_escrepeat",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1580,7 +1580,7 @@ return {
     {
         label = "escright",
         sortText = "3_escright",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1593,7 +1593,7 @@ return {
     {
         label = "extractroles",
         sortText = "3_extractroles",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1606,7 +1606,7 @@ return {
     {
         label = "featurenames_tbf",
         sortText = "3_featurenames_tbf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1619,7 +1619,7 @@ return {
     {
         label = "floor",
         sortText = "3_floor",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1632,7 +1632,7 @@ return {
     {
         label = "fpfanovamap",
         sortText = "3_fpfanovamap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1645,7 +1645,7 @@ return {
     {
         label = "fpfanovamap_contract",
         sortText = "3_fpfanovamap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1658,7 +1658,7 @@ return {
     {
         label = "fpfanovareduce",
         sortText = "3_fpfanovareduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1671,7 +1671,7 @@ return {
     {
         label = "fpfanovareduce_contract",
         sortText = "3_fpfanovareduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1684,7 +1684,7 @@ return {
     {
         label = "fpfftestmap",
         sortText = "3_fpfftestmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1697,7 +1697,7 @@ return {
     {
         label = "fpfftestmap_contract",
         sortText = "3_fpfftestmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1710,7 +1710,7 @@ return {
     {
         label = "fpfftestreducer",
         sortText = "3_fpfftestreducer",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1723,7 +1723,7 @@ return {
     {
         label = "fpfftestreducer_contract",
         sortText = "3_fpfftestreducer_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1736,7 +1736,7 @@ return {
     {
         label = "fpfhypothesisprep",
         sortText = "3_fpfhypothesisprep",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1749,7 +1749,7 @@ return {
     {
         label = "fpfhypothesisprep_contract",
         sortText = "3_fpfhypothesisprep_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1762,7 +1762,7 @@ return {
     {
         label = "fpfparseschedulerstring",
         sortText = "3_fpfparseschedulerstring",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1775,7 +1775,7 @@ return {
     {
         label = "fpfschedalternumses",
         sortText = "3_fpfschedalternumses",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1788,7 +1788,7 @@ return {
     {
         label = "fpfwritenos_manifest",
         sortText = "3_fpfwritenos_manifest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1801,7 +1801,7 @@ return {
     {
         label = "fpfztestmap",
         sortText = "3_fpfztestmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1814,7 +1814,7 @@ return {
     {
         label = "fpfztestmap_contract",
         sortText = "3_fpfztestmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1827,7 +1827,7 @@ return {
     {
         label = "fpfztestreduce",
         sortText = "3_fpfztestreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1840,7 +1840,7 @@ return {
     {
         label = "fpfztestreduce_contract",
         sortText = "3_fpfztestreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1853,7 +1853,7 @@ return {
     {
         label = "from_bytes",
         sortText = "3_from_bytes",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1866,7 +1866,7 @@ return {
     {
         label = "from_mgrs",
         sortText = "3_from_mgrs",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1879,7 +1879,7 @@ return {
     {
         label = "fsysshowblocks",
         sortText = "3_fsysshowblocks",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1892,7 +1892,7 @@ return {
     {
         label = "fsysshowblocks_contract",
         sortText = "3_fsysshowblocks_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1905,7 +1905,7 @@ return {
     {
         label = "fsysshowcompress",
         sortText = "3_fsysshowcompress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1918,7 +1918,7 @@ return {
     {
         label = "fsysshowcompress_contract",
         sortText = "3_fsysshowcompress_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1931,7 +1931,7 @@ return {
     {
         label = "fsysshowinner",
         sortText = "3_fsysshowinner",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1944,7 +1944,7 @@ return {
     {
         label = "fsysshowofsspace",
         sortText = "3_fsysshowofsspace",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1957,7 +1957,7 @@ return {
     {
         label = "fsysshowofsspace_contract",
         sortText = "3_fsysshowofsspace_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1970,7 +1970,7 @@ return {
     {
         label = "fsysshowwhere",
         sortText = "3_fsysshowwhere",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1983,7 +1983,7 @@ return {
     {
         label = "fsysshowwhere_contract",
         sortText = "3_fsysshowwhere_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -1996,7 +1996,7 @@ return {
     {
         label = "ftest_contract",
         sortText = "3_ftest_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2009,7 +2009,7 @@ return {
     {
         label = "geojsonfromgeom",
         sortText = "3_geojsonfromgeom",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2023,7 +2023,7 @@ return {
     {
         label = "geometrytorows",
         sortText = "3_geometrytorows",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2036,7 +2036,7 @@ return {
     {
         label = "geomfromgeojson",
         sortText = "3_geomfromgeojson",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2049,7 +2049,7 @@ return {
     {
         label = "geosequencefromrows",
         sortText = "3_geosequencefromrows",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2063,7 +2063,7 @@ return {
     {
         label = "geosequencelobfromrows",
         sortText = "3_geosequencelobfromrows",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2076,7 +2076,7 @@ return {
     {
         label = "geosequencelobtorows",
         sortText = "3_geosequencelobtorows",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2089,7 +2089,7 @@ return {
     {
         label = "geosequencetorows",
         sortText = "3_geosequencetorows",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2103,7 +2103,7 @@ return {
     {
         label = "getbit",
         sortText = "3_getbit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -2120,7 +2120,7 @@ return {
     {
         label = "getcolumns",
         sortText = "3_getcolumns",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2133,7 +2133,7 @@ return {
     {
         label = "getcolumns_contract",
         sortText = "3_getcolumns_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2146,7 +2146,7 @@ return {
     {
         label = "getcurrentpxyroles",
         sortText = "3_getcurrentpxyroles",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2159,7 +2159,7 @@ return {
     {
         label = "getfsgmem",
         sortText = "3_getfsgmem",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2172,7 +2172,7 @@ return {
     {
         label = "getisfdname",
         sortText = "3_getisfdname",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2185,7 +2185,7 @@ return {
     {
         label = "getpsfversion",
         sortText = "3_getpsfversion",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2198,7 +2198,7 @@ return {
     {
         label = "getqueryband",
         sortText = "3_getqueryband",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2211,7 +2211,7 @@ return {
     {
         label = "getquerybandpairs",
         sortText = "3_getquerybandpairs",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2225,7 +2225,7 @@ return {
     {
         label = "getquerybandvalue",
         sortText = "3_getquerybandvalue",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2239,7 +2239,7 @@ return {
     {
         label = "getquerybandvaluesf",
         sortText = "3_getquerybandvaluesf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2253,7 +2253,7 @@ return {
     {
         label = "getsystemtcore",
         sortText = "3_getsystemtcore",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2266,7 +2266,7 @@ return {
     {
         label = "gettimezonedisplacement",
         sortText = "3_gettimezonedisplacement",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2279,7 +2279,7 @@ return {
     {
         label = "gettvsudfviewpointsummary",
         sortText = "3_gettvsudfviewpointsummary",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2292,7 +2292,7 @@ return {
     {
         label = "glmpredict",
         sortText = "3_glmpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2305,7 +2305,7 @@ return {
     {
         label = "glmpredictcontract",
         sortText = "3_glmpredictcontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2318,7 +2318,7 @@ return {
     {
         label = "glmpredictpersegment_contract",
         sortText = "3_glmpredictpersegment_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2331,7 +2331,7 @@ return {
     {
         label = "greatest",
         sortText = "3_greatest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (10 variants)",
         documentation = {
             kind = "markdown",
@@ -2353,7 +2353,7 @@ return {
     {
         label = "h2opredict",
         sortText = "3_h2opredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2366,7 +2366,7 @@ return {
     {
         label = "h2opredict_contract",
         sortText = "3_h2opredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2379,7 +2379,7 @@ return {
     {
         label = "hashfilter",
         sortText = "3_hashfilter",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2392,7 +2392,7 @@ return {
     {
         label = "identifydatabase",
         sortText = "3_identifydatabase",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2405,7 +2405,7 @@ return {
     {
         label = "identifysession",
         sortText = "3_identifysession",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2418,7 +2418,7 @@ return {
     {
         label = "identifytable",
         sortText = "3_identifytable",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2431,7 +2431,7 @@ return {
     {
         label = "identifyuser",
         sortText = "3_identifyuser",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2444,7 +2444,7 @@ return {
     {
         label = "initcap",
         sortText = "3_initcap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2457,7 +2457,7 @@ return {
     {
         label = "installpkg",
         sortText = "3_installpkg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2470,7 +2470,7 @@ return {
     {
         label = "instr",
         sortText = "3_instr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -2485,7 +2485,7 @@ return {
     {
         label = "internalperioddatetype",
         sortText = "3_internalperioddatetype",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2498,7 +2498,7 @@ return {
     {
         label = "internalperiodtimestamptype",
         sortText = "3_internalperiodtimestamptype",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2511,7 +2511,7 @@ return {
     {
         label = "internalperiodtimestampwtztype",
         sortText = "3_internalperiodtimestampwtztype",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2524,7 +2524,7 @@ return {
     {
         label = "internalperiodtimetype",
         sortText = "3_internalperiodtimetype",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2537,7 +2537,7 @@ return {
     {
         label = "internalperiodtimewtztype",
         sortText = "3_internalperiodtimewtztype",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2550,7 +2550,7 @@ return {
     {
         label = "json_agg",
         sortText = "3_json_agg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2563,7 +2563,7 @@ return {
     {
         label = "json_check",
         sortText = "3_json_check",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2576,7 +2576,7 @@ return {
     {
         label = "json_compose",
         sortText = "3_json_compose",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2589,7 +2589,7 @@ return {
     {
         label = "json_compress",
         sortText = "3_json_compress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2602,7 +2602,7 @@ return {
     {
         label = "json_decompress",
         sortText = "3_json_decompress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2615,7 +2615,7 @@ return {
     {
         label = "json_keys",
         sortText = "3_json_keys",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2628,7 +2628,7 @@ return {
     {
         label = "json_publish",
         sortText = "3_json_publish",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2641,7 +2641,7 @@ return {
     {
         label = "json_shred_gensqls",
         sortText = "3_json_shred_gensqls",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2654,7 +2654,7 @@ return {
     {
         label = "json_shred_gettables",
         sortText = "3_json_shred_gettables",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2667,7 +2667,7 @@ return {
     {
         label = "json_table",
         sortText = "3_json_table",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2680,7 +2680,7 @@ return {
     {
         label = "jsongetvalue",
         sortText = "3_jsongetvalue",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2693,7 +2693,7 @@ return {
     {
         label = "jsonmetadata",
         sortText = "3_jsonmetadata",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2706,7 +2706,7 @@ return {
     {
         label = "jvmmemstats",
         sortText = "3_jvmmemstats",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2719,7 +2719,7 @@ return {
     {
         label = "jvmmemstats_contract",
         sortText = "3_jvmmemstats_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2732,7 +2732,7 @@ return {
     {
         label = "knn_contract",
         sortText = "3_knn_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2745,7 +2745,7 @@ return {
     {
         label = "knnreduce",
         sortText = "3_knnreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2758,7 +2758,7 @@ return {
     {
         label = "knnreduce_contract",
         sortText = "3_knnreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2771,7 +2771,7 @@ return {
     {
         label = "last_day",
         sortText = "3_last_day",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2784,7 +2784,7 @@ return {
     {
         label = "least",
         sortText = "3_least",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (10 variants)",
         documentation = {
             kind = "markdown",
@@ -2806,7 +2806,7 @@ return {
     {
         label = "left",
         sortText = "3_left",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2819,7 +2819,7 @@ return {
     {
         label = "length",
         sortText = "3_length",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2832,7 +2832,7 @@ return {
     {
         label = "lower",
         sortText = "3_lower",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2845,7 +2845,7 @@ return {
     {
         label = "lpad",
         sortText = "3_lpad",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2859,7 +2859,7 @@ return {
     {
         label = "ltrim",
         sortText = "3_ltrim",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -2873,7 +2873,7 @@ return {
     {
         label = "lzcomp",
         sortText = "3_lzcomp",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2886,7 +2886,7 @@ return {
     {
         label = "lzcomp_l",
         sortText = "3_lzcomp_l",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2899,7 +2899,7 @@ return {
     {
         label = "lzdecomp",
         sortText = "3_lzdecomp",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2912,7 +2912,7 @@ return {
     {
         label = "lzdecomp_l",
         sortText = "3_lzdecomp_l",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2925,7 +2925,7 @@ return {
     {
         label = "mbb",
         sortText = "3_mbb",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2938,7 +2938,7 @@ return {
     {
         label = "mbr",
         sortText = "3_mbr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2951,7 +2951,7 @@ return {
     {
         label = "merge_bitmaps",
         sortText = "3_merge_bitmaps",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2964,7 +2964,7 @@ return {
     {
         label = "merge_bitmaps_v2",
         sortText = "3_merge_bitmaps_v2",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2977,7 +2977,7 @@ return {
     {
         label = "monitorampload",
         sortText = "3_monitorampload",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -2990,7 +2990,7 @@ return {
     {
         label = "monitorawtresource",
         sortText = "3_monitorawtresource",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -3004,7 +3004,7 @@ return {
     {
         label = "monitormysessions",
         sortText = "3_monitormysessions",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3017,7 +3017,7 @@ return {
     {
         label = "monitorphysicalconfig",
         sortText = "3_monitorphysicalconfig",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3030,7 +3030,7 @@ return {
     {
         label = "monitorphysicalresource",
         sortText = "3_monitorphysicalresource",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3043,7 +3043,7 @@ return {
     {
         label = "monitorphysicalsummary",
         sortText = "3_monitorphysicalsummary",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3056,7 +3056,7 @@ return {
     {
         label = "monitorqueryband",
         sortText = "3_monitorqueryband",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3069,7 +3069,7 @@ return {
     {
         label = "monitorsession",
         sortText = "3_monitorsession",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3082,7 +3082,7 @@ return {
     {
         label = "monitorsessionrate",
         sortText = "3_monitorsessionrate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3095,7 +3095,7 @@ return {
     {
         label = "monitorsqlcurrentstep",
         sortText = "3_monitorsqlcurrentstep",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3108,7 +3108,7 @@ return {
     {
         label = "monitorsqlsteps",
         sortText = "3_monitorsqlsteps",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3121,7 +3121,7 @@ return {
     {
         label = "monitorsqltext",
         sortText = "3_monitorsqltext",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3134,7 +3134,7 @@ return {
     {
         label = "monitorsystemphysicalconfig",
         sortText = "3_monitorsystemphysicalconfig",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3147,7 +3147,7 @@ return {
     {
         label = "monitorversion",
         sortText = "3_monitorversion",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3160,7 +3160,7 @@ return {
     {
         label = "monitorvirtualconfig",
         sortText = "3_monitorvirtualconfig",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3173,7 +3173,7 @@ return {
     {
         label = "monitorvirtualresource",
         sortText = "3_monitorvirtualresource",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3186,7 +3186,7 @@ return {
     {
         label = "monitorvirtualsummary",
         sortText = "3_monitorvirtualsummary",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3199,7 +3199,7 @@ return {
     {
         label = "monitorwd",
         sortText = "3_monitorwd",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3212,7 +3212,7 @@ return {
     {
         label = "monitorwdrate",
         sortText = "3_monitorwdrate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3225,7 +3225,7 @@ return {
     {
         label = "monthnumber_of_calendar",
         sortText = "3_monthnumber_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3240,7 +3240,7 @@ return {
     {
         label = "monthnumber_of_quarter",
         sortText = "3_monthnumber_of_quarter",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3255,7 +3255,7 @@ return {
     {
         label = "monthnumber_of_year",
         sortText = "3_monthnumber_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3270,7 +3270,7 @@ return {
     {
         label = "months_between",
         sortText = "3_months_between",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3285,7 +3285,7 @@ return {
     {
         label = "movingaverage",
         sortText = "3_movingaverage",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3298,7 +3298,7 @@ return {
     {
         label = "movingaverage_contract",
         sortText = "3_movingaverage_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3311,7 +3311,7 @@ return {
     {
         label = "mybigdeciarray",
         sortText = "3_mybigdeciarray",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3324,7 +3324,7 @@ return {
     {
         label = "naivebayescontract",
         sortText = "3_naivebayescontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3337,7 +3337,7 @@ return {
     {
         label = "naivebayespredict",
         sortText = "3_naivebayespredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3350,7 +3350,7 @@ return {
     {
         label = "naivebayestextclassifierpredict",
         sortText = "3_naivebayestextclassifierpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3363,7 +3363,7 @@ return {
     {
         label = "nbtclassifierpredictcontract",
         sortText = "3_nbtclassifierpredictcontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3376,7 +3376,7 @@ return {
     {
         label = "next_day",
         sortText = "3_next_day",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3389,7 +3389,7 @@ return {
     {
         label = "ngram",
         sortText = "3_ngram",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -3403,7 +3403,7 @@ return {
     {
         label = "ngramsplitter",
         sortText = "3_ngramsplitter",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3416,7 +3416,7 @@ return {
     {
         label = "ngramsplitter_contract",
         sortText = "3_ngramsplitter_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3429,7 +3429,7 @@ return {
     {
         label = "nosextractvarfrompath",
         sortText = "3_nosextractvarfrompath",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -3443,7 +3443,7 @@ return {
     {
         label = "npath",
         sortText = "3_npath",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3456,7 +3456,7 @@ return {
     {
         label = "nullif",
         sortText = "3_nullif",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3469,7 +3469,7 @@ return {
     {
         label = "nullifzero",
         sortText = "3_nullifzero",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3482,7 +3482,7 @@ return {
     {
         label = "numfpfns",
         sortText = "3_numfpfns",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3495,7 +3495,7 @@ return {
     {
         label = "numtodsinterval",
         sortText = "3_numtodsinterval",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3508,7 +3508,7 @@ return {
     {
         label = "numtoyminterval",
         sortText = "3_numtoyminterval",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3521,7 +3521,7 @@ return {
     {
         label = "nvl",
         sortText = "3_nvl",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3534,7 +3534,7 @@ return {
     {
         label = "nvl2",
         sortText = "3_nvl2",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3547,7 +3547,7 @@ return {
     {
         label = "nvp",
         sortText = "3_nvp",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -3563,7 +3563,7 @@ return {
     {
         label = "nvp2json",
         sortText = "3_nvp2json",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3578,7 +3578,7 @@ return {
     {
         label = "oadd_months",
         sortText = "3_oadd_months",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3591,7 +3591,7 @@ return {
     {
         label = "ocount",
         sortText = "3_ocount",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3604,7 +3604,7 @@ return {
     {
         label = "odelete",
         sortText = "3_odelete",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3617,7 +3617,7 @@ return {
     {
         label = "oexists",
         sortText = "3_oexists",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3630,7 +3630,7 @@ return {
     {
         label = "oextend",
         sortText = "3_oextend",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3645,7 +3645,7 @@ return {
     {
         label = "ofirst",
         sortText = "3_ofirst",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3658,7 +3658,7 @@ return {
     {
         label = "ofsreadmetadata",
         sortText = "3_ofsreadmetadata",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3671,7 +3671,7 @@ return {
     {
         label = "ofsreadmetadata_contract",
         sortText = "3_ofsreadmetadata_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3684,7 +3684,7 @@ return {
     {
         label = "ofsstorageinfo",
         sortText = "3_ofsstorageinfo",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3697,7 +3697,7 @@ return {
     {
         label = "olast",
         sortText = "3_olast",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3710,7 +3710,7 @@ return {
     {
         label = "olimit",
         sortText = "3_olimit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3723,7 +3723,7 @@ return {
     {
         label = "onext",
         sortText = "3_onext",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3736,7 +3736,7 @@ return {
     {
         label = "onnxembeddings",
         sortText = "3_onnxembeddings",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3749,7 +3749,7 @@ return {
     {
         label = "onnxembeddings_contract",
         sortText = "3_onnxembeddings_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3762,7 +3762,7 @@ return {
     {
         label = "onnxpredict",
         sortText = "3_onnxpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3775,7 +3775,7 @@ return {
     {
         label = "onnxpredict_contract",
         sortText = "3_onnxpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3788,7 +3788,7 @@ return {
     {
         label = "onnxseq2seq",
         sortText = "3_onnxseq2seq",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3801,7 +3801,7 @@ return {
     {
         label = "onnxseq2seq_contract",
         sortText = "3_onnxseq2seq_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3814,7 +3814,7 @@ return {
     {
         label = "oprior",
         sortText = "3_oprior",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3827,7 +3827,7 @@ return {
     {
         label = "oreplace",
         sortText = "3_oreplace",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -3841,7 +3841,7 @@ return {
     {
         label = "otranslate",
         sortText = "3_otranslate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3854,7 +3854,7 @@ return {
     {
         label = "otrim",
         sortText = "3_otrim",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -3868,7 +3868,7 @@ return {
     {
         label = "pack",
         sortText = "3_pack",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3881,7 +3881,7 @@ return {
     {
         label = "pack_contract",
         sortText = "3_pack_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3894,7 +3894,7 @@ return {
     {
         label = "parsestatsxml",
         sortText = "3_parsestatsxml",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3907,7 +3907,7 @@ return {
     {
         label = "pmmlpredict",
         sortText = "3_pmmlpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3920,7 +3920,7 @@ return {
     {
         label = "pmmlpredict_contract",
         sortText = "3_pmmlpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3933,7 +3933,7 @@ return {
     {
         label = "polygonsplit",
         sortText = "3_polygonsplit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3946,7 +3946,7 @@ return {
     {
         label = "power",
         sortText = "3_power",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -3961,7 +3961,7 @@ return {
     {
         label = "purge",
         sortText = "3_purge",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3974,7 +3974,7 @@ return {
     {
         label = "qbreservednamevalues",
         sortText = "3_qbreservednamevalues",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -3987,7 +3987,7 @@ return {
     {
         label = "qgexecuteforeignquery",
         sortText = "3_qgexecuteforeignquery",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4000,7 +4000,7 @@ return {
     {
         label = "qgexecuteforeignquerycontract",
         sortText = "3_qgexecuteforeignquerycontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4013,7 +4013,7 @@ return {
     {
         label = "qginitiatorexport",
         sortText = "3_qginitiatorexport",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4026,7 +4026,7 @@ return {
     {
         label = "qginitiatorexportcontract",
         sortText = "3_qginitiatorexportcontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4039,7 +4039,7 @@ return {
     {
         label = "qginitiatorimport",
         sortText = "3_qginitiatorimport",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4052,7 +4052,7 @@ return {
     {
         label = "qginitiatorimportcontract",
         sortText = "3_qginitiatorimportcontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4065,7 +4065,7 @@ return {
     {
         label = "qgremoteexport",
         sortText = "3_qgremoteexport",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4078,7 +4078,7 @@ return {
     {
         label = "qgremoteexportcontract",
         sortText = "3_qgremoteexportcontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4091,7 +4091,7 @@ return {
     {
         label = "qgremoteimport",
         sortText = "3_qgremoteimport",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4104,7 +4104,7 @@ return {
     {
         label = "qgremoteimportcontract",
         sortText = "3_qgremoteimportcontract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4117,7 +4117,7 @@ return {
     {
         label = "quarternumber_of_calendar",
         sortText = "3_quarternumber_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -4132,7 +4132,7 @@ return {
     {
         label = "quarternumber_of_year",
         sortText = "3_quarternumber_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -4147,7 +4147,7 @@ return {
     {
         label = "querybandreservednames_tbf",
         sortText = "3_querybandreservednames_tbf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4160,7 +4160,7 @@ return {
     {
         label = "read_nos",
         sortText = "3_read_nos",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4173,7 +4173,7 @@ return {
     {
         label = "read_nos_contract",
         sortText = "3_read_nos_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4186,7 +4186,7 @@ return {
     {
         label = "regexp_instr",
         sortText = "3_regexp_instr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4203,7 +4203,7 @@ return {
     {
         label = "regexp_replace",
         sortText = "3_regexp_replace",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4220,7 +4220,7 @@ return {
     {
         label = "regexp_similar",
         sortText = "3_regexp_similar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4234,7 +4234,7 @@ return {
     {
         label = "regexp_split_to_table",
         sortText = "3_regexp_split_to_table",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4247,7 +4247,7 @@ return {
     {
         label = "regexp_substr",
         sortText = "3_regexp_substr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -4263,7 +4263,7 @@ return {
     {
         label = "regexp_substr_gpl",
         sortText = "3_regexp_substr_gpl",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4276,7 +4276,7 @@ return {
     {
         label = "reverse",
         sortText = "3_reverse",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4289,7 +4289,7 @@ return {
     {
         label = "right",
         sortText = "3_right",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4302,7 +4302,7 @@ return {
     {
         label = "rotateleft",
         sortText = "3_rotateleft",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4319,7 +4319,7 @@ return {
     {
         label = "rotateright",
         sortText = "3_rotateright",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4336,7 +4336,7 @@ return {
     {
         label = "round",
         sortText = "3_round",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4350,7 +4350,7 @@ return {
     {
         label = "rpad",
         sortText = "3_rpad",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4364,7 +4364,7 @@ return {
     {
         label = "rtrim",
         sortText = "3_rtrim",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4378,7 +4378,7 @@ return {
     {
         label = "schemaequal",
         sortText = "3_schemaequal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4391,7 +4391,7 @@ return {
     {
         label = "schemamatch",
         sortText = "3_schemamatch",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4404,7 +4404,7 @@ return {
     {
         label = "script",
         sortText = "3_script",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4417,7 +4417,7 @@ return {
     {
         label = "sessionize",
         sortText = "3_sessionize",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4430,7 +4430,7 @@ return {
     {
         label = "sessionize_contract",
         sortText = "3_sessionize_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4443,7 +4443,7 @@ return {
     {
         label = "setbit",
         sortText = "3_setbit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (10 variants)",
         documentation = {
             kind = "markdown",
@@ -4465,7 +4465,7 @@ return {
     {
         label = "setresourcerate",
         sortText = "3_setresourcerate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4478,7 +4478,7 @@ return {
     {
         label = "setsessionaccount",
         sortText = "3_setsessionaccount",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4491,7 +4491,7 @@ return {
     {
         label = "setsessionrate",
         sortText = "3_setsessionrate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4504,7 +4504,7 @@ return {
     {
         label = "setsystemtcore",
         sortText = "3_setsystemtcore",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4517,7 +4517,7 @@ return {
     {
         label = "shiftleft",
         sortText = "3_shiftleft",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4534,7 +4534,7 @@ return {
     {
         label = "shiftright",
         sortText = "3_shiftright",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4551,7 +4551,7 @@ return {
     {
         label = "sign",
         sortText = "3_sign",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4564,7 +4564,7 @@ return {
     {
         label = "snappy_compress",
         sortText = "3_snappy_compress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4577,7 +4577,7 @@ return {
     {
         label = "snappy_decompress",
         sortText = "3_snappy_decompress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4590,7 +4590,7 @@ return {
     {
         label = "spaaggrtrackinfoglobal",
         sortText = "3_spaaggrtrackinfoglobal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4603,7 +4603,7 @@ return {
     {
         label = "spaprinttrackinfoglobal",
         sortText = "3_spaprinttrackinfoglobal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4616,7 +4616,7 @@ return {
     {
         label = "spaprinttrackinfolocal",
         sortText = "3_spaprinttrackinfolocal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4629,7 +4629,7 @@ return {
     {
         label = "sparsemapamps",
         sortText = "3_sparsemapamps",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4642,7 +4642,7 @@ return {
     {
         label = "sparsetableamps",
         sortText = "3_sparsetableamps",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4655,7 +4655,7 @@ return {
     {
         label = "sphericaldistance",
         sortText = "3_sphericaldistance",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4668,7 +4668,7 @@ return {
     {
         label = "spheroidaldistance",
         sortText = "3_spheroidaldistance",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4682,7 +4682,7 @@ return {
     {
         label = "sqlrestrictedwords_tbf",
         sortText = "3_sqlrestrictedwords_tbf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4695,7 +4695,7 @@ return {
     {
         label = "st_geometry",
         sortText = "3_st_geometry",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4708,7 +4708,7 @@ return {
     {
         label = "st_geomfromtext",
         sortText = "3_st_geomfromtext",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -4724,7 +4724,7 @@ return {
     {
         label = "st_geomfromwkb",
         sortText = "3_st_geomfromwkb",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -4740,7 +4740,7 @@ return {
     {
         label = "stringsimilarity",
         sortText = "3_stringsimilarity",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4753,7 +4753,7 @@ return {
     {
         label = "stringsimilarity_contract",
         sortText = "3_stringsimilarity_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4766,7 +4766,7 @@ return {
     {
         label = "strtok",
         sortText = "3_strtok",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4779,7 +4779,7 @@ return {
     {
         label = "strtok_split_to_table",
         sortText = "3_strtok_split_to_table",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4792,7 +4792,7 @@ return {
     {
         label = "subbitstr",
         sortText = "3_subbitstr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (5 variants)",
         documentation = {
             kind = "markdown",
@@ -4809,7 +4809,7 @@ return {
     {
         label = "substr",
         sortText = "3_substr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4823,7 +4823,7 @@ return {
     {
         label = "substring",
         sortText = "3_substring",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -4837,7 +4837,7 @@ return {
     {
         label = "svmsparsepredict",
         sortText = "3_svmsparsepredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4850,7 +4850,7 @@ return {
     {
         label = "svmsparsepredict_contract",
         sortText = "3_svmsparsepredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4863,7 +4863,7 @@ return {
     {
         label = "td_anova",
         sortText = "3_td_anova",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4876,7 +4876,7 @@ return {
     {
         label = "td_array2p",
         sortText = "3_td_array2p",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4889,7 +4889,7 @@ return {
     {
         label = "td_avro",
         sortText = "3_td_avro",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4902,7 +4902,7 @@ return {
     {
         label = "td_awtdpscache",
         sortText = "3_td_awtdpscache",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4915,7 +4915,7 @@ return {
     {
         label = "td_awtdpscachedump",
         sortText = "3_td_awtdpscachedump",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4928,7 +4928,7 @@ return {
     {
         label = "td_awtdpscachehash",
         sortText = "3_td_awtdpscachehash",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4941,7 +4941,7 @@ return {
     {
         label = "td_betaencoderdriver",
         sortText = "3_td_betaencoderdriver",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4954,7 +4954,7 @@ return {
     {
         label = "td_betaencoderdriver_contract",
         sortText = "3_td_betaencoderdriver_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4967,7 +4967,7 @@ return {
     {
         label = "td_betaencodermap",
         sortText = "3_td_betaencodermap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4980,7 +4980,7 @@ return {
     {
         label = "td_betaencodermap_contract",
         sortText = "3_td_betaencodermap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -4993,7 +4993,7 @@ return {
     {
         label = "td_betaencoderreduce",
         sortText = "3_td_betaencoderreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5006,7 +5006,7 @@ return {
     {
         label = "td_betaencoderreduce_contract",
         sortText = "3_td_betaencoderreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5019,7 +5019,7 @@ return {
     {
         label = "td_bincodefit",
         sortText = "3_td_bincodefit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5032,7 +5032,7 @@ return {
     {
         label = "td_bincodefit_contract",
         sortText = "3_td_bincodefit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5045,7 +5045,7 @@ return {
     {
         label = "td_bincodefitemap",
         sortText = "3_td_bincodefitemap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5058,7 +5058,7 @@ return {
     {
         label = "td_bincodefitemap_contract",
         sortText = "3_td_bincodefitemap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5071,7 +5071,7 @@ return {
     {
         label = "td_bincodefitereduce",
         sortText = "3_td_bincodefitereduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5084,7 +5084,7 @@ return {
     {
         label = "td_bincodefitereduce_contract",
         sortText = "3_td_bincodefitereduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5097,7 +5097,7 @@ return {
     {
         label = "td_bincodefitv",
         sortText = "3_td_bincodefitv",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5110,7 +5110,7 @@ return {
     {
         label = "td_bincodefitv_contract",
         sortText = "3_td_bincodefitv_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5123,7 +5123,7 @@ return {
     {
         label = "td_bincodetransform",
         sortText = "3_td_bincodetransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5136,7 +5136,7 @@ return {
     {
         label = "td_bincodetransform_contract",
         sortText = "3_td_bincodetransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5149,7 +5149,7 @@ return {
     {
         label = "td_byone",
         sortText = "3_td_byone",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5162,7 +5162,7 @@ return {
     {
         label = "td_categoricalsummary",
         sortText = "3_td_categoricalsummary",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5175,7 +5175,7 @@ return {
     {
         label = "td_categoricalsummary_contract",
         sortText = "3_td_categoricalsummary_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5188,7 +5188,7 @@ return {
     {
         label = "td_catsuminternal",
         sortText = "3_td_catsuminternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5201,7 +5201,7 @@ return {
     {
         label = "td_catsuminternal_contract",
         sortText = "3_td_catsuminternal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5214,7 +5214,7 @@ return {
     {
         label = "td_chisq",
         sortText = "3_td_chisq",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5227,7 +5227,7 @@ return {
     {
         label = "td_classevalmap",
         sortText = "3_td_classevalmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5240,7 +5240,7 @@ return {
     {
         label = "td_classevalmap_contract",
         sortText = "3_td_classevalmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5253,7 +5253,7 @@ return {
     {
         label = "td_classevalreduce",
         sortText = "3_td_classevalreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5266,7 +5266,7 @@ return {
     {
         label = "td_classevalreduce_contract",
         sortText = "3_td_classevalreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5279,7 +5279,7 @@ return {
     {
         label = "td_classificationevaluator",
         sortText = "3_td_classificationevaluator",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5292,7 +5292,7 @@ return {
     {
         label = "td_classificationevaluator_ct",
         sortText = "3_td_classificationevaluator_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5305,7 +5305,7 @@ return {
     {
         label = "td_cloudstatus",
         sortText = "3_td_cloudstatus",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5318,7 +5318,7 @@ return {
     {
         label = "td_cloudstatus_contract",
         sortText = "3_td_cloudstatus_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5331,7 +5331,7 @@ return {
     {
         label = "td_collectstats_geo",
         sortText = "3_td_collectstats_geo",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5344,7 +5344,7 @@ return {
     {
         label = "td_columnsummary",
         sortText = "3_td_columnsummary",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5357,7 +5357,7 @@ return {
     {
         label = "td_columnsummary_contract",
         sortText = "3_td_columnsummary_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5370,7 +5370,7 @@ return {
     {
         label = "td_columnsummarymap",
         sortText = "3_td_columnsummarymap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5383,7 +5383,7 @@ return {
     {
         label = "td_columnsummarymap_contract",
         sortText = "3_td_columnsummarymap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5396,7 +5396,7 @@ return {
     {
         label = "td_columnsummaryreduce",
         sortText = "3_td_columnsummaryreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5409,7 +5409,7 @@ return {
     {
         label = "td_columnsummaryreduce_ct",
         sortText = "3_td_columnsummaryreduce_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5422,7 +5422,7 @@ return {
     {
         label = "td_columntransformer",
         sortText = "3_td_columntransformer",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5435,7 +5435,7 @@ return {
     {
         label = "td_columntransformer_contract",
         sortText = "3_td_columntransformer_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5448,7 +5448,7 @@ return {
     {
         label = "td_conn_get_supp_version",
         sortText = "3_td_conn_get_supp_version",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5461,7 +5461,7 @@ return {
     {
         label = "td_converttableforuaf",
         sortText = "3_td_converttableforuaf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5474,7 +5474,7 @@ return {
     {
         label = "td_converttableforuaf_contract",
         sortText = "3_td_converttableforuaf_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5487,7 +5487,7 @@ return {
     {
         label = "td_convertto",
         sortText = "3_td_convertto",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5500,7 +5500,7 @@ return {
     {
         label = "td_convertto_contract",
         sortText = "3_td_convertto_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5513,7 +5513,7 @@ return {
     {
         label = "td_csvlatin",
         sortText = "3_td_csvlatin",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5526,7 +5526,7 @@ return {
     {
         label = "td_csvunicode",
         sortText = "3_td_csvunicode",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5539,7 +5539,7 @@ return {
     {
         label = "td_currtransform",
         sortText = "3_td_currtransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5552,7 +5552,7 @@ return {
     {
         label = "td_day_of_calendar",
         sortText = "3_td_day_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -5566,7 +5566,7 @@ return {
     {
         label = "td_day_of_month",
         sortText = "3_td_day_of_month",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -5580,7 +5580,7 @@ return {
     {
         label = "td_day_of_week",
         sortText = "3_td_day_of_week",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -5594,7 +5594,7 @@ return {
     {
         label = "td_day_of_year",
         sortText = "3_td_day_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -5608,7 +5608,7 @@ return {
     {
         label = "td_dbqlampdata",
         sortText = "3_td_dbqlampdata",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5621,7 +5621,7 @@ return {
     {
         label = "td_dbqlextampdata",
         sortText = "3_td_dbqlextampdata",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5634,7 +5634,7 @@ return {
     {
         label = "td_dbqlextpedata",
         sortText = "3_td_dbqlextpedata",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5647,7 +5647,7 @@ return {
     {
         label = "td_dbqlful",
         sortText = "3_td_dbqlful",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5660,7 +5660,7 @@ return {
     {
         label = "td_dbqlparam",
         sortText = "3_td_dbqlparam",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5673,7 +5673,7 @@ return {
     {
         label = "td_decisionforest",
         sortText = "3_td_decisionforest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5686,7 +5686,7 @@ return {
     {
         label = "td_decisionforest_contract",
         sortText = "3_td_decisionforest_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5699,7 +5699,7 @@ return {
     {
         label = "td_decisionforestpredict",
         sortText = "3_td_decisionforestpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5712,7 +5712,7 @@ return {
     {
         label = "td_decisionforestpredict_ct",
         sortText = "3_td_decisionforestpredict_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5725,7 +5725,7 @@ return {
     {
         label = "td_densescaletransform",
         sortText = "3_td_densescaletransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5738,7 +5738,7 @@ return {
     {
         label = "td_densescaletransform_ct",
         sortText = "3_td_densescaletransform_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5751,7 +5751,7 @@ return {
     {
         label = "td_dfpinternal",
         sortText = "3_td_dfpinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5764,7 +5764,7 @@ return {
     {
         label = "td_dfpinternal_contract",
         sortText = "3_td_dfpinternal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5777,7 +5777,7 @@ return {
     {
         label = "td_dirichletencoderdriver",
         sortText = "3_td_dirichletencoderdriver",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5790,7 +5790,7 @@ return {
     {
         label = "td_dirichletencoderdriver_ct",
         sortText = "3_td_dirichletencoderdriver_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5803,7 +5803,7 @@ return {
     {
         label = "td_dirichletencodermap",
         sortText = "3_td_dirichletencodermap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5816,7 +5816,7 @@ return {
     {
         label = "td_dirichletencodermap_ct",
         sortText = "3_td_dirichletencodermap_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5829,7 +5829,7 @@ return {
     {
         label = "td_dirichletencoderreduce",
         sortText = "3_td_dirichletencoderreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5842,7 +5842,7 @@ return {
     {
         label = "td_dirichletencoderreduce_ct",
         sortText = "3_td_dirichletencoderreduce_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5855,7 +5855,7 @@ return {
     {
         label = "td_escapedoublequote",
         sortText = "3_td_escapedoublequote",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5868,7 +5868,7 @@ return {
     {
         label = "td_escapesinglequote",
         sortText = "3_td_escapesinglequote",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5881,7 +5881,7 @@ return {
     {
         label = "td_filerrows",
         sortText = "3_td_filerrows",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -5895,7 +5895,7 @@ return {
     {
         label = "td_fillrowid",
         sortText = "3_td_fillrowid",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5908,7 +5908,7 @@ return {
     {
         label = "td_fillrowid_contract",
         sortText = "3_td_fillrowid_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5921,7 +5921,7 @@ return {
     {
         label = "td_fpfqqnorm",
         sortText = "3_td_fpfqqnorm",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5934,7 +5934,7 @@ return {
     {
         label = "td_fpfqqnorm_contract",
         sortText = "3_td_fpfqqnorm_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5947,7 +5947,7 @@ return {
     {
         label = "td_friday",
         sortText = "3_td_friday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -5961,7 +5961,7 @@ return {
     {
         label = "td_ftest",
         sortText = "3_td_ftest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5974,7 +5974,7 @@ return {
     {
         label = "td_functionfit",
         sortText = "3_td_functionfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -5987,7 +5987,7 @@ return {
     {
         label = "td_functionfit_contract",
         sortText = "3_td_functionfit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6000,7 +6000,7 @@ return {
     {
         label = "td_functionfiti",
         sortText = "3_td_functionfiti",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6013,7 +6013,7 @@ return {
     {
         label = "td_functionfiti_contract",
         sortText = "3_td_functionfiti_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6026,7 +6026,7 @@ return {
     {
         label = "td_functiontransform",
         sortText = "3_td_functiontransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6039,7 +6039,7 @@ return {
     {
         label = "td_functiontransform_contract",
         sortText = "3_td_functiontransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6052,7 +6052,7 @@ return {
     {
         label = "td_gen_binary_pushopset",
         sortText = "3_td_gen_binary_pushopset",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6065,7 +6065,7 @@ return {
     {
         label = "td_gen_exp_pushprofile",
         sortText = "3_td_gen_exp_pushprofile",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6078,7 +6078,7 @@ return {
     {
         label = "td_get_cod_limits",
         sortText = "3_td_get_cod_limits",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6091,7 +6091,7 @@ return {
     {
         label = "td_getartinfo",
         sortText = "3_td_getartinfo",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6104,7 +6104,7 @@ return {
     {
         label = "td_getcount",
         sortText = "3_td_getcount",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6117,7 +6117,7 @@ return {
     {
         label = "td_getcstinfo",
         sortText = "3_td_getcstinfo",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6130,7 +6130,7 @@ return {
     {
         label = "td_getcstinfo_contract",
         sortText = "3_td_getcstinfo_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6143,7 +6143,7 @@ return {
     {
         label = "td_getdistinctcount",
         sortText = "3_td_getdistinctcount",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6156,7 +6156,7 @@ return {
     {
         label = "td_getdistinctcount_contract",
         sortText = "3_td_getdistinctcount_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6169,7 +6169,7 @@ return {
     {
         label = "td_getfunctioncontext",
         sortText = "3_td_getfunctioncontext",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6182,7 +6182,7 @@ return {
     {
         label = "td_getfutilecolumns",
         sortText = "3_td_getfutilecolumns",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6195,7 +6195,7 @@ return {
     {
         label = "td_getfutilecolumns_contract",
         sortText = "3_td_getfutilecolumns_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6208,7 +6208,7 @@ return {
     {
         label = "td_getfutileinternal",
         sortText = "3_td_getfutileinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6221,7 +6221,7 @@ return {
     {
         label = "td_getfutileinternal_contract",
         sortText = "3_td_getfutileinternal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6234,7 +6234,7 @@ return {
     {
         label = "td_getmetadata",
         sortText = "3_td_getmetadata",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6247,7 +6247,7 @@ return {
     {
         label = "td_getmetadata_con",
         sortText = "3_td_getmetadata_con",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6260,7 +6260,7 @@ return {
     {
         label = "td_getrowswithmissingvalues",
         sortText = "3_td_getrowswithmissingvalues",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6273,7 +6273,7 @@ return {
     {
         label = "td_getrowswithoutmissingvalues",
         sortText = "3_td_getrowswithoutmissingvalues",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6286,7 +6286,7 @@ return {
     {
         label = "td_getsample",
         sortText = "3_td_getsample",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6299,7 +6299,7 @@ return {
     {
         label = "td_getsample_con",
         sortText = "3_td_getsample_con",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6312,7 +6312,7 @@ return {
     {
         label = "td_getsystemtype",
         sortText = "3_td_getsystemtype",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6325,7 +6325,7 @@ return {
     {
         label = "td_gettbn",
         sortText = "3_td_gettbn",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6338,7 +6338,7 @@ return {
     {
         label = "td_gettcr",
         sortText = "3_td_gettcr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6351,7 +6351,7 @@ return {
     {
         label = "td_gettimebucket",
         sortText = "3_td_gettimebucket",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -6365,7 +6365,7 @@ return {
     {
         label = "td_getudtcontext",
         sortText = "3_td_getudtcontext",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6378,7 +6378,7 @@ return {
     {
         label = "td_getunion",
         sortText = "3_td_getunion",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6391,7 +6391,7 @@ return {
     {
         label = "td_getunion_contract",
         sortText = "3_td_getunion_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6404,7 +6404,7 @@ return {
     {
         label = "td_getunionmap",
         sortText = "3_td_getunionmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6417,7 +6417,7 @@ return {
     {
         label = "td_getunionmap_contract",
         sortText = "3_td_getunionmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6430,7 +6430,7 @@ return {
     {
         label = "td_getunionreduce",
         sortText = "3_td_getunionreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6443,7 +6443,7 @@ return {
     {
         label = "td_getunionreduce_contract",
         sortText = "3_td_getunionreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6456,7 +6456,7 @@ return {
     {
         label = "td_gigencoderdriver",
         sortText = "3_td_gigencoderdriver",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6469,7 +6469,7 @@ return {
     {
         label = "td_gigencoderdriver_contract",
         sortText = "3_td_gigencoderdriver_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6482,7 +6482,7 @@ return {
     {
         label = "td_gigencodermap",
         sortText = "3_td_gigencodermap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6495,7 +6495,7 @@ return {
     {
         label = "td_gigencodermap_contract",
         sortText = "3_td_gigencodermap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6508,7 +6508,7 @@ return {
     {
         label = "td_gigencoderreduce",
         sortText = "3_td_gigencoderreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6521,7 +6521,7 @@ return {
     {
         label = "td_gigencoderreduce_contract",
         sortText = "3_td_gigencoderreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6534,7 +6534,7 @@ return {
     {
         label = "td_glm",
         sortText = "3_td_glm",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6547,7 +6547,7 @@ return {
     {
         label = "td_glm_contract",
         sortText = "3_td_glm_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6560,7 +6560,7 @@ return {
     {
         label = "td_glm_internal",
         sortText = "3_td_glm_internal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6573,7 +6573,7 @@ return {
     {
         label = "td_glm_internal_contract",
         sortText = "3_td_glm_internal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6586,7 +6586,7 @@ return {
     {
         label = "td_glmpersegment",
         sortText = "3_td_glmpersegment",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6599,7 +6599,7 @@ return {
     {
         label = "td_glmpred_internal",
         sortText = "3_td_glmpred_internal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6612,7 +6612,7 @@ return {
     {
         label = "td_glmpred_internal_contract",
         sortText = "3_td_glmpred_internal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6625,7 +6625,7 @@ return {
     {
         label = "td_glmpredict",
         sortText = "3_td_glmpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6638,7 +6638,7 @@ return {
     {
         label = "td_glmpredict_contract",
         sortText = "3_td_glmpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6651,7 +6651,7 @@ return {
     {
         label = "td_glmpredictpersegment",
         sortText = "3_td_glmpredictpersegment",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6664,7 +6664,7 @@ return {
     {
         label = "td_glmsegment_contract",
         sortText = "3_td_glmsegment_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6677,7 +6677,7 @@ return {
     {
         label = "td_histogram",
         sortText = "3_td_histogram",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6690,7 +6690,7 @@ return {
     {
         label = "td_histogram_contract",
         sortText = "3_td_histogram_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6703,7 +6703,7 @@ return {
     {
         label = "td_histogrammap",
         sortText = "3_td_histogrammap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6716,7 +6716,7 @@ return {
     {
         label = "td_histogrammap_contract",
         sortText = "3_td_histogrammap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6729,7 +6729,7 @@ return {
     {
         label = "td_histogramprep",
         sortText = "3_td_histogramprep",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6742,7 +6742,7 @@ return {
     {
         label = "td_histogramprep_contract",
         sortText = "3_td_histogramprep_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6755,7 +6755,7 @@ return {
     {
         label = "td_histogramreduce",
         sortText = "3_td_histogramreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6768,7 +6768,7 @@ return {
     {
         label = "td_histogramreduce_contract",
         sortText = "3_td_histogramreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6781,7 +6781,7 @@ return {
     {
         label = "td_history",
         sortText = "3_td_history",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6794,7 +6794,7 @@ return {
     {
         label = "td_history_contract",
         sortText = "3_td_history_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6807,7 +6807,7 @@ return {
     {
         label = "td_image2matrix",
         sortText = "3_td_image2matrix",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6820,7 +6820,7 @@ return {
     {
         label = "td_image2matrix_contract",
         sortText = "3_td_image2matrix_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6833,7 +6833,7 @@ return {
     {
         label = "td_isfinite",
         sortText = "3_td_isfinite",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6846,7 +6846,7 @@ return {
     {
         label = "td_isinf",
         sortText = "3_td_isinf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6859,7 +6859,7 @@ return {
     {
         label = "td_isnan",
         sortText = "3_td_isnan",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6872,7 +6872,7 @@ return {
     {
         label = "td_json_bson",
         sortText = "3_td_json_bson",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6885,7 +6885,7 @@ return {
     {
         label = "td_json_shred",
         sortText = "3_td_json_shred",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6898,7 +6898,7 @@ return {
     {
         label = "td_json_shred_contract",
         sortText = "3_td_json_shred_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6911,7 +6911,7 @@ return {
     {
         label = "td_json_ubjson",
         sortText = "3_td_json_ubjson",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6924,7 +6924,7 @@ return {
     {
         label = "td_jsonlatin_lob",
         sortText = "3_td_jsonlatin_lob",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6937,7 +6937,7 @@ return {
     {
         label = "td_jsonshred",
         sortText = "3_td_jsonshred",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6950,7 +6950,7 @@ return {
     {
         label = "td_jsonunicode_lob",
         sortText = "3_td_jsonunicode_lob",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6963,7 +6963,7 @@ return {
     {
         label = "td_kmeans",
         sortText = "3_td_kmeans",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6976,7 +6976,7 @@ return {
     {
         label = "td_kmeans_contract",
         sortText = "3_td_kmeans_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -6989,7 +6989,7 @@ return {
     {
         label = "td_kmeansdriver",
         sortText = "3_td_kmeansdriver",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7002,7 +7002,7 @@ return {
     {
         label = "td_kmeansdriver_contract",
         sortText = "3_td_kmeansdriver_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7015,7 +7015,7 @@ return {
     {
         label = "td_kmeansdrivercall",
         sortText = "3_td_kmeansdrivercall",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7028,7 +7028,7 @@ return {
     {
         label = "td_kmeansdrivercall_contract",
         sortText = "3_td_kmeansdrivercall_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7041,7 +7041,7 @@ return {
     {
         label = "td_kmeansmap",
         sortText = "3_td_kmeansmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7054,7 +7054,7 @@ return {
     {
         label = "td_kmeansmap_contract",
         sortText = "3_td_kmeansmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7067,7 +7067,7 @@ return {
     {
         label = "td_kmeanspredict",
         sortText = "3_td_kmeanspredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7080,7 +7080,7 @@ return {
     {
         label = "td_kmeanspredict_contract",
         sortText = "3_td_kmeanspredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7093,7 +7093,7 @@ return {
     {
         label = "td_kmeansreduce",
         sortText = "3_td_kmeansreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7106,7 +7106,7 @@ return {
     {
         label = "td_kmeansreduce_contract",
         sortText = "3_td_kmeansreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7119,7 +7119,7 @@ return {
     {
         label = "td_knn",
         sortText = "3_td_knn",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7132,7 +7132,7 @@ return {
     {
         label = "td_left",
         sortText = "3_td_left",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7145,7 +7145,7 @@ return {
     {
         label = "td_localsgdmap",
         sortText = "3_td_localsgdmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7158,7 +7158,7 @@ return {
     {
         label = "td_localsgdmap_contract",
         sortText = "3_td_localsgdmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7171,7 +7171,7 @@ return {
     {
         label = "td_localsgdreduce",
         sortText = "3_td_localsgdreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7184,7 +7184,7 @@ return {
     {
         label = "td_localsgdreduce_contract",
         sortText = "3_td_localsgdreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7197,7 +7197,7 @@ return {
     {
         label = "td_lz_compress",
         sortText = "3_td_lz_compress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7210,7 +7210,7 @@ return {
     {
         label = "td_lz_decompress",
         sortText = "3_td_lz_decompress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7223,7 +7223,7 @@ return {
     {
         label = "td_manifests",
         sortText = "3_td_manifests",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7236,7 +7236,7 @@ return {
     {
         label = "td_manifests_contract",
         sortText = "3_td_manifests_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7249,7 +7249,7 @@ return {
     {
         label = "td_mbrsum",
         sortText = "3_td_mbrsum",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7262,7 +7262,7 @@ return {
     {
         label = "td_merge_exp_pushprofile",
         sortText = "3_td_merge_exp_pushprofile",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7275,7 +7275,7 @@ return {
     {
         label = "td_merge_pushprofile",
         sortText = "3_td_merge_pushprofile",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7288,7 +7288,7 @@ return {
     {
         label = "td_monday",
         sortText = "3_td_monday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -7302,7 +7302,7 @@ return {
     {
         label = "td_month_begin",
         sortText = "3_td_month_begin",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -7316,7 +7316,7 @@ return {
     {
         label = "td_month_end",
         sortText = "3_td_month_end",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -7330,7 +7330,7 @@ return {
     {
         label = "td_month_of_calendar",
         sortText = "3_td_month_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -7344,7 +7344,7 @@ return {
     {
         label = "td_month_of_quarter",
         sortText = "3_td_month_of_quarter",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -7358,7 +7358,7 @@ return {
     {
         label = "td_month_of_year",
         sortText = "3_td_month_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -7372,7 +7372,7 @@ return {
     {
         label = "td_naivebayes",
         sortText = "3_td_naivebayes",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7385,7 +7385,7 @@ return {
     {
         label = "td_naivebayes_contract",
         sortText = "3_td_naivebayes_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7398,7 +7398,7 @@ return {
     {
         label = "td_naivebayesmap_d",
         sortText = "3_td_naivebayesmap_d",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7411,7 +7411,7 @@ return {
     {
         label = "td_naivebayesmap_d_contract",
         sortText = "3_td_naivebayesmap_d_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7424,7 +7424,7 @@ return {
     {
         label = "td_naivebayesmap_s",
         sortText = "3_td_naivebayesmap_s",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7437,7 +7437,7 @@ return {
     {
         label = "td_naivebayesmap_s_contract",
         sortText = "3_td_naivebayesmap_s_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7450,7 +7450,7 @@ return {
     {
         label = "td_naivebayespredict",
         sortText = "3_td_naivebayespredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7463,7 +7463,7 @@ return {
     {
         label = "td_naivebayespredict_contract",
         sortText = "3_td_naivebayespredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7476,7 +7476,7 @@ return {
     {
         label = "td_naivebayespredict_d",
         sortText = "3_td_naivebayespredict_d",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7489,7 +7489,7 @@ return {
     {
         label = "td_naivebayespredict_d_ct",
         sortText = "3_td_naivebayespredict_d_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7502,7 +7502,7 @@ return {
     {
         label = "td_naivebayespredict_s",
         sortText = "3_td_naivebayespredict_s",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7515,7 +7515,7 @@ return {
     {
         label = "td_naivebayespredict_s_ct",
         sortText = "3_td_naivebayespredict_s_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7528,7 +7528,7 @@ return {
     {
         label = "td_naivebayesreduce",
         sortText = "3_td_naivebayesreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7541,7 +7541,7 @@ return {
     {
         label = "td_naivebayesreduce_contract",
         sortText = "3_td_naivebayesreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7554,7 +7554,7 @@ return {
     {
         label = "td_naivebayesreduceinit",
         sortText = "3_td_naivebayesreduceinit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7567,7 +7567,7 @@ return {
     {
         label = "td_naivebayesreduceinit_ct",
         sortText = "3_td_naivebayesreduceinit_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7580,7 +7580,7 @@ return {
     {
         label = "td_naivebayesreducetop",
         sortText = "3_td_naivebayesreducetop",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7593,7 +7593,7 @@ return {
     {
         label = "td_naivebayesreducetop_ct",
         sortText = "3_td_naivebayesreducetop_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7606,7 +7606,7 @@ return {
     {
         label = "td_naivebayestextclassifierpredict",
         sortText = "3_td_naivebayestextclassifierpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7619,7 +7619,7 @@ return {
     {
         label = "td_naivebayestextclassifiertrainer",
         sortText = "3_td_naivebayestextclassifiertrainer",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7632,7 +7632,7 @@ return {
     {
         label = "td_nbtccardinality",
         sortText = "3_td_nbtccardinality",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7645,7 +7645,7 @@ return {
     {
         label = "td_nbtccardinality_contract",
         sortText = "3_td_nbtccardinality_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7658,7 +7658,7 @@ return {
     {
         label = "td_nbtccardinalitymap",
         sortText = "3_td_nbtccardinalitymap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7671,7 +7671,7 @@ return {
     {
         label = "td_nbtccardinalitymap_ct",
         sortText = "3_td_nbtccardinalitymap_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7684,7 +7684,7 @@ return {
     {
         label = "td_nbtccardinalityreduce",
         sortText = "3_td_nbtccardinalityreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7697,7 +7697,7 @@ return {
     {
         label = "td_nbtccardinalityreduce_ct",
         sortText = "3_td_nbtccardinalityreduce_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7710,7 +7710,7 @@ return {
     {
         label = "td_nbtcclassitems",
         sortText = "3_td_nbtcclassitems",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7723,7 +7723,7 @@ return {
     {
         label = "td_nbtcclassitems_contract",
         sortText = "3_td_nbtcclassitems_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7736,7 +7736,7 @@ return {
     {
         label = "td_nbtcclassitemsinternal",
         sortText = "3_td_nbtcclassitemsinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7749,7 +7749,7 @@ return {
     {
         label = "td_nbtcclassitemsinternal_ct",
         sortText = "3_td_nbtcclassitemsinternal_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7762,7 +7762,7 @@ return {
     {
         label = "td_nbtcpredict_contract",
         sortText = "3_td_nbtcpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7775,7 +7775,7 @@ return {
     {
         label = "td_nbtctrainer_contract",
         sortText = "3_td_nbtctrainer_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7788,7 +7788,7 @@ return {
     {
         label = "td_nbtctrainerinternal",
         sortText = "3_td_nbtctrainerinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7801,7 +7801,7 @@ return {
     {
         label = "td_nbtctrainerinternal_ct",
         sortText = "3_td_nbtctrainerinternal_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7814,7 +7814,7 @@ return {
     {
         label = "td_nonlinearcombinefit",
         sortText = "3_td_nonlinearcombinefit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7827,7 +7827,7 @@ return {
     {
         label = "td_nonlinearcombinefit_ct",
         sortText = "3_td_nonlinearcombinefit_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7840,7 +7840,7 @@ return {
     {
         label = "td_nonlinearcombinetrans_ct",
         sortText = "3_td_nonlinearcombinetrans_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7853,7 +7853,7 @@ return {
     {
         label = "td_nonlinearcombinetransform",
         sortText = "3_td_nonlinearcombinetransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7866,7 +7866,7 @@ return {
     {
         label = "td_nonnullcntmap",
         sortText = "3_td_nonnullcntmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7879,7 +7879,7 @@ return {
     {
         label = "td_nonnullcntmap_contract",
         sortText = "3_td_nonnullcntmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7892,7 +7892,7 @@ return {
     {
         label = "td_nonnullcntreduce",
         sortText = "3_td_nonnullcntreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7905,7 +7905,7 @@ return {
     {
         label = "td_nonnullcntreduce_contract",
         sortText = "3_td_nonnullcntreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7918,7 +7918,7 @@ return {
     {
         label = "td_normalize_meet",
         sortText = "3_td_normalize_meet",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7931,7 +7931,7 @@ return {
     {
         label = "td_normalize_overlap",
         sortText = "3_td_normalize_overlap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7944,7 +7944,7 @@ return {
     {
         label = "td_normalize_overlap_meet",
         sortText = "3_td_normalize_overlap_meet",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7957,7 +7957,7 @@ return {
     {
         label = "td_numapply",
         sortText = "3_td_numapply",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7970,7 +7970,7 @@ return {
     {
         label = "td_numapply_contract",
         sortText = "3_td_numapply_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7983,7 +7983,7 @@ return {
     {
         label = "td_oneclasssvm",
         sortText = "3_td_oneclasssvm",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -7996,7 +7996,7 @@ return {
     {
         label = "td_oneclasssvm_contract",
         sortText = "3_td_oneclasssvm_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8009,7 +8009,7 @@ return {
     {
         label = "td_oneclasssvmpredict",
         sortText = "3_td_oneclasssvmpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8022,7 +8022,7 @@ return {
     {
         label = "td_oneclasssvmpredict_contract",
         sortText = "3_td_oneclasssvmpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8035,7 +8035,7 @@ return {
     {
         label = "td_onehotencodingfit",
         sortText = "3_td_onehotencodingfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8048,7 +8048,7 @@ return {
     {
         label = "td_onehotencodingfit_contract",
         sortText = "3_td_onehotencodingfit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8061,7 +8061,7 @@ return {
     {
         label = "td_onehotencodingfit_dr",
         sortText = "3_td_onehotencodingfit_dr",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8074,7 +8074,7 @@ return {
     {
         label = "td_onehotencodingfit_dr_ct",
         sortText = "3_td_onehotencodingfit_dr_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8087,7 +8087,7 @@ return {
     {
         label = "td_onehotencodingfit_s",
         sortText = "3_td_onehotencodingfit_s",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8100,7 +8100,7 @@ return {
     {
         label = "td_onehotencodingfit_s_ct",
         sortText = "3_td_onehotencodingfit_s_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8113,7 +8113,7 @@ return {
     {
         label = "td_onehotencodingfitmap",
         sortText = "3_td_onehotencodingfitmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8126,7 +8126,7 @@ return {
     {
         label = "td_onehotencodingfitmap_c",
         sortText = "3_td_onehotencodingfitmap_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8139,7 +8139,7 @@ return {
     {
         label = "td_onehotencodingtran_contract",
         sortText = "3_td_onehotencodingtran_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8152,7 +8152,7 @@ return {
     {
         label = "td_onehotencodingtran_d",
         sortText = "3_td_onehotencodingtran_d",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8165,7 +8165,7 @@ return {
     {
         label = "td_onehotencodingtran_d_ct",
         sortText = "3_td_onehotencodingtran_d_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8178,7 +8178,7 @@ return {
     {
         label = "td_onehotencodingtran_s",
         sortText = "3_td_onehotencodingtran_s",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8191,7 +8191,7 @@ return {
     {
         label = "td_onehotencodingtran_s_ct",
         sortText = "3_td_onehotencodingtran_s_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8204,7 +8204,7 @@ return {
     {
         label = "td_onehotencodingtransform",
         sortText = "3_td_onehotencodingtransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8217,7 +8217,7 @@ return {
     {
         label = "td_ordencfitmapinternal",
         sortText = "3_td_ordencfitmapinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8230,7 +8230,7 @@ return {
     {
         label = "td_ordencfitmapinternal2",
         sortText = "3_td_ordencfitmapinternal2",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8243,7 +8243,7 @@ return {
     {
         label = "td_ordencfitmapinternal2_c",
         sortText = "3_td_ordencfitmapinternal2_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8256,7 +8256,7 @@ return {
     {
         label = "td_ordencfitmapinternal_c",
         sortText = "3_td_ordencfitmapinternal_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8269,7 +8269,7 @@ return {
     {
         label = "td_orderedstats",
         sortText = "3_td_orderedstats",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8282,7 +8282,7 @@ return {
     {
         label = "td_orderedstats_contract",
         sortText = "3_td_orderedstats_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8295,7 +8295,7 @@ return {
     {
         label = "td_ordinalencodingfit",
         sortText = "3_td_ordinalencodingfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8308,7 +8308,7 @@ return {
     {
         label = "td_ordinalencodingfit_c",
         sortText = "3_td_ordinalencodingfit_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8321,7 +8321,7 @@ return {
     {
         label = "td_ordinalencodingfitmap",
         sortText = "3_td_ordinalencodingfitmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8334,7 +8334,7 @@ return {
     {
         label = "td_ordinalencodingfitmap_c",
         sortText = "3_td_ordinalencodingfitmap_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8347,7 +8347,7 @@ return {
     {
         label = "td_ordinalencodingfitreduce",
         sortText = "3_td_ordinalencodingfitreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8360,7 +8360,7 @@ return {
     {
         label = "td_ordinalencodingfitreduce_c",
         sortText = "3_td_ordinalencodingfitreduce_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8373,7 +8373,7 @@ return {
     {
         label = "td_ordinalencodingtransform",
         sortText = "3_td_ordinalencodingtransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8386,7 +8386,7 @@ return {
     {
         label = "td_ordinaltransform_contract",
         sortText = "3_td_ordinaltransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8399,7 +8399,7 @@ return {
     {
         label = "td_outlierfilterfit",
         sortText = "3_td_outlierfilterfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8412,7 +8412,7 @@ return {
     {
         label = "td_outlierfiltertransform",
         sortText = "3_td_outlierfiltertransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8425,7 +8425,7 @@ return {
     {
         label = "td_outlierfit_contract",
         sortText = "3_td_outlierfit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8438,7 +8438,7 @@ return {
     {
         label = "td_outlierinternal",
         sortText = "3_td_outlierinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8451,7 +8451,7 @@ return {
     {
         label = "td_outlierinternal_contract",
         sortText = "3_td_outlierinternal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8464,7 +8464,7 @@ return {
     {
         label = "td_outliertransform_contract",
         sortText = "3_td_outliertransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8477,7 +8477,7 @@ return {
     {
         label = "td_partitions",
         sortText = "3_td_partitions",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8490,7 +8490,7 @@ return {
     {
         label = "td_partitions_contract",
         sortText = "3_td_partitions_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8503,7 +8503,7 @@ return {
     {
         label = "td_pivoting",
         sortText = "3_td_pivoting",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8516,7 +8516,7 @@ return {
     {
         label = "td_pivoting_contract",
         sortText = "3_td_pivoting_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8529,7 +8529,7 @@ return {
     {
         label = "td_polynomialfeaturesfit",
         sortText = "3_td_polynomialfeaturesfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8542,7 +8542,7 @@ return {
     {
         label = "td_polynomialfeaturestransform",
         sortText = "3_td_polynomialfeaturestransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8555,7 +8555,7 @@ return {
     {
         label = "td_polynomialfit_contract",
         sortText = "3_td_polynomialfit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8568,7 +8568,7 @@ return {
     {
         label = "td_polytransform_contract",
         sortText = "3_td_polytransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8581,7 +8581,7 @@ return {
     {
         label = "td_qqnorm",
         sortText = "3_td_qqnorm",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8594,7 +8594,7 @@ return {
     {
         label = "td_qqnorm_contract",
         sortText = "3_td_qqnorm_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8607,7 +8607,7 @@ return {
     {
         label = "td_quarter_begin",
         sortText = "3_td_quarter_begin",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -8621,7 +8621,7 @@ return {
     {
         label = "td_quarter_end",
         sortText = "3_td_quarter_end",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -8635,7 +8635,7 @@ return {
     {
         label = "td_quarter_of_calendar",
         sortText = "3_td_quarter_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -8649,7 +8649,7 @@ return {
     {
         label = "td_quarter_of_year",
         sortText = "3_td_quarter_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -8663,7 +8663,7 @@ return {
     {
         label = "td_randomprojectionfit",
         sortText = "3_td_randomprojectionfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8676,7 +8676,7 @@ return {
     {
         label = "td_randomprojectionmincomponents",
         sortText = "3_td_randomprojectionmincomponents",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8689,7 +8689,7 @@ return {
     {
         label = "td_randomprojectiontransform",
         sortText = "3_td_randomprojectiontransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8702,7 +8702,7 @@ return {
     {
         label = "td_randprojfit_contract",
         sortText = "3_td_randprojfit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8715,7 +8715,7 @@ return {
     {
         label = "td_randprojfitmap",
         sortText = "3_td_randprojfitmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8728,7 +8728,7 @@ return {
     {
         label = "td_randprojfitmap_ctrct",
         sortText = "3_td_randprojfitmap_ctrct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8741,7 +8741,7 @@ return {
     {
         label = "td_randprojfitreduce",
         sortText = "3_td_randprojfitreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8754,7 +8754,7 @@ return {
     {
         label = "td_randprojfitreduce_ctrct",
         sortText = "3_td_randprojfitreduce_ctrct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8767,7 +8767,7 @@ return {
     {
         label = "td_randprojmincomp_contract",
         sortText = "3_td_randprojmincomp_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8780,7 +8780,7 @@ return {
     {
         label = "td_randprojtransform_contract",
         sortText = "3_td_randprojtransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8793,7 +8793,7 @@ return {
     {
         label = "td_regevalmap",
         sortText = "3_td_regevalmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8806,7 +8806,7 @@ return {
     {
         label = "td_regevalmap_contract",
         sortText = "3_td_regevalmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8819,7 +8819,7 @@ return {
     {
         label = "td_regevalprep",
         sortText = "3_td_regevalprep",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8832,7 +8832,7 @@ return {
     {
         label = "td_regevalprep_contract",
         sortText = "3_td_regevalprep_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8845,7 +8845,7 @@ return {
     {
         label = "td_regevalreduce",
         sortText = "3_td_regevalreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8858,7 +8858,7 @@ return {
     {
         label = "td_regevalreduce_contract",
         sortText = "3_td_regevalreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8871,7 +8871,7 @@ return {
     {
         label = "td_regressionevaluator",
         sortText = "3_td_regressionevaluator",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8884,7 +8884,7 @@ return {
     {
         label = "td_regressionevaluator_c",
         sortText = "3_td_regressionevaluator_c",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8897,7 +8897,7 @@ return {
     {
         label = "td_right",
         sortText = "3_td_right",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8910,7 +8910,7 @@ return {
     {
         label = "td_roc",
         sortText = "3_td_roc",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8923,7 +8923,7 @@ return {
     {
         label = "td_roc_contract",
         sortText = "3_td_roc_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8936,7 +8936,7 @@ return {
     {
         label = "td_rocmap",
         sortText = "3_td_rocmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8949,7 +8949,7 @@ return {
     {
         label = "td_rocmap_contract",
         sortText = "3_td_rocmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8962,7 +8962,7 @@ return {
     {
         label = "td_rocreduce",
         sortText = "3_td_rocreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8975,7 +8975,7 @@ return {
     {
         label = "td_rocreduce_contract",
         sortText = "3_td_rocreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -8988,7 +8988,7 @@ return {
     {
         label = "td_roundcolumns",
         sortText = "3_td_roundcolumns",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9001,7 +9001,7 @@ return {
     {
         label = "td_roundcolumns_contract",
         sortText = "3_td_roundcolumns_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9014,7 +9014,7 @@ return {
     {
         label = "td_rownormalizefit",
         sortText = "3_td_rownormalizefit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9027,7 +9027,7 @@ return {
     {
         label = "td_rownormalizefit_contract",
         sortText = "3_td_rownormalizefit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9040,7 +9040,7 @@ return {
     {
         label = "td_rownormalizetransform",
         sortText = "3_td_rownormalizetransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9053,7 +9053,7 @@ return {
     {
         label = "td_rownormalizetransform_ct",
         sortText = "3_td_rownormalizetransform_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9066,7 +9066,7 @@ return {
     {
         label = "td_rowswithmisval_contract",
         sortText = "3_td_rowswithmisval_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9079,7 +9079,7 @@ return {
     {
         label = "td_rowswithoutmisval_contract",
         sortText = "3_td_rowswithoutmisval_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9092,7 +9092,7 @@ return {
     {
         label = "td_saturday",
         sortText = "3_td_saturday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -9106,7 +9106,7 @@ return {
     {
         label = "td_scalebypartitionfit",
         sortText = "3_td_scalebypartitionfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9119,7 +9119,7 @@ return {
     {
         label = "td_scalebypartitionfit_ct",
         sortText = "3_td_scalebypartitionfit_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9132,7 +9132,7 @@ return {
     {
         label = "td_scalefit",
         sortText = "3_td_scalefit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9145,7 +9145,7 @@ return {
     {
         label = "td_scalefit_contract",
         sortText = "3_td_scalefit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9158,7 +9158,7 @@ return {
     {
         label = "td_scalefitmap",
         sortText = "3_td_scalefitmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9171,7 +9171,7 @@ return {
     {
         label = "td_scalefitmap_contract",
         sortText = "3_td_scalefitmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9184,7 +9184,7 @@ return {
     {
         label = "td_scalefitreduce",
         sortText = "3_td_scalefitreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9197,7 +9197,7 @@ return {
     {
         label = "td_scalefitreduce0",
         sortText = "3_td_scalefitreduce0",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9210,7 +9210,7 @@ return {
     {
         label = "td_scalefitreduce0_contract",
         sortText = "3_td_scalefitreduce0_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9223,7 +9223,7 @@ return {
     {
         label = "td_scalefitreduce_contract",
         sortText = "3_td_scalefitreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9236,7 +9236,7 @@ return {
     {
         label = "td_scaletransform",
         sortText = "3_td_scaletransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9249,7 +9249,7 @@ return {
     {
         label = "td_scaletransform_contract",
         sortText = "3_td_scaletransform_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9262,7 +9262,7 @@ return {
     {
         label = "td_senextinternal",
         sortText = "3_td_senextinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9275,7 +9275,7 @@ return {
     {
         label = "td_senextinternal_contract",
         sortText = "3_td_senextinternal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9288,7 +9288,7 @@ return {
     {
         label = "td_sentimentextractor",
         sortText = "3_td_sentimentextractor",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9301,7 +9301,7 @@ return {
     {
         label = "td_sentimentextractor_contract",
         sortText = "3_td_sentimentextractor_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9314,7 +9314,7 @@ return {
     {
         label = "td_sequenced_avg",
         sortText = "3_td_sequenced_avg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9327,7 +9327,7 @@ return {
     {
         label = "td_sequenced_count",
         sortText = "3_td_sequenced_count",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9340,7 +9340,7 @@ return {
     {
         label = "td_sequenced_sum",
         sortText = "3_td_sequenced_sum",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9353,7 +9353,7 @@ return {
     {
         label = "td_sgd",
         sortText = "3_td_sgd",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9366,7 +9366,7 @@ return {
     {
         label = "td_sgddriver",
         sortText = "3_td_sgddriver",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9379,7 +9379,7 @@ return {
     {
         label = "td_sgddriver_contract",
         sortText = "3_td_sgddriver_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9392,7 +9392,7 @@ return {
     {
         label = "td_sgdmap",
         sortText = "3_td_sgdmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9405,7 +9405,7 @@ return {
     {
         label = "td_sgdmap_contract",
         sortText = "3_td_sgdmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9418,7 +9418,7 @@ return {
     {
         label = "td_sgdreduce",
         sortText = "3_td_sgdreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9431,7 +9431,7 @@ return {
     {
         label = "td_sgdreduce_contract",
         sortText = "3_td_sgdreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9444,7 +9444,7 @@ return {
     {
         label = "td_shap",
         sortText = "3_td_shap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9457,7 +9457,7 @@ return {
     {
         label = "td_shap_contract",
         sortText = "3_td_shap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9470,7 +9470,7 @@ return {
     {
         label = "td_shapley",
         sortText = "3_td_shapley",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9483,7 +9483,7 @@ return {
     {
         label = "td_shapley_contract",
         sortText = "3_td_shapley_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9496,7 +9496,7 @@ return {
     {
         label = "td_silhouette",
         sortText = "3_td_silhouette",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9509,7 +9509,7 @@ return {
     {
         label = "td_silhouette_contract",
         sortText = "3_td_silhouette_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9522,7 +9522,7 @@ return {
     {
         label = "td_silhouettemap",
         sortText = "3_td_silhouettemap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9535,7 +9535,7 @@ return {
     {
         label = "td_silhouettemap_contract",
         sortText = "3_td_silhouettemap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9548,7 +9548,7 @@ return {
     {
         label = "td_silhouettereduce",
         sortText = "3_td_silhouettereduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9561,7 +9561,7 @@ return {
     {
         label = "td_silhouettereduce_contract",
         sortText = "3_td_silhouettereduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9574,7 +9574,7 @@ return {
     {
         label = "td_simpleimputefit",
         sortText = "3_td_simpleimputefit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9587,7 +9587,7 @@ return {
     {
         label = "td_simpleimputefit_contract",
         sortText = "3_td_simpleimputefit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9600,7 +9600,7 @@ return {
     {
         label = "td_simpleimputefitmap",
         sortText = "3_td_simpleimputefitmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9613,7 +9613,7 @@ return {
     {
         label = "td_simpleimputefitmap_contract",
         sortText = "3_td_simpleimputefitmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9626,7 +9626,7 @@ return {
     {
         label = "td_simpleimputefitred",
         sortText = "3_td_simpleimputefitred",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9639,7 +9639,7 @@ return {
     {
         label = "td_simpleimputefitred_contract",
         sortText = "3_td_simpleimputefitred_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9652,7 +9652,7 @@ return {
     {
         label = "td_simpleimputetransform",
         sortText = "3_td_simpleimputetransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9665,7 +9665,7 @@ return {
     {
         label = "td_simpleimputetransform_con",
         sortText = "3_td_simpleimputetransform_con",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9678,7 +9678,7 @@ return {
     {
         label = "td_smote",
         sortText = "3_td_smote",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9691,7 +9691,7 @@ return {
     {
         label = "td_smote_contract",
         sortText = "3_td_smote_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9704,7 +9704,7 @@ return {
     {
         label = "td_smotemap",
         sortText = "3_td_smotemap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9717,7 +9717,7 @@ return {
     {
         label = "td_smotemap_contract",
         sortText = "3_td_smotemap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9730,7 +9730,7 @@ return {
     {
         label = "td_smotencmap",
         sortText = "3_td_smotencmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9743,7 +9743,7 @@ return {
     {
         label = "td_smotencmap_contract",
         sortText = "3_td_smotencmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9756,7 +9756,7 @@ return {
     {
         label = "td_smotencreduce",
         sortText = "3_td_smotencreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9769,7 +9769,7 @@ return {
     {
         label = "td_smotencreduce_contract",
         sortText = "3_td_smotencreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9782,7 +9782,7 @@ return {
     {
         label = "td_smotereduce",
         sortText = "3_td_smotereduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9795,7 +9795,7 @@ return {
     {
         label = "td_smotereduce_contract",
         sortText = "3_td_smotereduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9808,7 +9808,7 @@ return {
     {
         label = "td_snapshots",
         sortText = "3_td_snapshots",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9821,7 +9821,7 @@ return {
     {
         label = "td_snapshots_contract",
         sortText = "3_td_snapshots_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9834,7 +9834,7 @@ return {
     {
         label = "td_sparsescalefit",
         sortText = "3_td_sparsescalefit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9847,7 +9847,7 @@ return {
     {
         label = "td_sparsescalefit_contract",
         sortText = "3_td_sparsescalefit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9860,7 +9860,7 @@ return {
     {
         label = "td_sparsescalefitrw",
         sortText = "3_td_sparsescalefitrw",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9873,7 +9873,7 @@ return {
     {
         label = "td_sparsescalefitrw1",
         sortText = "3_td_sparsescalefitrw1",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9886,7 +9886,7 @@ return {
     {
         label = "td_sparsescalefitrw1_contract",
         sortText = "3_td_sparsescalefitrw1_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9899,7 +9899,7 @@ return {
     {
         label = "td_sparsescalefitrw2",
         sortText = "3_td_sparsescalefitrw2",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9912,7 +9912,7 @@ return {
     {
         label = "td_sparsescalefitrw2_contract",
         sortText = "3_td_sparsescalefitrw2_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9925,7 +9925,7 @@ return {
     {
         label = "td_sparsescalefitrw_contract",
         sortText = "3_td_sparsescalefitrw_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9938,7 +9938,7 @@ return {
     {
         label = "td_sparsescaletransform",
         sortText = "3_td_sparsescaletransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9951,7 +9951,7 @@ return {
     {
         label = "td_sparsescaletransform_ct",
         sortText = "3_td_sparsescaletransform_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9964,7 +9964,7 @@ return {
     {
         label = "td_spatialdistancekey",
         sortText = "3_td_spatialdistancekey",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9977,7 +9977,7 @@ return {
     {
         label = "td_spatialindexkey",
         sortText = "3_td_spatialindexkey",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -9990,7 +9990,7 @@ return {
     {
         label = "td_spatialmbbkey",
         sortText = "3_td_spatialmbbkey",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10003,7 +10003,7 @@ return {
     {
         label = "td_sprsclgblstatmap",
         sortText = "3_td_sprsclgblstatmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10016,7 +10016,7 @@ return {
     {
         label = "td_sprsclgblstatmap_contract",
         sortText = "3_td_sprsclgblstatmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10029,7 +10029,7 @@ return {
     {
         label = "td_sprsclgblstatred",
         sortText = "3_td_sprsclgblstatred",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10042,7 +10042,7 @@ return {
     {
         label = "td_sprsclgblstatred_contract",
         sortText = "3_td_sprsclgblstatred_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10055,7 +10055,7 @@ return {
     {
         label = "td_srdriver",
         sortText = "3_td_srdriver",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10068,7 +10068,7 @@ return {
     {
         label = "td_srdriver_contract",
         sortText = "3_td_srdriver_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10081,7 +10081,7 @@ return {
     {
         label = "td_stepwiseregression",
         sortText = "3_td_stepwiseregression",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10094,7 +10094,7 @@ return {
     {
         label = "td_stepwiseregression_contract",
         sortText = "3_td_stepwiseregression_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10107,7 +10107,7 @@ return {
     {
         label = "td_strapply",
         sortText = "3_td_strapply",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10120,7 +10120,7 @@ return {
     {
         label = "td_strapply_contract",
         sortText = "3_td_strapply_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10133,7 +10133,7 @@ return {
     {
         label = "td_sum_normalize_meet",
         sortText = "3_td_sum_normalize_meet",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10146,7 +10146,7 @@ return {
     {
         label = "td_sum_normalize_overlap",
         sortText = "3_td_sum_normalize_overlap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10159,7 +10159,7 @@ return {
     {
         label = "td_sum_normalize_overlap_meet",
         sortText = "3_td_sum_normalize_overlap_meet",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10172,7 +10172,7 @@ return {
     {
         label = "td_sunday",
         sortText = "3_td_sunday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -10186,7 +10186,7 @@ return {
     {
         label = "td_svm",
         sortText = "3_td_svm",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10199,7 +10199,7 @@ return {
     {
         label = "td_svm_contract",
         sortText = "3_td_svm_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10212,7 +10212,7 @@ return {
     {
         label = "td_svmpredict",
         sortText = "3_td_svmpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10225,7 +10225,7 @@ return {
     {
         label = "td_svmpredict_contract",
         sortText = "3_td_svmpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10238,7 +10238,7 @@ return {
     {
         label = "td_targetencodingfit",
         sortText = "3_td_targetencodingfit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10251,7 +10251,7 @@ return {
     {
         label = "td_targetencodingfit_contract",
         sortText = "3_td_targetencodingfit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10264,7 +10264,7 @@ return {
     {
         label = "td_targetencodingfitcall1",
         sortText = "3_td_targetencodingfitcall1",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10277,7 +10277,7 @@ return {
     {
         label = "td_targetencodingfitcall1_ct",
         sortText = "3_td_targetencodingfitcall1_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10290,7 +10290,7 @@ return {
     {
         label = "td_targetencodingfitcall2",
         sortText = "3_td_targetencodingfitcall2",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10303,7 +10303,7 @@ return {
     {
         label = "td_targetencodingfitcall2_ct",
         sortText = "3_td_targetencodingfitcall2_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10316,7 +10316,7 @@ return {
     {
         label = "td_targetencodingtransform",
         sortText = "3_td_targetencodingtransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10329,7 +10329,7 @@ return {
     {
         label = "td_targetencodingtransform_ct",
         sortText = "3_td_targetencodingtransform_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10342,7 +10342,7 @@ return {
     {
         label = "td_textparser",
         sortText = "3_td_textparser",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10355,7 +10355,7 @@ return {
     {
         label = "td_textparser_contract",
         sortText = "3_td_textparser_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10368,7 +10368,7 @@ return {
     {
         label = "td_tfidf",
         sortText = "3_td_tfidf",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10381,7 +10381,7 @@ return {
     {
         label = "td_tfidf_contract",
         sortText = "3_td_tfidf_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10394,7 +10394,7 @@ return {
     {
         label = "td_tfidfmap",
         sortText = "3_td_tfidfmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10407,7 +10407,7 @@ return {
     {
         label = "td_tfidfmap_contract",
         sortText = "3_td_tfidfmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10420,7 +10420,7 @@ return {
     {
         label = "td_tfidfreduce",
         sortText = "3_td_tfidfreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10433,7 +10433,7 @@ return {
     {
         label = "td_tfidfreduce_contract",
         sortText = "3_td_tfidfreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10446,7 +10446,7 @@ return {
     {
         label = "td_tfidfreg",
         sortText = "3_td_tfidfreg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10459,7 +10459,7 @@ return {
     {
         label = "td_tfidfreg_contract",
         sortText = "3_td_tfidfreg_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10472,7 +10472,7 @@ return {
     {
         label = "td_thursday",
         sortText = "3_td_thursday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -10486,7 +10486,7 @@ return {
     {
         label = "td_time_bucket_number",
         sortText = "3_td_time_bucket_number",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10499,7 +10499,7 @@ return {
     {
         label = "td_tjdiag",
         sortText = "3_td_tjdiag",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10512,7 +10512,7 @@ return {
     {
         label = "td_tjtrans",
         sortText = "3_td_tjtrans",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10525,7 +10525,7 @@ return {
     {
         label = "td_traintestsplit",
         sortText = "3_td_traintestsplit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10538,7 +10538,7 @@ return {
     {
         label = "td_traintestsplit_contract",
         sortText = "3_td_traintestsplit_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10551,7 +10551,7 @@ return {
     {
         label = "td_ttsmap",
         sortText = "3_td_ttsmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10564,7 +10564,7 @@ return {
     {
         label = "td_ttsmap_contract",
         sortText = "3_td_ttsmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10577,7 +10577,7 @@ return {
     {
         label = "td_ttsreduce",
         sortText = "3_td_ttsreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10590,7 +10590,7 @@ return {
     {
         label = "td_ttsreduce_contract",
         sortText = "3_td_ttsreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10603,7 +10603,7 @@ return {
     {
         label = "td_ttsstratifymap",
         sortText = "3_td_ttsstratifymap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10616,7 +10616,7 @@ return {
     {
         label = "td_ttsstratifymap_contract",
         sortText = "3_td_ttsstratifymap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10629,7 +10629,7 @@ return {
     {
         label = "td_ttsstratifyreduce",
         sortText = "3_td_ttsstratifyreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10642,7 +10642,7 @@ return {
     {
         label = "td_ttsstratifyreduce_contract",
         sortText = "3_td_ttsstratifyreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10655,7 +10655,7 @@ return {
     {
         label = "td_tuesday",
         sortText = "3_td_tuesday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -10669,7 +10669,7 @@ return {
     {
         label = "td_tunable",
         sortText = "3_td_tunable",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10682,7 +10682,7 @@ return {
     {
         label = "td_uaf_getseqinterval",
         sortText = "3_td_uaf_getseqinterval",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10695,7 +10695,7 @@ return {
     {
         label = "td_uaf_getseqinterval_nd",
         sortText = "3_td_uaf_getseqinterval_nd",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10708,7 +10708,7 @@ return {
     {
         label = "td_uaf_getseqinterval_r",
         sortText = "3_td_uaf_getseqinterval_r",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10721,7 +10721,7 @@ return {
     {
         label = "td_univariatestatistics",
         sortText = "3_td_univariatestatistics",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10734,7 +10734,7 @@ return {
     {
         label = "td_univariatestatistics_ct",
         sortText = "3_td_univariatestatistics_ct",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10747,7 +10747,7 @@ return {
     {
         label = "td_univprecompute",
         sortText = "3_td_univprecompute",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10760,7 +10760,7 @@ return {
     {
         label = "td_univprecompute_contract",
         sortText = "3_td_univprecompute_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10773,7 +10773,7 @@ return {
     {
         label = "td_univstatsmap",
         sortText = "3_td_univstatsmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10786,7 +10786,7 @@ return {
     {
         label = "td_univstatsmap_contract",
         sortText = "3_td_univstatsmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10799,7 +10799,7 @@ return {
     {
         label = "td_univstatsreduce",
         sortText = "3_td_univstatsreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10812,7 +10812,7 @@ return {
     {
         label = "td_univstatsreduce_contract",
         sortText = "3_td_univstatsreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10825,7 +10825,7 @@ return {
     {
         label = "td_unorderedstats",
         sortText = "3_td_unorderedstats",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10838,7 +10838,7 @@ return {
     {
         label = "td_unorderedstats_contract",
         sortText = "3_td_unorderedstats_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10851,7 +10851,7 @@ return {
     {
         label = "td_unpivot",
         sortText = "3_td_unpivot",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10864,7 +10864,7 @@ return {
     {
         label = "td_unpivot_contract",
         sortText = "3_td_unpivot_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10877,7 +10877,7 @@ return {
     {
         label = "td_unpivoting",
         sortText = "3_td_unpivoting",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10890,7 +10890,7 @@ return {
     {
         label = "td_unpivoting_contract",
         sortText = "3_td_unpivoting_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10903,7 +10903,7 @@ return {
     {
         label = "td_vecdistmap",
         sortText = "3_td_vecdistmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10916,7 +10916,7 @@ return {
     {
         label = "td_vecdistmap_contract",
         sortText = "3_td_vecdistmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10929,7 +10929,7 @@ return {
     {
         label = "td_vecdistreduce",
         sortText = "3_td_vecdistreduce",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10942,7 +10942,7 @@ return {
     {
         label = "td_vecdistreduce_contract",
         sortText = "3_td_vecdistreduce_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10955,7 +10955,7 @@ return {
     {
         label = "td_vecdistrw2",
         sortText = "3_td_vecdistrw2",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10968,7 +10968,7 @@ return {
     {
         label = "td_vecdistrw2_contract",
         sortText = "3_td_vecdistrw2_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10981,7 +10981,7 @@ return {
     {
         label = "td_vectordistance",
         sortText = "3_td_vectordistance",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -10994,7 +10994,7 @@ return {
     {
         label = "td_vectordistance_contract",
         sortText = "3_td_vectordistance_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11007,7 +11007,7 @@ return {
     {
         label = "td_vectornormalize",
         sortText = "3_td_vectornormalize",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11020,7 +11020,7 @@ return {
     {
         label = "td_vectornormalize_contract",
         sortText = "3_td_vectornormalize_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11033,7 +11033,7 @@ return {
     {
         label = "td_wednesday",
         sortText = "3_td_wednesday",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11047,7 +11047,7 @@ return {
     {
         label = "td_week_begin",
         sortText = "3_td_week_begin",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11061,7 +11061,7 @@ return {
     {
         label = "td_week_end",
         sortText = "3_td_week_end",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11075,7 +11075,7 @@ return {
     {
         label = "td_week_of_calendar",
         sortText = "3_td_week_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11089,7 +11089,7 @@ return {
     {
         label = "td_week_of_month",
         sortText = "3_td_week_of_month",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11103,7 +11103,7 @@ return {
     {
         label = "td_week_of_year",
         sortText = "3_td_week_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11117,7 +11117,7 @@ return {
     {
         label = "td_weekday_of_month",
         sortText = "3_td_weekday_of_month",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11131,7 +11131,7 @@ return {
     {
         label = "td_whichmax",
         sortText = "3_td_whichmax",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11144,7 +11144,7 @@ return {
     {
         label = "td_whichmax_contract",
         sortText = "3_td_whichmax_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11157,7 +11157,7 @@ return {
     {
         label = "td_whichmin",
         sortText = "3_td_whichmin",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11170,7 +11170,7 @@ return {
     {
         label = "td_whichmin_contract",
         sortText = "3_td_whichmin_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11183,7 +11183,7 @@ return {
     {
         label = "td_wordembeddings",
         sortText = "3_td_wordembeddings",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11196,7 +11196,7 @@ return {
     {
         label = "td_wordembeddings_contract",
         sortText = "3_td_wordembeddings_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11209,7 +11209,7 @@ return {
     {
         label = "td_wordembeddingsmap",
         sortText = "3_td_wordembeddingsmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11222,7 +11222,7 @@ return {
     {
         label = "td_wordembeddingsmap_contract",
         sortText = "3_td_wordembeddingsmap_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11235,7 +11235,7 @@ return {
     {
         label = "td_wordembeddingsred",
         sortText = "3_td_wordembeddingsred",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11248,7 +11248,7 @@ return {
     {
         label = "td_wordembeddingsred_contract",
         sortText = "3_td_wordembeddingsred_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11261,7 +11261,7 @@ return {
     {
         label = "td_wordembeddingstp",
         sortText = "3_td_wordembeddingstp",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11274,7 +11274,7 @@ return {
     {
         label = "td_wordembeddingstp_contract",
         sortText = "3_td_wordembeddingstp_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11287,7 +11287,7 @@ return {
     {
         label = "td_xgboost",
         sortText = "3_td_xgboost",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11300,7 +11300,7 @@ return {
     {
         label = "td_xgboost_contract",
         sortText = "3_td_xgboost_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11313,7 +11313,7 @@ return {
     {
         label = "td_xgboostpredict",
         sortText = "3_td_xgboostpredict",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11326,7 +11326,7 @@ return {
     {
         label = "td_xgboostpredict_contract",
         sortText = "3_td_xgboostpredict_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11339,7 +11339,7 @@ return {
     {
         label = "td_xgbpinternal",
         sortText = "3_td_xgbpinternal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11352,7 +11352,7 @@ return {
     {
         label = "td_xgbpinternal_contract",
         sortText = "3_td_xgbpinternal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11365,7 +11365,7 @@ return {
     {
         label = "td_year_begin",
         sortText = "3_td_year_begin",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11379,7 +11379,7 @@ return {
     {
         label = "td_year_end",
         sortText = "3_td_year_end",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11393,7 +11393,7 @@ return {
     {
         label = "td_year_of_calendar",
         sortText = "3_td_year_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11407,7 +11407,7 @@ return {
     {
         label = "td_ztest",
         sortText = "3_td_ztest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11420,7 +11420,7 @@ return {
     {
         label = "tda_dt_calc",
         sortText = "3_tda_dt_calc",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11433,7 +11433,7 @@ return {
     {
         label = "tda_dt_calc_contract",
         sortText = "3_tda_dt_calc_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11446,7 +11446,7 @@ return {
     {
         label = "tda_kmeans",
         sortText = "3_tda_kmeans",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11459,7 +11459,7 @@ return {
     {
         label = "tda_kmeans_contract",
         sortText = "3_tda_kmeans_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11472,7 +11472,7 @@ return {
     {
         label = "tdampcopy",
         sortText = "3_tdampcopy",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11485,7 +11485,7 @@ return {
     {
         label = "tdampcopy_contract",
         sortText = "3_tdampcopy_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11498,7 +11498,7 @@ return {
     {
         label = "tdheatmap",
         sortText = "3_tdheatmap",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11511,7 +11511,7 @@ return {
     {
         label = "tdwmabortdelayedrequest",
         sortText = "3_tdwmabortdelayedrequest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11524,7 +11524,7 @@ return {
     {
         label = "tdwmactiveallocgroups",
         sortText = "3_tdwmactiveallocgroups",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11537,7 +11537,7 @@ return {
     {
         label = "tdwmactivewds",
         sortText = "3_tdwmactivewds",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11550,7 +11550,7 @@ return {
     {
         label = "tdwmassignwd",
         sortText = "3_tdwmassignwd",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11563,7 +11563,7 @@ return {
     {
         label = "tdwmeventmapping",
         sortText = "3_tdwmeventmapping",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11576,7 +11576,7 @@ return {
     {
         label = "tdwmeventstatus",
         sortText = "3_tdwmeventstatus",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11589,7 +11589,7 @@ return {
     {
         label = "tdwmexceptionrate",
         sortText = "3_tdwmexceptionrate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11602,7 +11602,7 @@ return {
     {
         label = "tdwmexceptions",
         sortText = "3_tdwmexceptions",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11615,7 +11615,7 @@ return {
     {
         label = "tdwmgetdelayedqueries",
         sortText = "3_tdwmgetdelayedqueries",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11628,7 +11628,7 @@ return {
     {
         label = "tdwmgetdelayedutilities",
         sortText = "3_tdwmgetdelayedutilities",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11641,7 +11641,7 @@ return {
     {
         label = "tdwminquire",
         sortText = "3_tdwminquire",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11654,7 +11654,7 @@ return {
     {
         label = "tdwmintgetlimit",
         sortText = "3_tdwmintgetlimit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11667,7 +11667,7 @@ return {
     {
         label = "tdwmlistwds",
         sortText = "3_tdwmlistwds",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11680,7 +11680,7 @@ return {
     {
         label = "tdwmloadutilstatistics",
         sortText = "3_tdwmloadutilstatistics",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11693,7 +11693,7 @@ return {
     {
         label = "tdwmreleasedelayedrequest",
         sortText = "3_tdwmreleasedelayedrequest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11706,7 +11706,7 @@ return {
     {
         label = "tdwmsummary",
         sortText = "3_tdwmsummary",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11719,7 +11719,7 @@ return {
     {
         label = "tdwmsummaryrate",
         sortText = "3_tdwmsummaryrate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11732,7 +11732,7 @@ return {
     {
         label = "tdwmthrottlestatistics",
         sortText = "3_tdwmthrottlestatistics",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11745,7 +11745,7 @@ return {
     {
         label = "tessellate",
         sortText = "3_tessellate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -11760,7 +11760,7 @@ return {
     {
         label = "tessellate_index",
         sortText = "3_tessellate_index",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11773,7 +11773,7 @@ return {
     {
         label = "tessellate_search",
         sortText = "3_tessellate_search",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -11788,7 +11788,7 @@ return {
     {
         label = "to_byte",
         sortText = "3_to_byte",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -11804,7 +11804,7 @@ return {
     {
         label = "to_bytes",
         sortText = "3_to_bytes",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11817,7 +11817,7 @@ return {
     {
         label = "to_char",
         sortText = "3_to_char",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -11832,7 +11832,7 @@ return {
     {
         label = "to_date",
         sortText = "3_to_date",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11846,7 +11846,7 @@ return {
     {
         label = "to_dsinterval",
         sortText = "3_to_dsinterval",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11859,7 +11859,7 @@ return {
     {
         label = "to_mgrs",
         sortText = "3_to_mgrs",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11872,7 +11872,7 @@ return {
     {
         label = "to_number",
         sortText = "3_to_number",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -11887,7 +11887,7 @@ return {
     {
         label = "to_timestamp",
         sortText = "3_to_timestamp",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11901,7 +11901,7 @@ return {
     {
         label = "to_timestamp_tz",
         sortText = "3_to_timestamp_tz",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11915,7 +11915,7 @@ return {
     {
         label = "to_yminterval",
         sortText = "3_to_yminterval",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11928,7 +11928,7 @@ return {
     {
         label = "transunicodetoutf8",
         sortText = "3_transunicodetoutf8",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11941,7 +11941,7 @@ return {
     {
         label = "transutf8tounicode",
         sortText = "3_transutf8tounicode",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11954,7 +11954,7 @@ return {
     {
         label = "trunc",
         sortText = "3_trunc",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (2 variants)",
         documentation = {
             kind = "markdown",
@@ -11968,7 +11968,7 @@ return {
     {
         label = "trycast",
         sortText = "3_trycast",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11981,7 +11981,7 @@ return {
     {
         label = "ts_compress",
         sortText = "3_ts_compress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -11994,7 +11994,7 @@ return {
     {
         label = "ts_decompress",
         sortText = "3_ts_decompress",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12007,7 +12007,7 @@ return {
     {
         label = "ucase",
         sortText = "3_ucase",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12020,7 +12020,7 @@ return {
     {
         label = "udfconcat",
         sortText = "3_udfconcat",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12033,7 +12033,7 @@ return {
     {
         label = "upper",
         sortText = "3_upper",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12046,7 +12046,7 @@ return {
     {
         label = "unnest",
         sortText = "3_unnest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (4 variants)",
         documentation = {
             kind = "markdown",
@@ -12062,7 +12062,7 @@ return {
     {
         label = "unpack",
         sortText = "3_unpack",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12075,7 +12075,7 @@ return {
     {
         label = "unpack_contract",
         sortText = "3_unpack_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12088,7 +12088,7 @@ return {
     {
         label = "verify_credentials",
         sortText = "3_verify_credentials",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12101,7 +12101,7 @@ return {
     {
         label = "week",
         sortText = "3_week",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -12116,7 +12116,7 @@ return {
     {
         label = "weeknumber_of_calendar",
         sortText = "3_weeknumber_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -12131,7 +12131,7 @@ return {
     {
         label = "weeknumber_of_month",
         sortText = "3_weeknumber_of_month",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -12146,7 +12146,7 @@ return {
     {
         label = "weeknumber_of_quarter",
         sortText = "3_weeknumber_of_quarter",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -12161,7 +12161,7 @@ return {
     {
         label = "weeknumber_of_year",
         sortText = "3_weeknumber_of_year",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -12176,7 +12176,7 @@ return {
     {
         label = "write_nos",
         sortText = "3_write_nos",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12189,7 +12189,7 @@ return {
     {
         label = "xgboost_internal",
         sortText = "3_xgboost_internal",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Operator (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12202,7 +12202,7 @@ return {
     {
         label = "xgboost_internal_contract",
         sortText = "3_xgboost_internal_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12215,7 +12215,7 @@ return {
     {
         label = "xml",
         sortText = "3_xml",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12228,7 +12228,7 @@ return {
     {
         label = "xmlagg",
         sortText = "3_xmlagg",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Aggregate Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12241,7 +12241,7 @@ return {
     {
         label = "xmlclientfmttxt",
         sortText = "3_xmlclientfmttxt",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12254,7 +12254,7 @@ return {
     {
         label = "xmlcomment",
         sortText = "3_xmlcomment",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12267,7 +12267,7 @@ return {
     {
         label = "xmlconcat",
         sortText = "3_xmlconcat",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12280,7 +12280,7 @@ return {
     {
         label = "xmldocument",
         sortText = "3_xmldocument",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12293,7 +12293,7 @@ return {
     {
         label = "xmlelement",
         sortText = "3_xmlelement",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12306,7 +12306,7 @@ return {
     {
         label = "xmlforest",
         sortText = "3_xmlforest",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12319,7 +12319,7 @@ return {
     {
         label = "xmlnormalize",
         sortText = "3_xmlnormalize",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12332,7 +12332,7 @@ return {
     {
         label = "xmlpadkey",
         sortText = "3_xmlpadkey",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12345,7 +12345,7 @@ return {
     {
         label = "xmlparse",
         sortText = "3_xmlparse",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12358,7 +12358,7 @@ return {
     {
         label = "xmlpi",
         sortText = "3_xmlpi",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12371,7 +12371,7 @@ return {
     {
         label = "xmlpublish_gen_canonical_sql",
         sortText = "3_xmlpublish_gen_canonical_sql",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12384,7 +12384,7 @@ return {
     {
         label = "xmlpublish_gensql",
         sortText = "3_xmlpublish_gensql",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12397,7 +12397,7 @@ return {
     {
         label = "xmlpublishtable",
         sortText = "3_xmlpublishtable",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12410,7 +12410,7 @@ return {
     {
         label = "xmlquery",
         sortText = "3_xmlquery",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12423,7 +12423,7 @@ return {
     {
         label = "xmlserialize",
         sortText = "3_xmlserialize",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12436,7 +12436,7 @@ return {
     {
         label = "xmlsplit",
         sortText = "3_xmlsplit",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12449,7 +12449,7 @@ return {
     {
         label = "xmltable",
         sortText = "3_xmltable",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12462,7 +12462,7 @@ return {
     {
         label = "xmltext",
         sortText = "3_xmltext",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12475,7 +12475,7 @@ return {
     {
         label = "xmltransform",
         sortText = "3_xmltransform",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12488,7 +12488,7 @@ return {
     {
         label = "xmlvalidate",
         sortText = "3_xmlvalidate",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12501,7 +12501,7 @@ return {
     {
         label = "xslt_shred_gencanonical_sql",
         sortText = "3_xslt_shred_gencanonical_sql",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12514,7 +12514,7 @@ return {
     {
         label = "xslt_shred_generate_sql",
         sortText = "3_xslt_shred_generate_sql",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12527,7 +12527,7 @@ return {
     {
         label = "xslt_shred_gettables",
         sortText = "3_xslt_shred_gettables",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12540,7 +12540,7 @@ return {
     {
         label = "xslt_shredtb",
         sortText = "3_xslt_shredtb",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Table Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12553,7 +12553,7 @@ return {
     {
         label = "xslt_xml2sql",
         sortText = "3_xslt_xml2sql",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12566,7 +12566,7 @@ return {
     {
         label = "yearnumber_of_calendar",
         sortText = "3_yearnumber_of_calendar",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (3 variants)",
         documentation = {
             kind = "markdown",
@@ -12581,7 +12581,7 @@ return {
     {
         label = "ztest_contract",
         sortText = "3_ztest_contract",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Contract (1 variant)",
         documentation = {
             kind = "markdown",
@@ -12594,7 +12594,7 @@ return {
     {
         label = "zeroifnull",
         sortText = "3_zeroifnull",
-        kind = require("blink.cmp.types").CompletionItemKind.Function,
+        kind = 3,
         detail = "Scalar Function (1 variant)",
         documentation = {
             kind = "markdown",

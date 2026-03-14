@@ -1,6 +1,16 @@
 local utils = require('vim-teradata.util')
 local ts = require('vim-teradata.sql-autocomplete.treesitter')
 
+-- LSP CompletionItemKind integers (protocol-neutral)
+local Kind = {
+    Text     = 1,
+    Function = 3,
+    Field    = 5,
+    Module   = 9,
+    Keyword  = 14,
+    Struct   = 22,
+}
+
 local M = {}
 
 
@@ -102,17 +112,17 @@ function M.complete_manual(findstart)
 end
 
 --- Provides filtered SQL completion items based on the current context and input base.
---- @return table Start column or filtered completion items.
-function M.complete_blink()
+--- @return table Filtered completion items.
+function M.complete_items()
     local context = analyze_sql_context()
 
     local raw_items = {}
 
     local context_results
-    local context_kind = require("blink.cmp.types").CompletionItemKind.Text
+    local context_kind = Kind.Text
 
     if context.type == 'columns' then
-        context_kind = require("blink.cmp.types").CompletionItemKind.Field
+        context_kind = Kind.Field
         if context.alias_prefix then
             context.tables = vim.tbl_filter(function(item)
                 return item.alias == string.upper(context.alias_prefix)
@@ -153,13 +163,13 @@ function M.complete_blink()
         context_results = context_results or {}
         vim.list_extend(context_results, final_flat_list)
     elseif context.type == 'tables' then
-        context_kind = require("blink.cmp.types").CompletionItemKind.Struct
+        context_kind = Kind.Struct
         context_results = utils.get_tables(context.db_name)
     elseif context.type == 'databases' then
-        context_kind = require("blink.cmp.types").CompletionItemKind.Module
+        context_kind = Kind.Module
         context_results = utils.get_databases()
     elseif context.type == 'keywords' then
-        context_kind = require("blink.cmp.types").CompletionItemKind.Keyword
+        context_kind = Kind.Keyword
         context_results = context.candidates
     end
 
@@ -177,7 +187,7 @@ function M.complete_blink()
         local keywords = ts.get_sql_keywords()
         for _, kw in ipairs(keywords) do
             table.insert(raw_items, {
-                kind = require("blink.cmp.types").CompletionItemKind.Keyword,
+                kind = Kind.Keyword,
                 sortText = "2_" .. kw,
                 label = kw,
             })
