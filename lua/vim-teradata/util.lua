@@ -275,21 +275,31 @@ function M.export_db_data()
         return vim.notify("Missing TD env variables", vim.log.levels.ERROR)
     end
 
-    local tbuild_command = "tbuild -f " ..
-        tpt_script ..
-        " -u \"user='" ..
-        user .. "', logon_mech='" .. logon_mech .. "', tdpid='" .. tdpid .. "', data_path='" .. data_tmp .. "'\""
+    local tbuild_command = {
+        "tbuild",
+        "-f",
+        tpt_script,
+        "-u",
+        string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'", user, logon_mech, tdpid, data_tmp)
+    }
 
     local data_tmp_file = data_tmp .. "/data_tmp.csv"
     M.remove_files(data_tmp_file)
-    local tpt_result = vim.fn.system(tbuild_command)
-    local exit_code = vim.v.shell_error
-    if exit_code ~= 0 then
-        return vim.notify("tbuild command failed : " .. tpt_result, vim.log.levels.ERROR)
-    end
 
-    split_data_db_file_to_lua()
-    M.remove_files(data_tmp_file)
+    vim.notify("TDSync: Syncing databases... (this may take a while)", vim.log.levels.INFO)
+
+    vim.system(tbuild_command, { text = true }, function(result)
+        vim.schedule(function()
+            if result.code ~= 0 then
+                vim.notify("TDSync failed: " .. (result.stderr or result.stdout or "unknown error"), vim.log.levels.ERROR)
+                return
+            end
+
+            split_data_db_file_to_lua()
+            M.remove_files(data_tmp_file)
+            vim.notify("TDSync: Completed successfully", vim.log.levels.INFO)
+        end)
+    end)
 end
 
 --- Gets the full path for a history directory.
