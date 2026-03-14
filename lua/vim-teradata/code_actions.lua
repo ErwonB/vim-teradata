@@ -27,14 +27,13 @@ end
 local function find_star_node(bufnr)
     local cursor_node = vim.treesitter.get_node({ bufnr = bufnr })
     if not cursor_node then return nil end
-    -- The cursor may be directly on the `all_fields` node or its parent
-    if cursor_node:type() == "all_fields" then
-        return cursor_node
-    end
-    -- Check if cursor is on a `*` literal that is child of select_expression
-    local text = diag.get_text(cursor_node, bufnr)
-    if text == "*" then
-        return cursor_node
+    local node = cursor_node
+    while node do
+        if node:type() == "all_fields" then
+            return node
+        end
+        if node:type() == "select_expression" or node:type() == "statement" then break end
+        node = node:parent()
     end
     return nil
 end
@@ -59,11 +58,11 @@ local function action_expand_star(bufnr)
 
     -- Find the scope that contains our star node
     local target_scope = nil
-    local star_sr, _, _, _ = star_node:range()
+    local star_sr, _, star_er, _ = star_node:range()
     for _, scope_nodes in ipairs(scopes) do
         for _, node in ipairs(scope_nodes) do
             local s_sr, _, s_er, _ = node:range()
-            if star_sr >= s_sr and star_sr <= s_er then
+            if star_sr >= s_sr and star_er <= s_er then
                 target_scope = scope_nodes
                 break
             end
@@ -76,26 +75,49 @@ local function action_expand_star(bufnr)
         return
     end
 
-    local _, active_tables = diag.analyze_relations(target_scope, bufnr, {}, cte_defs)
+    local relation_map, active_tables = diag.analyze_relations(target_scope, bufnr, {}, cte_defs)
 
     if #active_tables == 0 then
         vim.notify("No tables found in scope to expand *.", vim.log.levels.WARN)
         return
     end
 
-    -- Collect all columns
-    local all_columns = {}
-    local has_multiple_tables = #active_tables > 1
+    local scope_multi_tables = (#active_tables > 1)
 
-    -- Build alias map from relations
-    local alias_map = {}
+    -- Extract qualifier from all_fields node (e.g. `a.*`)
+    local qualifier = nil
+    for child in star_node:iter_children() do
+        if child:type() == "object_reference" then
+            local parts = {}
+            for part in child:iter_children() do
+                if part:type() == "identifier" then
+                    table.insert(parts, diag.get_text(part, bufnr))
+                end
+            end
+            if #parts > 0 then
+                qualifier = parts[#parts]
+            end
+            break
+        end
+    end
+
+    if qualifier then
+        local rel = relation_map[qualifier:upper()]
+        if not rel then
+            vim.notify(string.format("'%s' does not match any table or alias in scope.", qualifier), vim.log.levels.WARN)
+            return
+        end
+        active_tables = { rel }
+    end
+
+    -- Build alias map (table_name -> alias) from relations
+    local table_to_alias = {}
     for _, scope_node in ipairs(target_scope) do
         for _, rel_node in diag.QUERIES.relation:iter_captures(scope_node, bufnr, 0, -1) do
             if not diag.is_nested_in_subquery(rel_node, scope_node) then
                 local alias_node = rel_node:field("alias")[1]
                 if alias_node then
                     local alias = diag.get_text(alias_node, bufnr)
-                    -- Find the obj_ref in the relation
                     for child in rel_node:iter_children() do
                         if child:type() == "object_reference" then
                             local parts = {}
@@ -105,13 +127,13 @@ local function action_expand_star(bufnr)
                                 end
                             end
                             local tbl_name = parts[#parts]
-                            if tbl_name then
-                                alias_map[tbl_name:upper()] = alias
+                            if tbl_name and alias then
+                                table_to_alias[tbl_name:upper()] = alias
                             end
                             break
                         elseif child:type() == "subquery" then
                             if alias then
-                                alias_map[alias:upper()] = alias
+                                table_to_alias[alias:upper()] = alias
                             end
                             break
                         end
@@ -121,21 +143,31 @@ local function action_expand_star(bufnr)
         end
     end
 
+    local all_columns = {}
     for _, rel in ipairs(active_tables) do
         local columns = {}
         local prefix = ""
 
+        local tbl_key = rel.table and rel.table:upper() or nil
+        local alias = tbl_key and table_to_alias[tbl_key] or nil
+
+        if qualifier then
+            -- explicit qualifier: always use it
+            prefix = qualifier .. "."
+        elseif alias then
+            -- table has an alias: always use it
+            prefix = alias .. "."
+        elseif scope_multi_tables and rel.table then
+            -- multiple unaliased tables: use raw table name
+            prefix = rel.table .. "."
+        end
+        -- single unaliased table: no prefix
+
         if rel.db and rel.table and not rel.derived then
             columns = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or {}
-            if has_multiple_tables then
-                prefix = (alias_map[rel.table:upper()] or rel.table) .. "."
-            end
         elseif rel.columns then
             for _, c in ipairs(rel.columns) do
                 table.insert(columns, c.name)
-            end
-            if has_multiple_tables and rel.table then
-                prefix = (alias_map[rel.table:upper()] or rel.table) .. "."
             end
         end
 
@@ -145,7 +177,11 @@ local function action_expand_star(bufnr)
     end
 
     if #all_columns == 0 then
-        vim.notify("No columns found to expand.", vim.log.levels.WARN)
+        if qualifier then
+            vim.notify(string.format("No columns found for %s.*", qualifier), vim.log.levels.WARN)
+        else
+            vim.notify("No columns found to expand.", vim.log.levels.WARN)
+        end
         return
     end
 
