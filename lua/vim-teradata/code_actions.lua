@@ -1,6 +1,5 @@
 local util = require('vim-teradata.util')
 local diag = require('vim-teradata.diagnostics')
-local ts = require('vim-teradata.sql-autocomplete.treesitter')
 
 local M = {}
 
@@ -344,7 +343,8 @@ local function generate_alias(table_name, used_aliases)
     return final
 end
 
----Auto-aliases all unaliased tables in the statement.
+---Auto-aliases all unaliased tables in the statement, and adds prefix to unaliased fields
+---(only when the scope has exactly one table)
 ---@param bufnr number
 local function action_auto_alias(bufnr)
     local stmt_node = get_cursor_statement(bufnr)
@@ -353,13 +353,14 @@ local function action_auto_alias(bufnr)
         return
     end
 
+    local cte_defs = diag.get_cte_definitions(stmt_node, bufnr)
     local scopes = diag.get_query_scopes(stmt_node)
     if #scopes == 0 then
         vim.notify("No query scopes found.", vim.log.levels.WARN)
         return
     end
 
-    -- Collect existing aliases
+    -- Collect existing aliases globally
     local used_aliases = {}
     for _, scope_nodes in ipairs(scopes) do
         for _, node in ipairs(scope_nodes) do
@@ -375,71 +376,106 @@ local function action_auto_alias(bufnr)
         end
     end
 
-    -- Collect relations that need aliases (in reverse line order to avoid index shifts)
     local edits = {}
+
     for _, scope_nodes in ipairs(scopes) do
+        -- 1. Identify tables (and derive active_tables)
+        local _, active_tables = diag.analyze_relations(scope_nodes, bufnr, {}, cte_defs)
+
+        local scope_table_aliases = {} -- upper(table_name) -> alias
+
+        -- First pass: add missing aliases to tables
         for _, node in ipairs(scope_nodes) do
             for _, rel_node in diag.QUERIES.relation:iter_captures(node, bufnr, 0, -1) do
                 if diag.is_nested_in_subquery(rel_node, node) then goto continue end
 
                 local alias_node = rel_node:field("alias")[1]
-                if alias_node then goto continue end -- already has alias
 
-                -- Check it's not a subquery (we only auto-alias direct table references)
+                -- Skip derived tables / subqueries
                 local has_subquery = false
+                local obj_ref = nil
                 for child in rel_node:iter_children() do
                     if child:type() == "subquery" then
                         has_subquery = true
                         break
-                    end
-                end
-                if has_subquery then goto continue end
-
-                -- Find the object_reference to get the table name
-                local obj_ref = nil
-                for child in rel_node:iter_children() do
-                    if child:type() == "object_reference" then
+                    elseif child:type() == "object_reference" then
                         obj_ref = child
-                        break
                     end
                 end
+                if has_subquery or not obj_ref then goto continue end
 
-                if obj_ref then
-                    local parts = {}
-                    for part in obj_ref:iter_children() do
-                        if part:type() == "identifier" then
-                            table.insert(parts, diag.get_text(part, bufnr))
-                        end
+                local parts = {}
+                for part in obj_ref:iter_children() do
+                    if part:type() == "identifier" then
+                        table.insert(parts, diag.get_text(part, bufnr))
                     end
-                    local table_name = parts[#parts]
-                    if table_name then
-                        local alias = generate_alias(table_name, used_aliases)
-                        local _, _, er, ec = obj_ref:range()
-                        table.insert(edits, { row = er, col = ec, alias = alias })
-                    end
+                end
+                local table_name = parts[#parts]
+                if not table_name then goto continue end
+
+                local t_upper = table_name:upper()
+                local alias
+
+                if alias_node then
+                    alias = diag.get_text(alias_node, bufnr)
+                    scope_table_aliases[t_upper] = alias
+                else
+                    alias = generate_alias(table_name, used_aliases)
+                    scope_table_aliases[t_upper] = alias
+                    local _, _, er, ec = obj_ref:range()
+                    table.insert(edits, { row = er, col = ec, text = " " .. alias })
                 end
 
                 ::continue::
             end
         end
+
+        -- 2. Prefix fields ONLY for simple single-table scopes
+        if #active_tables ~= 1 then goto next_scope end
+
+        local t_name = active_tables[1].table and active_tables[1].table:upper() or nil
+        if not t_name then goto next_scope end
+
+        local single_alias = scope_table_aliases[t_name]
+        if not single_alias then goto next_scope end
+
+        local function gather_unaliased_fields(container_node)
+            if not container_node then return end
+            for _, col_node in diag.QUERIES.bare_field:iter_captures(container_node, bufnr, 0, -1) do
+                if diag.is_nested_in_subquery(col_node, container_node) then goto skip_field end
+
+                -- bare_field already gives us the unprefixed identifier
+                local sr, sc, _, _ = col_node:range()
+                table.insert(edits, { row = sr, col = sc, text = single_alias .. "." })
+
+                ::skip_field::
+            end
+        end
+
+        -- Run on every child of the scope – this covers both SELECT list and WHERE clause
+        for _, node in ipairs(scope_nodes) do
+            gather_unaliased_fields(node)
+        end
+
+        ::next_scope::
     end
 
     if #edits == 0 then
-        vim.notify("All tables already have aliases.", vim.log.levels.INFO)
+        vim.notify("All tables already have aliases and fields are prefixed.", vim.log.levels.INFO)
         return
     end
 
-    -- Sort edits in reverse order (bottom-to-top, right-to-left)
+    -- Apply edits bottom-to-top
     table.sort(edits, function(a, b)
         if a.row == b.row then return a.col > b.col end
         return a.row > b.row
     end)
 
     for _, edit in ipairs(edits) do
-        vim.api.nvim_buf_set_text(bufnr, edit.row, edit.col, edit.row, edit.col, { " " .. edit.alias })
+        vim.api.nvim_buf_set_text(bufnr, edit.row, edit.col, edit.row, edit.col, { edit.text })
     end
 
-    vim.notify(string.format("Added %d alias(es).", #edits), vim.log.levels.INFO)
+    vim.notify(string.format("Applied %d auto-alias edit(s).", #edits), vim.log.levels.INFO)
 end
 
 -- =============================================================================
