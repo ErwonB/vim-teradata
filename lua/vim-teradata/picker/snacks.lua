@@ -1,14 +1,16 @@
 local M = {}
 
 function M.grep_queries(queries_dir, on_select)
-    Snacks.picker.grep({
+    require('snacks').picker.grep({
         cwd = queries_dir,
-        prompt_title = 'Grep Queries',
+        title = 'Grep Queries',
         confirm = function(picker, item)
             picker:close()
             if item and item.file then
                 local filename = vim.fn.fnamemodify(item.file, ':t:r')
-                on_select(filename)
+                vim.schedule(function()
+                    on_select(filename)
+                end)
             end
         end
     })
@@ -28,35 +30,39 @@ function M.pick_completion(items, context, opts, on_select)
         })
     end
 
-    Snacks.picker.pick({
+    require('snacks').picker.pick({
         title = 'SQL Completion',
         items = picker_items,
         format = 'text',
         layout = {
-            preset = 'dropdown',
+            preset = 'select',
             preview = false,
         },
-        actions = {
-            confirm = function(picker, item)
-                local selected = {}
-                if is_multi then
-                    -- Get all selected items if multi-select is on
-                    for _, sel_item in ipairs(picker:selected()) do
-                        table.insert(selected, sel_item.text)
-                    end
-                end
-
-                -- Fallback to the current item if nothing specific was multi-selected
-                if #selected == 0 and item then
-                    table.insert(selected, item.text)
-                end
-
-                picker:close()
-                if #selected > 0 then
-                    on_select(selected, context)
+        win = is_multi and {} or {
+            input = { keys = { ["<Tab>"] = false, ["<S-Tab>"] = false, ["<c-a>"] = false } },
+            list  = { keys = { ["<Tab>"] = false, ["<S-Tab>"] = false, ["<c-a>"] = false } }
+        },
+        confirm = function(picker, item)
+            local selected = {}
+            if is_multi then
+                local multi_items = picker:selected()
+                for _, sel_item in ipairs(multi_items) do
+                    table.insert(selected, sel_item.text)
                 end
             end
-        }
+
+            -- Fallback to current item if nothing was multi-selected
+            if #selected == 0 and item then
+                table.insert(selected, item.text)
+            end
+
+            picker:close()
+            if #selected > 0 then
+                vim.schedule(function()
+                    on_select(selected, context)
+                end)
+            end
+        end
     })
 end
 
