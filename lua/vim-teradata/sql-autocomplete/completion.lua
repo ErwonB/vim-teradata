@@ -191,11 +191,11 @@ function M.complete_blink()
     return raw_items
 end
 
---- Inserts selected FZF items into the buffer based on SQL context.
+--- Inserts selected items into the buffer based on SQL context.
 --- @param selected table List of selected completion items.
 --- @param context table Context metadata for insertion.
 --- @return nil
-local function handle_fzf_selection(selected, context)
+local function handle_selection(selected, context)
     if not vim.api.nvim_buf_is_valid(context.buf) or #selected == 0 then
         return
     end
@@ -231,9 +231,9 @@ local function handle_fzf_selection(selected, context)
 end
 
 
---- Triggers FZF-based SQL completion and handles user selection.
+--- Triggers SQL completion and handles user selection.
 --- @return nil
-function M.trigger_fzf()
+function M.trigger_completion()
     local cursor_pos = vim.api.nvim_win_get_cursor(0)
     local start_col = M.complete_manual(1)
 
@@ -249,18 +249,13 @@ function M.trigger_fzf()
     completion_data.context.start_col = start_col
     completion_data.context.end_col = cursor_pos[2]
 
-
-    local fzf_config = {
-        source = completion_data.items,
-        options = completion_data.fzf_options,
-        window = { width = 0.5, height = 0.4, border = 'rounded' },
-        -- Use a lambda with a captured context for cleaner state management
-        ['sink*'] = function(selected)
-            handle_fzf_selection(selected, completion_data.context)
-        end,
-    }
-
-    vim.fn['fzf#run'](fzf_config)
+    local picker = require('vim-teradata.picker').get()
+    picker.pick_completion(
+        completion_data.items,
+        completion_data.context,
+        { fzf_options = completion_data.fzf_options },
+        handle_selection
+    )
 end
 
 return M

@@ -2,6 +2,8 @@ local M = {}
 -- Default configuration values
 local tpt_script = vim.api.nvim_get_runtime_file("lua/vim-teradata/sql-autocomplete/tpt/export_db.tpt", true)
 M.defaults = {
+    -- Picker backend: 'auto', 'fzf_vim', 'fzf_lua', 'snacks', or 'telescope'
+    picker = 'auto',
     -- Connection parameters moved to users list
     ft = { "sql", "teradata" },
     -- Path configuration

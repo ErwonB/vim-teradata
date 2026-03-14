@@ -2,7 +2,7 @@ local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
 local bteq = require('vim-teradata.bteq')
 local ui = require('vim-teradata.ui')
-local fzf = require('vim-teradata.fzf')
+local picker = require('vim-teradata.pick')
 local bookmark = require('vim-teradata.bookmark')
 local ope = require('vim-teradata.td_ope')
 
@@ -208,7 +208,7 @@ function M.setup(user_config)
             -- :TDH command (history)
             vim.api.nvim_create_user_command('TDH', ui.show_queries, { nargs = 0 })
             -- :TDR command (search history)
-            vim.api.nvim_create_user_command('TDR', fzf.find_query_by_content, { nargs = 0 })
+            vim.api.nvim_create_user_command('TDR', picker.find_query_by_content, { nargs = 0 })
             -- :TDHelp display help
             vim.api.nvim_create_user_command('TDHelp', ui.display_help, { nargs = 0 })
             -- :TDU user management
@@ -225,7 +225,7 @@ function M.setup(user_config)
             register_td_provider()
             -- Set up a keybinding to trigger completion
             vim.api.nvim_buf_set_keymap(0, 'i', '<C-x><C-u>',
-                '<cmd>lua require("vim-teradata.sql-autocomplete.completion").trigger_fzf()<CR>', {
+                '<cmd>lua require("vim-teradata.sql-autocomplete.completion").trigger_completion()<CR>', {
                     noremap = true,
                     silent = true
                 })
