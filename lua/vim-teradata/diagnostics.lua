@@ -957,4 +957,16 @@ function M.update_diagnostics(bufnr)
     vim.diagnostic.set(NAMESPACE, bufnr, diagnostics)
 end
 
+-- =============================================================================
+-- Shared helpers (used by code_actions.lua)
+-- =============================================================================
+
+M.QUERIES = QUERIES
+M.get_query_scopes = get_query_scopes
+M.analyze_relations = analyze_relations
+M.get_cte_definitions = get_cte_definitions
+M.get_columns_from_select_expr = get_columns_from_select_expr
+M.is_nested_in_subquery = is_nested_in_subquery
+M.get_text = get_text
+
 return M
