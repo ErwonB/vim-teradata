@@ -479,6 +479,267 @@ local function action_auto_alias(bufnr)
 end
 
 -- =============================================================================
+-- Action 4: Transform SELECT to DELETE
+-- =============================================================================
+
+---Transforms a SELECT statement into a DELETE statement (inserts below).
+---@param bufnr number
+local function action_transform_to_delete(bufnr)
+    local stmt_node = get_cursor_statement(bufnr)
+    if not stmt_node then
+        vim.notify("Cursor is not inside a SQL statement.", vim.log.levels.WARN)
+        return
+    end
+
+    local select_node = util.find_first_descendant_by_type(stmt_node, "select")
+    local from_node = util.find_first_descendant_by_type(stmt_node, "from")
+
+    if not select_node or not from_node then
+        vim.notify("Statement does not have a SELECT and FROM clause.", vim.log.levels.WARN)
+        return
+    end
+
+    local from_sr, from_sc, _, _ = from_node:range()
+    local _, _, stmt_er, stmt_ec = stmt_node:range()
+
+    local lines = vim.api.nvim_buf_get_text(bufnr, from_sr, from_sc, stmt_er, stmt_ec, {})
+    if not lines or #lines == 0 then return end
+
+    -- Remove trailing semicolon from the extracted text if any, as well as whitespaces
+    lines[#lines] = lines[#lines]:gsub("%s*;%s*$", "")
+
+    lines[1] = "delete " .. lines[1]
+    lines[#lines] = lines[#lines] .. ";"
+
+    -- Determine indent of the original statement to pad the new statement if desired.
+    -- (We will just insert it as is for now)
+
+    -- Insert 2 new lines and the new text below the statement
+    local insert_row = stmt_er + 1
+    -- ensure we're not inserting out of bounds
+    local total_lines = vim.api.nvim_buf_line_count(bufnr)
+    if insert_row > total_lines then insert_row = total_lines end
+
+    vim.api.nvim_buf_set_lines(bufnr, insert_row, insert_row, false, { "" })
+    vim.api.nvim_buf_set_lines(bufnr, insert_row + 1, insert_row + 1, false, lines)
+
+    vim.notify("Transform to DELETE action completed.", vim.log.levels.INFO)
+end
+
+-- =============================================================================
+-- Action 5: Transform SELECT to INSERT
+-- =============================================================================
+
+---Transforms a SELECT statement into an INSERT SELECT statement (inserts below).
+---@param bufnr number
+local function action_transform_to_insert(bufnr)
+    local stmt_node = get_cursor_statement(bufnr)
+    if not stmt_node then
+        vim.notify("Cursor is not inside a SQL statement.", vim.log.levels.WARN)
+        return
+    end
+
+    local select_node = util.find_first_descendant_by_type(stmt_node, "select")
+    local from_node = util.find_first_descendant_by_type(stmt_node, "from")
+
+    if not select_node or not from_node then
+        vim.notify("Statement does not have a SELECT and FROM clause.", vim.log.levels.WARN)
+        return
+    end
+
+    local cte_defs = diag.get_cte_definitions(stmt_node, bufnr)
+    local scopes = diag.get_query_scopes(stmt_node)
+
+    local _, active_tables = {}, {}
+    if #scopes > 0 then
+        local main_scope_nodes = scopes[1]
+        for _, scope in ipairs(scopes) do
+            if scope[1] == stmt_node then
+                main_scope_nodes = scope
+                break
+            end
+        end
+        _, active_tables = diag.analyze_relations(main_scope_nodes, bufnr, {}, cte_defs)
+    end
+
+    if #active_tables == 0 then
+        vim.notify("No tables found in FROM clause.", vim.log.levels.WARN)
+        return
+    end
+
+    local target_table = nil
+    for _, rel in ipairs(active_tables) do
+        if not rel.derived and rel.table then
+            target_table = rel.table
+            break
+        end
+    end
+
+    if not target_table then
+        vim.notify("Could not find a base table in the SELECT statement.", vim.log.levels.WARN)
+        return
+    end
+
+    local databases = util.get_databases()
+    local filtered_dbs = {}
+    for _, db in ipairs(databases or {}) do
+        if util.is_a_table(db, target_table) then
+            table.insert(filtered_dbs, db)
+        end
+    end
+
+    if #filtered_dbs == 0 then
+        vim.notify("Target table " .. target_table .. " not found in any database.", vim.log.levels.WARN)
+        return
+    end
+
+    vim.ui.select(filtered_dbs, { prompt = "Select target database:" }, function(selected_db)
+        if not selected_db then return end
+
+        local target_cols = util.get_columns({ { db_name = selected_db, tb_name = target_table } })
+
+        local all_source_cols = {}
+        for _, rel in ipairs(active_tables) do
+            local rel_cols = {}
+            if rel.db and rel.table and not rel.derived then
+                rel_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } })
+            elseif rel.columns then
+                for _, c in ipairs(rel.columns) do table.insert(rel_cols, c.name) end
+            end
+            for _, c in ipairs(rel_cols or {}) do
+                all_source_cols[c:upper()] = true
+            end
+        end
+
+        local common_cols = {}
+        for _, c in ipairs(target_cols or {}) do
+            if all_source_cols[c:upper()] then
+                table.insert(common_cols, c)
+            end
+        end
+
+        if #common_cols == 0 then
+            vim.notify("No common columns found between target and source.", vim.log.levels.WARN)
+            return
+        end
+
+        local from_sr, from_sc, _, _ = from_node:range()
+        local _, _, stmt_er, stmt_ec = stmt_node:range()
+
+        local lines = vim.api.nvim_buf_get_text(bufnr, from_sr, from_sc, stmt_er, stmt_ec, {})
+        if not lines or #lines == 0 then return end
+
+        lines[#lines] = lines[#lines]:gsub("%s*;%s*$", "")
+        lines[#lines] = lines[#lines] .. ";"
+
+        local cols_str = table.concat(common_cols, ",\n    ")
+        local insert_clause = string.format("insert into %s.%s (\n    %s\n)", selected_db, target_table, cols_str)
+        local select_clause = "select \n    " .. cols_str
+
+        local select_lines = vim.split(select_clause, "\n")
+        local insert_lines = vim.split(insert_clause, "\n")
+
+        for i = #select_lines, 1, -1 do
+            table.insert(lines, 1, select_lines[i])
+        end
+        for i = #insert_lines, 1, -1 do
+            table.insert(lines, 1, insert_lines[i])
+        end
+
+        local insert_row = stmt_er + 1
+        local total_lines = vim.api.nvim_buf_line_count(bufnr)
+        if insert_row > total_lines then insert_row = total_lines end
+
+        vim.api.nvim_buf_set_lines(bufnr, insert_row, insert_row, false, { "" })
+        vim.api.nvim_buf_set_lines(bufnr, insert_row + 1, insert_row + 1, false, lines)
+
+        vim.notify("Transform to INSERT action completed.", vim.log.levels.INFO)
+    end)
+end
+
+-- =============================================================================
+-- Action 6: Autocomplete JOIN Condition
+-- =============================================================================
+
+---Autocompletes the JOIN condition matching common fields.
+---@param bufnr number
+local function action_autocomplete_join(bufnr)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local row_1, col_0 = cursor[1], cursor[2]
+
+    local ts_mod = require('vim-teradata.sql-autocomplete.treesitter')
+    local context = ts_mod.analyze_sql_context()
+
+    if not context or not context.tables or #context.tables < 2 then
+        vim.notify("Could not find at least 2 tables to join.", vim.log.levels.WARN)
+        return
+    end
+
+    local tables = context.tables
+    local t1 = tables[#tables - 1]
+    local t2 = tables[#tables]
+
+    if not t1.tb_name or not t2.tb_name then
+        vim.notify("Could not resolve table names for the join.", vim.log.levels.WARN)
+        return
+    end
+
+    local DatabaseMap = util.get_databases()
+    local t1_def = { db_name = t1.db_name, tb_name = t1.tb_name }
+    local t2_def = { db_name = t2.db_name, tb_name = t2.tb_name }
+
+    local cols1 = util.get_columns({ t1_def }) or {}
+    local cols2 = util.get_columns({ t2_def }) or {}
+
+    if #cols1 == 0 and not t1.db_name then
+        for _, db in ipairs(DatabaseMap or {}) do
+            if util.is_a_table(db, t1.tb_name) then
+                cols1 = util.get_columns({ { db_name = db, tb_name = t1.tb_name } }) or {}
+                break
+            end
+        end
+    end
+    if #cols2 == 0 and not t2.db_name then
+        for _, db in ipairs(DatabaseMap or {}) do
+            if util.is_a_table(db, t2.tb_name) then
+                cols2 = util.get_columns({ { db_name = db, tb_name = t2.tb_name } }) or {}
+                break
+            end
+        end
+    end
+
+    local set1 = {}
+    for _, c in ipairs(cols1) do
+        set1[c:upper()] = true
+    end
+
+    local common = {}
+    for _, c in ipairs(cols2) do
+        if set1[c:upper()] then
+            table.insert(common, c:lower())
+        end
+    end
+
+    if #common == 0 then
+        vim.notify("No common columns found between tables.", vim.log.levels.WARN)
+        return
+    end
+
+    local alias1 = (t1.alias and t1.alias ~= "") and t1.alias:lower() or t1.tb_name:lower()
+    local alias2 = (t2.alias and t2.alias ~= "") and t2.alias:lower() or t2.tb_name:lower()
+
+    local conds = {}
+    for _, c in ipairs(common) do
+        table.insert(conds, string.format("%s.%s = %s.%s", alias1, c, alias2, c))
+    end
+    local condition_str = table.concat(conds, " and ")
+
+    vim.api.nvim_buf_set_text(bufnr, row_1 - 1, col_0, row_1 - 1, col_0, { " " .. condition_str })
+
+    vim.notify("Auto-completed JOIN condition.", vim.log.levels.INFO)
+end
+
+-- =============================================================================
 -- Public API
 -- =============================================================================
 
@@ -511,10 +772,24 @@ function M.run()
         })
     end
 
-    -- Check: Auto-alias tables
+    -- Check: Autocomplete JOIN
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local cur_row, cur_col = cursor[1], cursor[2]
+    local current_line = vim.api.nvim_buf_get_lines(bufnr, cur_row - 1, cur_row, false)[1] or ""
+    local before_cursor = current_line:sub(1, cur_col)
+    local last_word = before_cursor:match("%S+$") or ""
+
+    if last_word:upper() == "ON" then
+        table.insert(actions, {
+            title = "Autocomplete JOIN condition",
+            fn = function() action_autocomplete_join(bufnr) end,
+        })
+    end
+
+    -- Check: Auto-alias tables / Transform to DELETE/INSERT
     local stmt_node = get_cursor_statement(bufnr)
     if stmt_node then
-        -- Check if there are unaliased relations
+        -- Auto-alias tables logic...
         local scopes = diag.get_query_scopes(stmt_node)
         local has_unaliased = false
         for _, scope_nodes in ipairs(scopes) do
@@ -546,6 +821,20 @@ function M.run()
             table.insert(actions, {
                 title = "Auto-alias tables",
                 fn = function() action_auto_alias(bufnr) end,
+            })
+        end
+
+        local select_node = util.find_first_descendant_by_type(stmt_node, "select")
+        local from_node = util.find_first_descendant_by_type(stmt_node, "from")
+
+        if select_node and from_node then
+            table.insert(actions, {
+                title = "Transform SELECT to DELETE statement",
+                fn = function() action_transform_to_delete(bufnr) end,
+            })
+            table.insert(actions, {
+                title = "Transform SELECT to INSERT SELECT statement",
+                fn = function() action_transform_to_insert(bufnr) end,
             })
         end
     end
