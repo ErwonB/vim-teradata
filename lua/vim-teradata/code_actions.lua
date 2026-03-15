@@ -593,68 +593,74 @@ local function action_transform_to_insert(bufnr)
         return
     end
 
-    vim.ui.select(filtered_dbs, { prompt = "Select target database:" }, function(selected_db)
-        if not selected_db then return end
+    local picker = require('vim-teradata.picker').get()
+    picker.pick_completion(
+        filtered_dbs,
+        {},                   -- context (unused here)
+        { fzf_options = "" }, -- single select, no multi
+        function(selected, _)
+            local selected_db = selected and selected[1] or nil
+            if not selected_db then return end
 
-        local target_cols = util.get_columns({ { db_name = selected_db, tb_name = target_table } })
-
-        local all_source_cols = {}
-        for _, rel in ipairs(active_tables) do
-            local rel_cols = {}
-            if rel.db and rel.table and not rel.derived then
-                rel_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } })
-            elseif rel.columns then
-                for _, c in ipairs(rel.columns) do table.insert(rel_cols, c.name) end
+            local target_cols = util.get_columns({ { db_name = selected_db, tb_name = target_table } })
+            local all_source_cols = {}
+            for _, rel in ipairs(active_tables) do
+                local rel_cols = {}
+                if rel.db and rel.table and not rel.derived then
+                    rel_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } })
+                elseif rel.columns then
+                    for _, c in ipairs(rel.columns) do table.insert(rel_cols, c.name) end
+                end
+                for _, c in ipairs(rel_cols or {}) do
+                    all_source_cols[c:upper()] = true
+                end
             end
-            for _, c in ipairs(rel_cols or {}) do
-                all_source_cols[c:upper()] = true
+
+            local common_cols = {}
+            for _, c in ipairs(target_cols or {}) do
+                if all_source_cols[c:upper()] then
+                    table.insert(common_cols, c)
+                end
             end
-        end
 
-        local common_cols = {}
-        for _, c in ipairs(target_cols or {}) do
-            if all_source_cols[c:upper()] then
-                table.insert(common_cols, c)
+            if #common_cols == 0 then
+                vim.notify("No common columns found between target and source.", vim.log.levels.WARN)
+                return
             end
+
+            local from_sr, from_sc, _, _ = from_node:range()
+            local _, _, stmt_er, stmt_ec = stmt_node:range()
+
+            local lines = vim.api.nvim_buf_get_text(bufnr, from_sr, from_sc, stmt_er, stmt_ec, {})
+            if not lines or #lines == 0 then return end
+
+            lines[#lines] = lines[#lines]:gsub("%s*;%s*$", "")
+            lines[#lines] = lines[#lines] .. ";"
+
+            local cols_str = table.concat(common_cols, ",\n    ")
+            local insert_clause = string.format("insert into %s.%s (\n    %s\n)", selected_db, target_table, cols_str)
+            local select_clause = "select \n    " .. cols_str
+
+            local select_lines = vim.split(select_clause, "\n")
+            local insert_lines = vim.split(insert_clause, "\n")
+
+            for i = #select_lines, 1, -1 do
+                table.insert(lines, 1, select_lines[i])
+            end
+            for i = #insert_lines, 1, -1 do
+                table.insert(lines, 1, insert_lines[i])
+            end
+
+            local insert_row = stmt_er + 1
+            local total_lines = vim.api.nvim_buf_line_count(bufnr)
+            if insert_row > total_lines then insert_row = total_lines end
+
+            vim.api.nvim_buf_set_lines(bufnr, insert_row, insert_row, false, { "" })
+            vim.api.nvim_buf_set_lines(bufnr, insert_row + 1, insert_row + 1, false, lines)
+
+            vim.notify("Transform to INSERT action completed.", vim.log.levels.INFO)
         end
-
-        if #common_cols == 0 then
-            vim.notify("No common columns found between target and source.", vim.log.levels.WARN)
-            return
-        end
-
-        local from_sr, from_sc, _, _ = from_node:range()
-        local _, _, stmt_er, stmt_ec = stmt_node:range()
-
-        local lines = vim.api.nvim_buf_get_text(bufnr, from_sr, from_sc, stmt_er, stmt_ec, {})
-        if not lines or #lines == 0 then return end
-
-        lines[#lines] = lines[#lines]:gsub("%s*;%s*$", "")
-        lines[#lines] = lines[#lines] .. ";"
-
-        local cols_str = table.concat(common_cols, ",\n    ")
-        local insert_clause = string.format("insert into %s.%s (\n    %s\n)", selected_db, target_table, cols_str)
-        local select_clause = "select \n    " .. cols_str
-
-        local select_lines = vim.split(select_clause, "\n")
-        local insert_lines = vim.split(insert_clause, "\n")
-
-        for i = #select_lines, 1, -1 do
-            table.insert(lines, 1, select_lines[i])
-        end
-        for i = #insert_lines, 1, -1 do
-            table.insert(lines, 1, insert_lines[i])
-        end
-
-        local insert_row = stmt_er + 1
-        local total_lines = vim.api.nvim_buf_line_count(bufnr)
-        if insert_row > total_lines then insert_row = total_lines end
-
-        vim.api.nvim_buf_set_lines(bufnr, insert_row, insert_row, false, { "" })
-        vim.api.nvim_buf_set_lines(bufnr, insert_row + 1, insert_row + 1, false, lines)
-
-        vim.notify("Transform to INSERT action completed.", vim.log.levels.INFO)
-    end)
+    )
 end
 
 -- =============================================================================
