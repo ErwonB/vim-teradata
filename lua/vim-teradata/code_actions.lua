@@ -16,6 +16,47 @@ local function get_cursor_statement(bufnr)
     return util.find_node_by_type(cursor_node, "statement")
 end
 
+---Finds the alias identifier under cursor (works on definition AND on any usage like `alias.col`).
+---@param bufnr number
+---@return TSNode|nil the identifier node of the alias
+local function find_alias_identifier(bufnr)
+    local cursor_node = vim.treesitter.get_node({ bufnr = bufnr })
+    if not cursor_node then return nil end
+
+    local node = cursor_node
+    while node do
+        if node:type() == "identifier" then
+            local parent = node:parent()
+
+            -- 1. Table / subquery alias definition
+            if parent and parent:type() == "relation" then
+                local alias_field = parent:field("alias")[1]
+                if alias_field == node then
+                    return node
+                end
+            end
+
+            -- 2. Alias used as prefix (alias.col) in a field/term
+            if parent and parent:type() == "object_reference" then
+                local grand = parent:parent()
+                if grand and (grand:type() == "field" or grand:type() == "term") then
+                    return node
+                end
+            end
+        end
+
+        -- If we're on a relation node, grab its alias directly
+        if node:type() == "relation" then
+            local alias = node:field("alias")[1]
+            if alias then return alias end
+        end
+
+        if node:type() == "statement" then break end
+        node = node:parent()
+    end
+    return nil
+end
+
 -- =============================================================================
 -- Action 1: Expand *
 -- =============================================================================
@@ -746,6 +787,74 @@ local function action_autocomplete_join(bufnr)
 end
 
 -- =============================================================================
+-- Action 7: Rename Alias
+-- =============================================================================
+
+---Renames the alias everywhere in the current statement.
+---@param bufnr number
+local function action_rename_alias(bufnr)
+    local alias_node = find_alias_identifier(bufnr)
+    if not alias_node then
+        vim.notify("Cursor is not on an alias (definition or usage).", vim.log.levels.WARN)
+        return
+    end
+
+    local current_name = diag.get_text(alias_node, bufnr)
+    if not current_name or current_name == "" then
+        vim.notify("Could not read alias name.", vim.log.levels.WARN)
+        return
+    end
+
+    local stmt_node = util.find_node_by_type(alias_node, "statement")
+    if not stmt_node then
+        vim.notify("Could not find enclosing statement.", vim.log.levels.WARN)
+        return
+    end
+
+    vim.ui.input({
+        prompt = "New alias name: ",
+        default = current_name,
+    }, function(new_name)
+        if not new_name or new_name == "" or new_name == current_name then
+            return
+        end
+
+        -- Find every identifier in the statement that matches the alias name
+        local edits = {}
+        local function collect_matches(n)
+            if n:type() == "identifier" then
+                if diag.get_text(n, bufnr) == current_name then
+                    local sr, sc, er, ec = n:range()
+                    table.insert(edits, { sr = sr, sc = sc, er = er, ec = ec, text = new_name })
+                end
+            end
+            for child in n:iter_children() do
+                collect_matches(child)
+            end
+        end
+
+        collect_matches(stmt_node)
+
+        if #edits == 0 then return end
+
+        -- Apply bottom-to-top (safest for ranges)
+        table.sort(edits, function(a, b)
+            if a.sr == b.sr then return a.sc > b.sc end
+            return a.sr > b.sr
+        end)
+
+        for _, e in ipairs(edits) do
+            vim.api.nvim_buf_set_text(bufnr, e.sr, e.sc, e.er, e.ec, { e.text })
+        end
+
+        vim.notify(
+            string.format("Renamed alias '%s' → '%s' in %d place(s)", current_name, new_name, #edits),
+            vim.log.levels.INFO
+        )
+    end)
+end
+
+-- =============================================================================
 -- Public API
 -- =============================================================================
 
@@ -843,6 +952,14 @@ function M.run()
                 fn = function() action_transform_to_insert(bufnr) end,
             })
         end
+    end
+
+    -- Check: Rename Alias
+    if find_alias_identifier(bufnr) then
+        table.insert(actions, {
+            title = "Rename alias and update all references",
+            fn = function() action_rename_alias(bufnr) end,
+        })
     end
 
     if #actions == 0 then
