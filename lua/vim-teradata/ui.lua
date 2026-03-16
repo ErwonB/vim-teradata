@@ -1,6 +1,7 @@
 local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
 local bookmark = require('vim-teradata.bookmark')
+local explain = require('vim-teradata.explain')
 local M = {}
 
 --- Post-processes and displays a query result file in a custom interactive buffer.
@@ -42,6 +43,22 @@ function M.display_output(file_path, query_id)
     vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(data))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', vim.deepcopy(header))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', {})
+
+    local query_path = util.get_history_path('queries_dir_name') ..
+        '/' .. vim.fn.fnamemodify(file_path, ":t:r") .. '.sql'
+    local original_query = table.concat(vim.fn.readfile(query_path), "\n")
+    if original_query then
+        explain.process_results(bufnr, original_query, lines)
+        local lower = original_query:lower():gsub("^%s*", "")
+        if lower:match("^explain") or lower:match("^show") then
+            if lower:match("^explain") then
+                local help_line = " <Folds: za / zR / zM>   High-cost steps in red"
+                vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { "", help_line })
+            end
+            vim.bo[bufnr].modifiable = false
+            return
+        end
+    end
 
     local function populate_buffer()
         vim.bo.modifiable      = true
