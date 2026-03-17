@@ -34,4 +34,15 @@ function M.pick_completion(items, context, opts, on_select)
     vim.fn['fzf#run'](fzf_config)
 end
 
+function M.pick_basic(columns, callback)
+    vim.fn['fzf#run'](vim.fn['fzf#wrap']({
+        source = columns,
+        options = '-m --prompt="Select Columns> "',
+        ['sink*'] = function(lines)
+            -- fzf#run with sink* returns the selected lines directly
+            callback(lines)
+        end
+    }))
+end
+
 return M

@@ -66,4 +66,33 @@ function M.pick_completion(items, context, opts, on_select)
     })
 end
 
+function M.pick_basic(columns, callback)
+    local items = {}
+    for _, c in ipairs(columns) do
+        table.insert(items, { text = c, item = c })
+    end
+    require("snacks").picker({
+        title = "Select Columns (Tab to multi-select)",
+        items = items,
+        format = "text",
+        layout = "select",
+        actions = {
+            confirm = function(p, item)
+                local selections = p:selected()
+                p:close()
+
+                local result = {}
+                if selections and #selections > 0 then
+                    for _, sel in ipairs(selections) do
+                        table.insert(result, sel.item)
+                    end
+                elseif item then
+                    table.insert(result, item.item)
+                end
+                callback(result)
+            end,
+        }
+    })
+end
+
 return M

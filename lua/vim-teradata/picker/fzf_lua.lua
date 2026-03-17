@@ -41,4 +41,16 @@ function M.pick_completion(items, context, opts, on_select)
     })
 end
 
+function M.pick_basic(columns, callback)
+    require('fzf-lua').fzf_exec(columns, {
+        prompt = 'Select Columns (Tab to multi-select)> ',
+        fzf_opts = { ['-m'] = true },     -- Enable multi-selection
+        actions = {
+            ['default'] = function(selected)
+                callback(selected)
+            end
+        }
+    })
+end
+
 return M

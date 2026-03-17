@@ -775,15 +775,29 @@ local function action_autocomplete_join(bufnr)
     local alias1 = (t1.alias and t1.alias ~= "") and t1.alias:lower() or t1.tb_name:lower()
     local alias2 = (t2.alias and t2.alias ~= "") and t2.alias:lower() or t2.tb_name:lower()
 
-    local conds = {}
-    for _, c in ipairs(common) do
-        table.insert(conds, string.format("%s.%s = %s.%s", alias1, c, alias2, c))
+    -- Wrapper to handle buffer insertion after possible async selection
+    local function apply_join(selected_cols)
+        if not selected_cols or #selected_cols == 0 then
+            vim.notify("No columns selected for JOIN.", vim.log.levels.WARN)
+            return
+        end
+
+        local conds = {}
+        for _, c in ipairs(selected_cols) do
+            table.insert(conds, string.format("%s.%s = %s.%s", alias1, c, alias2, c))
+        end
+        local condition_str = table.concat(conds, " and ")
+
+        vim.api.nvim_buf_set_text(bufnr, row_1 - 1, col_0, row_1 - 1, col_0, { " " .. condition_str })
+        vim.notify("Auto-completed JOIN condition.", vim.log.levels.INFO)
     end
-    local condition_str = table.concat(conds, " and ")
 
-    vim.api.nvim_buf_set_text(bufnr, row_1 - 1, col_0, row_1 - 1, col_0, { " " .. condition_str })
-
-    vim.notify("Auto-completed JOIN condition.", vim.log.levels.INFO)
+    if #common == 1 then
+        apply_join(common)
+    else
+        local picker = require('vim-teradata.picker').get()
+        picker.pick_basic(common, apply_join)
+    end
 end
 
 -- =============================================================================

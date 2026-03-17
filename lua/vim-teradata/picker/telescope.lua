@@ -77,4 +77,38 @@ function M.pick_completion(items, context, opts, on_select)
     }):find()
 end
 
+function M.pick_basic(columns, callback)
+    local pickers = require('telescope.pickers')
+    local finders = require('telescope.finders')
+    local conf = require('telescope.config').values
+    local action_state = require('telescope.actions.state')
+    local actions = require('telescope.actions')
+
+    pickers.new({}, {
+        prompt_title = "Select Columns",
+        finder = finders.new_table({ results = columns }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr, _)
+            actions.select_default:replace(function()
+                local current_picker = action_state.get_current_picker(prompt_bufnr)
+                local selections = current_picker:get_multi_selection()
+
+                -- Fallback to single selection if multi-select wasn't used
+                if vim.tbl_isempty(selections) then
+                    table.insert(selections, action_state.get_selected_entry())
+                end
+
+                actions.close(prompt_bufnr)
+
+                local result = {}
+                for _, sel in ipairs(selections) do
+                    table.insert(result, sel.value or sel[1])
+                end
+                callback(result)
+            end)
+            return true
+        end,
+    }):find()
+end
+
 return M
