@@ -231,14 +231,13 @@ local function format_select_expression(node, buf, indent_lvl, current_indent)
     for i, child in ipairs(children) do
         local txt = format_node(child, buf, indent_lvl)
         local c_type = child:type()
-        local trailing_newline = (i == #children) and "\n" or ""
 
         if c_type == NODE.TERM or c_type == NODE.FIELD or c_type == "all_fields" or c_type == NODE.IDENTIFIER then
             if is_first_field then
                 table.insert(parts, current_indent .. txt)
                 is_first_field = false
             else
-                table.insert(parts, "\n" .. current_indent .. ", " .. txt .. trailing_newline)
+                table.insert(parts, "\n" .. current_indent .. ", " .. txt)
             end
         elseif c_type == "," then
             -- Handled manually above
