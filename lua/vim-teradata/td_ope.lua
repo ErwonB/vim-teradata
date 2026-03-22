@@ -44,6 +44,9 @@ local NODE = {
     LITERAL = "literal",
     COMMENT = "comment",
     MARGINALIA = "marginalia",
+    SET_OPERATION = "set_operation",
+    CTE = "cte",
+    CREATE_MACRO = "create_macro",
 }
 
 local MAJOR_CLAUSES = {
@@ -604,6 +607,205 @@ local function format_insert(node, buf, indent_lvl, current_indent)
     return table.concat(parts, "")
 end
 
+--- Formats a set operation: UNION [ALL], INTERSECT [ALL], EXCEPT [ALL]
+local function format_set_operation(node, buf, indent_lvl, current_indent)
+    local parts       = {}
+    local pending_ops = {} -- keyword_union / keyword_intersect / keyword_except / keyword_all
+    local in_operator = false
+
+    -- Collect children: flush any pending op-keywords as a separator line before the next SELECT block
+    local function flush_ops()
+        if #pending_ops > 0 then
+            table.insert(parts, "\n" .. current_indent .. table.concat(pending_ops, " "))
+            pending_ops = {}
+        end
+        in_operator = false
+    end
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_union"
+            or c_type == "keyword_intersect"
+            or c_type == "keyword_except" then
+            in_operator = true
+            table.insert(pending_ops, get_formatted_text(child, buf))
+        elseif c_type == "keyword_all" and in_operator then
+            -- ALL/DISTINCT that qualifies the set operator
+            table.insert(pending_ops, get_formatted_text(child, buf))
+        elseif MAJOR_CLAUSES[c_type] or c_type == NODE.SELECT then
+            if c_type == NODE.SELECT then
+                flush_ops()
+                local txt = format_node(child, buf, indent_lvl)
+                if #parts == 0 then
+                    table.insert(parts, txt)
+                else
+                    table.insert(parts, "\n" .. current_indent .. txt)
+                end
+            else
+                -- from / where / group_by / … attached to the current query block
+                local txt = format_node(child, buf, indent_lvl)
+                table.insert(parts, "\n" .. current_indent .. txt)
+            end
+        else
+            -- Anything else (e.g. nested set_operation, parentheses)
+            flush_ops()
+            local txt = format_node(child, buf, indent_lvl)
+            if #parts > 0 then
+                table.insert(parts, "\n" .. current_indent .. txt)
+            else
+                table.insert(parts, txt)
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats a WITH … AS (cte) … [SELECT/INSERT/UPDATE] statement
+local function format_cte(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local is_first_cte = true
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_with" then
+            table.insert(parts, get_formatted_text(child, buf))
+        elseif c_type == NODE.CTE then
+            local inner_indent = string.rep(INDENT_STR, indent_lvl + 1)
+
+            -- 1. CTE name (first named child typed identifier, not an argument field)
+            local name_node    = child:named_child(0)
+            local cte_name     = name_node and get_formatted_text(name_node, buf) or ""
+
+            -- 2. Argument list via the "argument" field
+            local arg_nodes    = child:field("argument")
+            local arg_str      = ""
+            if #arg_nodes > 0 then
+                local arg_names = {}
+                for _, an in ipairs(arg_nodes) do
+                    table.insert(arg_names, get_formatted_text(an, buf))
+                end
+                arg_str = "(" .. table.concat(arg_names, ", ") .. ")"
+            end
+
+            -- 3. Body: the inner statement (last named child of type statement)
+            local body_node = nil
+            for cte_child in child:iter_children() do
+                if cte_child:type() == NODE.STATEMENT then
+                    body_node = cte_child
+                end
+            end
+
+            local body_str = ""
+            if body_node then
+                local body = format_node(body_node, buf, indent_lvl + 1)
+                body_str = " (\n" .. inner_indent .. body .. "\n" .. current_indent .. ")"
+            end
+
+            local cte_text = cte_name .. arg_str .. " as" .. body_str
+
+            if is_first_cte then
+                table.insert(parts, " " .. cte_text)
+                is_first_cte = false
+            else
+                table.insert(parts, "\n" .. current_indent .. ", " .. cte_text)
+            end
+        elseif c_type == "," then
+            -- top-level comma between CTEs: already handled by is_first_cte logic, skip
+            -- (do nothing)
+        elseif MAJOR_CLAUSES[c_type] or c_type == NODE.SELECT then
+            -- Final SELECT/UPDATE/INSERT after all CTEs
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        elseif c_type == NODE.SELECT_EXPR then
+            table.insert(parts, "\n" .. format_node(child, buf, indent_lvl))
+        else
+            -- comments, semicolons, etc. — skip anonymous punctuation silently
+            if child:named() then
+                local txt = format_node(child, buf, indent_lvl)
+                if txt ~= "" then
+                    table.insert(parts, " " .. txt)
+                end
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats a CREATE MACRO statement
+local function format_create_macro(node, buf, indent_lvl, current_indent)
+    local parts        = {}
+    local param_parts  = {}
+    local body_stmts   = {}
+    local seen_as      = false
+    local param_indent = string.rep(INDENT_STR, indent_lvl + 1)
+    local body_indent  = string.rep(INDENT_STR, indent_lvl + 1)
+
+    -- First pass: collect everything
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_create" then
+            table.insert(parts, get_formatted_text(child, buf))
+        elseif c_type == "keyword_macro" then
+            table.insert(parts, " " .. get_formatted_text(child, buf))
+        elseif c_type == NODE.OBJECT_REF then
+            table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+        elseif c_type == NODE.COL_DEF then
+            -- Collect parameter definitions; the surrounding '(' ')' and ',' are
+            -- anonymous children the tree provides — we reconstruct them ourselves.
+            local def_parts = {}
+            for gc in child:iter_children() do
+                table.insert(def_parts, format_node(gc, buf, indent_lvl))
+            end
+            table.insert(param_parts, table.concat(def_parts, " "))
+        elseif c_type == "keyword_as" then
+            -- Flush parameter list wrapped in ( … ) immediately before 'as'
+            if #param_parts > 0 then
+                table.insert(parts, " (\n")
+                for i, p in ipairs(param_parts) do
+                    if i == 1 then
+                        table.insert(parts, param_indent .. " " .. p)
+                    else
+                        table.insert(parts, "\n" .. param_indent .. ", " .. p)
+                    end
+                end
+                table.insert(parts, "\n" .. current_indent .. ")")
+            end
+            seen_as = true
+            table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+        elseif c_type == NODE.STATEMENT and seen_as then
+            -- Collect body statements — will be wrapped in a single ( … ) block below
+            local body = format_node(child, buf, indent_lvl + 1)
+            body = body:gsub("%s*;%s*$", "") -- strip any trailing semicolon
+            table.insert(body_stmts, body)
+        elseif c_type == "(" or c_type == ")" or c_type == "," or c_type == ";" then
+            -- Anonymous punctuation reproduced by our own logic — skip
+        else
+            if child:named() then
+                local txt = format_node(child, buf, indent_lvl)
+                if txt ~= "" then
+                    table.insert(parts, " " .. txt)
+                end
+            end
+        end
+    end
+
+    -- Emit the body block: all statements separated by ";\n<indent>" inside one ( … )
+    if #body_stmts > 0 then
+        local joined = table.concat(body_stmts, "\n" .. body_indent .. ";\n" .. body_indent)
+        table.insert(parts, " (\n" .. body_indent .. joined .. "\n" .. current_indent .. ")")
+    end
+
+    return table.concat(parts, "")
+end
+
+
+
 --- Main Recursive Formatter
 format_node = function(node, buf, indent_lvl, context)
     local type = node:type()
@@ -615,9 +817,28 @@ format_node = function(node, buf, indent_lvl, context)
     end
 
     -- Handlers for specific node types
+
+    -- set_operation: UNION [ALL] / INTERSECT [ALL] / EXCEPT [ALL]
+    if type == NODE.SET_OPERATION then
+        return format_set_operation(node, buf, indent_lvl, current_indent)
+    end
+
+    -- create_macro
+    if type == NODE.CREATE_MACRO then
+        return format_create_macro(node, buf, indent_lvl, current_indent)
+    end
+
     if type == NODE.STATEMENT or type == NODE.SELECT then
         if type == NODE.STATEMENT and is_merge_statement(node) then
             return format_merge(node, buf, indent_lvl, current_indent)
+        end
+
+        -- CTE: statement whose first named child is keyword_with
+        if type == NODE.STATEMENT then
+            local first = node:named_child(0)
+            if first and first:type() == "keyword_with" then
+                return format_cte(node, buf, indent_lvl, current_indent)
+            end
         end
 
         local parts = {}
