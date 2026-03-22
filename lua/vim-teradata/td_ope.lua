@@ -730,14 +730,34 @@ format_node = function(node, buf, indent_lvl, context)
 
         if has_paren then
             local parts = {}
+            local inner_indent = string.rep(INDENT_STR, indent_lvl + 1)
+            local is_first_inner = true
+
             for child in node:iter_children() do
                 local c_type = child:type()
                 if c_type == "(" then
-                    table.insert(parts, "(\n" .. string.rep(INDENT_STR, indent_lvl + 1))
+                    table.insert(parts, "(\n" .. inner_indent)
                 elseif c_type == ")" then
                     table.insert(parts, "\n" .. current_indent .. ")")
                 else
-                    table.insert(parts, format_node(child, buf, indent_lvl + 1))
+                    local txt = format_node(child, buf, indent_lvl + 1)
+                    if MAJOR_CLAUSES[c_type] or c_type == NODE.SELECT then
+                        if not is_first_inner then
+                            table.insert(parts, "\n" .. inner_indent .. txt)
+                        else
+                            table.insert(parts, txt)
+                        end
+                    elseif c_type == NODE.SELECT_EXPR then
+                        table.insert(parts, (is_first_inner and "" or "\n") .. txt)
+                    else
+                        if not is_first_inner then
+                            if parts[#parts] and not parts[#parts]:match("\n%s*$") then
+                                table.insert(parts, " ")
+                            end
+                        end
+                        table.insert(parts, txt)
+                    end
+                    is_first_inner = false
                 end
             end
             return table.concat(parts, "")
