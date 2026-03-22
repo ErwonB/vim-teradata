@@ -47,6 +47,8 @@ local NODE = {
     SET_OPERATION = "set_operation",
     CTE = "cte",
     CREATE_MACRO = "create_macro",
+    CREATE_VIEW = "create_view",
+    CREATE_QUERY = "create_query",
 }
 
 local MAJOR_CLAUSES = {
@@ -805,6 +807,71 @@ local function format_create_macro(node, buf, indent_lvl, current_indent)
 end
 
 
+--- Formats a CREATE [REPLACE] VIEW statement
+local function format_create_view(node, buf, indent_lvl, current_indent)
+    local parts   = {}
+    local seen_as = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        -- Header keywords: replace / view
+        if c_type == "keyword_replace" or c_type == "keyword_view" then
+            if #parts == 0 then
+                table.insert(parts, get_formatted_text(child, buf))
+            else
+                table.insert(parts, " " .. get_formatted_text(child, buf))
+            end
+
+            -- View name
+        elseif c_type == NODE.OBJECT_REF then
+            table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+
+            -- AS keyword: goes on the same line as the name
+        elseif c_type == "keyword_as" then
+            seen_as = true
+            table.insert(parts, " " .. get_formatted_text(child, buf))
+
+            -- create_query: the body — expand its children directly at current indent
+        elseif c_type == NODE.CREATE_QUERY and seen_as then
+            local is_first = true
+            for qchild in child:iter_children() do
+                local qc_type = qchild:type()
+                local txt     = format_node(qchild, buf, indent_lvl)
+
+                if MAJOR_CLAUSES[qc_type] or qc_type == NODE.SELECT then
+                    if is_first then
+                        table.insert(parts, "\n" .. current_indent .. txt)
+                    else
+                        table.insert(parts, "\n" .. current_indent .. txt)
+                    end
+                elseif qc_type == NODE.SELECT_EXPR then
+                    table.insert(parts, "\n" .. txt)
+                else
+                    -- lock_clause and any other named node
+                    if not is_first and parts[#parts] and not parts[#parts]:match("\n%s*$") then
+                        table.insert(parts, " ")
+                    end
+                    table.insert(parts, txt)
+                end
+                is_first = false
+            end
+
+            -- Skip anonymous punctuation (semicolons, etc.)
+        elseif not child:named() then
+            -- do nothing
+        else
+            -- Comments or unexpected named nodes
+            local txt = format_node(child, buf, indent_lvl)
+            if txt ~= "" then
+                table.insert(parts, " " .. txt)
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
 
 --- Main Recursive Formatter
 format_node = function(node, buf, indent_lvl, context)
@@ -1005,6 +1072,10 @@ format_node = function(node, buf, indent_lvl, context)
 
     if type == NODE.COLUMN_DEFS then
         return format_column_definitions(node, buf, indent_lvl, current_indent)
+    end
+
+    if type == NODE.CREATE_VIEW then
+        return format_create_view(node, buf, indent_lvl, current_indent)
     end
 
     if type == NODE.CREATE_TABLE then
