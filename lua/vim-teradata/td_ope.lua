@@ -557,7 +557,12 @@ local function format_insert(node, buf, indent_lvl, current_indent)
         local c_type = child:type()
 
         if c_type == "keyword_insert" or c_type == "keyword_into" or c_type == NODE.OBJECT_REF then
-            table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            local txt = format_node(child, buf, indent_lvl)
+            if #parts == 0 then
+                table.insert(parts, txt)
+            else
+                table.insert(parts, " " .. txt)
+            end
         elseif c_type == NODE.LIST then
             local col_parts = {}
             local col_indent = string.rep(INDENT_STR, indent_lvl + 1)
