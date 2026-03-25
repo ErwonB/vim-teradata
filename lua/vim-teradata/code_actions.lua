@@ -552,9 +552,6 @@ local function action_transform_to_delete(bufnr)
     lines[1] = "delete " .. lines[1]
     lines[#lines] = lines[#lines] .. ";"
 
-    -- Determine indent of the original statement to pad the new statement if desired.
-    -- (We will just insert it as is for now)
-
     -- Insert 2 new lines and the new text below the statement
     local insert_row = stmt_er + 1
     -- ensure we're not inserting out of bounds
@@ -705,7 +702,134 @@ local function action_transform_to_insert(bufnr)
 end
 
 -- =============================================================================
--- Action 6: Autocomplete JOIN Condition
+-- Action 6: Transform SELECT to UPDATE
+-- =============================================================================
+
+---Transforms a SELECT ... FROM t WHERE ... into an UPDATE t SET col = ? WHERE ...
+---The user picks which columns to include in the SET clause via the picker.
+---@param bufnr number
+local function action_transform_to_update(bufnr)
+    local stmt_node = get_cursor_statement(bufnr)
+    if not stmt_node then
+        vim.notify("Cursor is not inside a SQL statement.", vim.log.levels.WARN)
+        return
+    end
+
+    local select_node = util.find_first_descendant_by_type(stmt_node, "select")
+    local from_node   = util.find_first_descendant_by_type(stmt_node, "from")
+
+    if not select_node or not from_node then
+        vim.notify("Statement does not have a SELECT and FROM clause.", vim.log.levels.WARN)
+        return
+    end
+
+    -- Resolve the primary base table from the FROM clause
+    local cte_defs = diag.get_cte_definitions(stmt_node, bufnr)
+    local scopes = diag.get_query_scopes(stmt_node)
+
+    local active_tables = {}
+    if #scopes > 0 then
+        local main_scope_nodes = scopes[1]
+        for _, scope in ipairs(scopes) do
+            if scope[1] == stmt_node then
+                main_scope_nodes = scope
+                break
+            end
+        end
+        _, active_tables = diag.analyze_relations(main_scope_nodes, bufnr, {}, cte_defs)
+    end
+
+    if #active_tables == 0 then
+        vim.notify("No tables found in FROM clause.", vim.log.levels.WARN)
+        return
+    end
+
+    local target_table = nil
+    local target_db    = nil
+    for _, rel in ipairs(active_tables) do
+        if not rel.derived and rel.table and rel.db then
+            target_table = rel.table
+            target_db = rel.db
+            break
+        end
+    end
+
+    if not target_table then
+        vim.notify("Could not find a base table in the SELECT statement.", vim.log.levels.WARN)
+        return
+    end
+
+    local columns = util.get_columns({ { db_name = target_db, tb_name = target_table } }) or {}
+
+    if #columns == 0 then
+        vim.notify("No columns found for table " .. target_table .. ".", vim.log.levels.WARN)
+        return
+    end
+
+    -- Extract the WHERE + everything after FROM (same approach as DELETE action)
+    local from_sr, from_sc, _, _ = from_node:range()
+    local _, _, stmt_er, stmt_ec = stmt_node:range()
+
+    local tail_lines             = vim.api.nvim_buf_get_text(bufnr, from_sr, from_sc, stmt_er, stmt_ec, {})
+    if not tail_lines or #tail_lines == 0 then return end
+
+    -- Strip trailing semicolon
+    tail_lines[#tail_lines] = tail_lines[#tail_lines]:gsub("%s*;%s*$", "")
+
+    -- Let the user pick which columns go into the SET clause (multi-select)
+    local picker = require('vim-teradata.picker').get()
+    picker.pick_basic(
+        columns,
+        function(selected_cols)
+            if not selected_cols or #selected_cols == 0 then
+                vim.notify("No columns selected for SET clause.", vim.log.levels.WARN)
+                return
+            end
+
+            -- Build SET assignments: col = ?
+            local set_parts = {}
+            for _, col in ipairs(selected_cols) do
+                table.insert(set_parts, string.format("    %s = ?", col))
+            end
+            local set_str = table.concat(set_parts, ",\n")
+
+            local where_lines = vim.deepcopy(tail_lines)
+
+            where_lines[1] = where_lines[1]:gsub("^%s*[Ff][Rr][Oo][Mm]%s+%S+%s*", "")
+
+            -- Build the final statement lines
+            local result_lines = {}
+            table.insert(result_lines, string.format("update %s.%s", target_db, target_table))
+            table.insert(result_lines, "set")
+            for _, l in ipairs(vim.split(set_str, "\n")) do
+                table.insert(result_lines, l)
+            end
+
+            if where_lines[1] ~= "" then
+                table.insert(result_lines, where_lines[1])
+            end
+            for i = 2, #where_lines do
+                table.insert(result_lines, where_lines[i])
+            end
+
+            -- Terminate with semicolon
+            result_lines[#result_lines] = result_lines[#result_lines] .. ";"
+
+            -- Insert below the original statement (blank line separator)
+            local insert_row            = stmt_er + 1
+            local total_lines           = vim.api.nvim_buf_line_count(bufnr)
+            if insert_row > total_lines then insert_row = total_lines end
+
+            vim.api.nvim_buf_set_lines(bufnr, insert_row, insert_row, false, { "" })
+            vim.api.nvim_buf_set_lines(bufnr, insert_row + 1, insert_row + 1, false, result_lines)
+
+            vim.notify("Transform to UPDATE action completed.", vim.log.levels.INFO)
+        end
+    )
+end
+
+-- =============================================================================
+-- Action 7: Autocomplete JOIN Condition
 -- =============================================================================
 
 ---Autocompletes the JOIN condition matching common fields.
@@ -801,7 +925,7 @@ local function action_autocomplete_join(bufnr)
 end
 
 -- =============================================================================
--- Action 7: Rename Alias
+-- Action 8: Rename Alias
 -- =============================================================================
 
 ---Renames the alias everywhere in the current statement.
@@ -964,6 +1088,10 @@ function M.run()
             table.insert(actions, {
                 title = "Transform SELECT to INSERT SELECT statement",
                 fn = function() action_transform_to_insert(bufnr) end,
+            })
+            table.insert(actions, {
+                title = "Transform SELECT to UPDATE statement",
+                fn = function() action_transform_to_update(bufnr) end,
             })
         end
     end
