@@ -499,27 +499,40 @@ local function format_column_definitions(node, buf, indent_lvl, current_indent)
                 -- STANDARD COLUMN ALIGNMENT LOGIC
                 local col_parts = {}
                 local name_txt = ""
-                local last_r, last_c = -1, -1
+                local prev_er, prev_ec
+                do
+                    local sr, sc, _, _ = child:range(); prev_er, prev_ec = sr, sc
+                end
 
                 for grandchild in child:iter_children() do
-                    local gc_txt = format_node(grandchild, buf, indent_lvl)
                     local gc_type = grandchild:type()
-                    local _, _, er, ec = grandchild:range()
-                    last_r, last_c = er, ec
+                    local gc_sr, gc_sc, gc_er, gc_ec = grandchild:range()
 
+                    -- Capture gap before this grandchild (e.g. 'YYYY-MM-DD' after keyword_format)
+                    if gc_sr > prev_er or (gc_sr == prev_er and gc_sc > prev_ec) then
+                        local gap = api.nvim_buf_get_text(buf, prev_er, prev_ec, gc_sr, gc_sc, {})
+                        local joined = table.concat(gap, " "):match("^%s*(.-)%s*$")
+                        if joined ~= "" then
+                            table.insert(col_parts, joined)
+                        end
+                    end
+
+                    local gc_txt = format_node(grandchild, buf, indent_lvl)
                     if gc_type == NODE.IDENTIFIER and name_txt == "" then
                         name_txt = gc_txt
                     else
                         table.insert(col_parts, gc_txt)
                     end
+
+                    prev_er, prev_ec = gc_er, gc_ec
                 end
 
-                -- Capture missing text
+                -- Capture any trailing gap after the last node (e.g. 'YYYYMMDD' with no NOT NULL)
                 local _, _, parent_er, parent_ec = child:range()
-                if last_r ~= -1 and (parent_ec > last_c or parent_er > last_r) then
-                    local missing_text = api.nvim_buf_get_text(buf, last_r, last_c, parent_er, parent_ec, {})
-                    local joined = table.concat(missing_text, " ")
-                    if joined:match("%S") then
+                if prev_er ~= nil and (parent_er > prev_er or (parent_er == prev_er and parent_ec > prev_ec)) then
+                    local gap = api.nvim_buf_get_text(buf, prev_er, prev_ec, parent_er, parent_ec, {})
+                    local joined = table.concat(gap, " "):match("^%s*(.-)%s*$")
+                    if joined ~= "" then
                         table.insert(col_parts, joined)
                     end
                 end
@@ -1172,9 +1185,29 @@ format_node = function(node, buf, indent_lvl, context)
 
     -- Generic Fallback
     local parts = {}
+    local prev_er, prev_ec
+    do
+        local sr, sc, _, _ = node:range(); prev_er, prev_ec = sr, sc
+    end
+
     for child in node:iter_children() do
-        local txt = format_node(child, buf, indent_lvl, context)
         local c_type = child:type()
+        local c_sr, c_sc, c_er, c_ec = child:range()
+
+        -- Capture gap before this child (e.g. '1' between keyword_interval and keyword_month)
+        if c_sr > prev_er or (c_sr == prev_er and c_sc > prev_ec) then
+            local gap = api.nvim_buf_get_text(buf, prev_er, prev_ec, c_sr, c_sc, {})
+            local joined = table.concat(gap, " "):match("^%s*(.-)%s*$")
+            if joined ~= "" then
+                local prev = parts[#parts]
+                if #parts > 0 and prev ~= "(" and prev:sub(-1) ~= "\n" then
+                    table.insert(parts, " ")
+                end
+                table.insert(parts, joined)
+            end
+        end
+
+        local txt = format_node(child, buf, indent_lvl, context)
         local prev = parts[#parts]
 
         if c_type == "." or (prev and prev:sub(-1) == ".") then
@@ -1189,6 +1222,8 @@ format_node = function(node, buf, indent_lvl, context)
             end
             table.insert(parts, txt)
         end
+
+        prev_er, prev_ec = c_er, c_ec
     end
     return table.concat(parts, "")
 end
