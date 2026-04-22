@@ -57,7 +57,38 @@ local function start_job(script_lines, on_done)
     end)
 end
 
-local function run_query(args, operation, handle_result)
+--- Splits a raw SQL string into individual statements on ';'.
+--- @param sql string
+--- @return table list of trimmed, non-empty SQL strings (without trailing ';')
+local function split_sql_statements(sql)
+    local stmts = {}
+    for part in sql:gmatch('[^;]+') do
+        part = part:match('^%s*(.-)%s*$')
+        if part ~= '' then
+            table.insert(stmts, part)
+        end
+    end
+    return stmts
+end
+
+local function get_visual_sql()
+    local start_pos = vim.api.nvim_buf_get_mark(0, "<")
+    local end_pos = vim.api.nvim_buf_get_mark(0, ">")
+    return table.concat(
+        vim.api.nvim_buf_get_text(0, start_pos[1] - 1, start_pos[2], end_pos[1] - 1, end_pos[2], {}),
+        '\n'
+    )
+end
+
+local function get_node_statements(count)
+    local buf = vim.api.nvim_get_current_buf()
+    local current_node = vim.treesitter.get_node({ bufnr = buf })
+    local stmt_node = util.find_node_by_type(current_node, "statement")
+    if not stmt_node then return {} end
+    return util.collect_next_sibling_statements(stmt_node, count, buf)
+end
+
+local function run_single_query(sql, operation, handle_result)
     if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
     end
@@ -66,26 +97,6 @@ local function run_query(args, operation, handle_result)
         operation = operation,
         pattern = '',
     }
-
-    local sql
-    if args.range > 0 then
-        local start_pos = vim.api.nvim_buf_get_mark(0, "<")
-        local end_pos = vim.api.nvim_buf_get_mark(0, ">")
-        sql = table.concat(
-            vim.api.nvim_buf_get_text(0, start_pos[1] - 1, start_pos[2], end_pos[1] - 1, end_pos[2], {}),
-            '\n'
-        )
-    else
-        local buf = vim.api.nvim_get_current_buf()
-        local current_node = vim.treesitter.get_node({ bufnr = buf })
-        local stmt_node = util.find_node_by_type(current_node, "statement")
-        if stmt_node then
-            sql = vim.treesitter.get_node_text(stmt_node, buf)
-        end
-    end
-    if not sql or sql:match('^%s*$') then
-        return vim.notify('No SQL query provided in selection or register.', vim.log.levels.WARN)
-    end
 
     local clean_sql = util.replace_env_vars(sql)
     if not clean_sql:find(';') then
@@ -175,12 +186,29 @@ local function run_query(args, operation, handle_result)
     end)
 
     util.jobs_update(id, { handle = handle })
-
-    vim.notify('Query started' .. (id and ': ' .. id or ''), vim.log.levels.INFO, { title = 'Teradata' })
 end
 
+local function run_multiple(sqls, operation, handle_result)
+    if #sqls == 0 then
+        return vim.notify('No SQL statements found.', vim.log.levels.WARN)
+    end
+    for _, sql in ipairs(sqls) do
+        run_single_query(sql, operation, handle_result)
+    end
+    if #sqls > 1 then
+        vim.notify(#sqls .. ' queries started', vim.log.levels.INFO, { title = 'Teradata' })
+    else
+        -- Provide single notify
+        local job_id = util.jobs_all()[#util.jobs_all()].id -- just referencing the last job we added
+        vim.notify('Query started' .. (job_id and ': ' .. job_id or ''), vim.log.levels.INFO, { title = 'Teradata' })
+    end
+end
+
+-- Node-based syntax check (supports count: :3TD)
 function M.query_syntax(args)
-    run_query(args, 'syntax', function(res)
+    local count = (args.count and args.count > 0) and args.count or 1
+    local sqls = get_node_statements(count)
+    run_multiple(sqls, 'syntax', function(res)
         if res.rc == 0 then
             vim.notify('No syntax errors.', vim.log.levels.INFO, { title = 'Teradata' })
         else
@@ -189,8 +217,55 @@ function M.query_syntax(args)
     end)
 end
 
+-- Visual-selection syntax check (splits on ';')
+function M.query_syntax_visual(args)
+    local sql = get_visual_sql()
+    if not sql or sql:match('^%s*$') then
+        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
+    end
+    local sqls = split_sql_statements(sql)
+    run_multiple(sqls, 'syntax', function(res)
+        if res.rc == 0 then
+            vim.notify('No syntax errors.', vim.log.levels.INFO, { title = 'Teradata' })
+        else
+            ui.display_error(res.msg)
+        end
+    end)
+end
+
+-- Node-based output (supports count: :3TDO)
 function M.query_output(args)
-    run_query(args, 'output', function(res, context)
+    local count = (args.count and args.count > 0) and args.count or 1
+    local sqls = get_node_statements(count)
+    run_multiple(sqls, 'output', function(res, context)
+        if res.rc == 0 then
+            local result_path = context.result_path
+            if vim.fn.getfsize(result_path) > 0 then
+                ui.display_output(result_path, context.query_id)
+                local actual_lines = util.extract_rows_found(res.log_content)
+                if actual_lines and actual_lines > config.options.retlimit then
+                    vim.notify(
+                        string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
+                        vim.log.levels.WARN
+                    )
+                end
+            else
+                vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
+            end
+        else
+            ui.display_error(res.msg)
+        end
+    end)
+end
+
+-- Visual-selection output (splits on ';')
+function M.query_output_visual(args)
+    local sql = get_visual_sql()
+    if not sql or sql:match('^%s*$') then
+        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
+    end
+    local sqls = split_sql_statements(sql)
+    run_multiple(sqls, 'output', function(res, context)
         if res.rc == 0 then
             local result_path = context.result_path
             if vim.fn.getfsize(result_path) > 0 then

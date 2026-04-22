@@ -273,8 +273,10 @@ end
 
 function M.display_help()
     local help_text = {
-        'TD: syntax checking',
-        'TDO: to get the output of the query',
+        ':nTD   syntax check current + next n-1 statements',
+        ':nTDO  output current + next n-1 statements',
+        'TDE    syntax check visual selection (splits on ;)',
+        'TDV    output visual selection (splits on ;)',
         'TDH: Show query history',
         'TDR: Search query history with FZF',
         'TDU: Manage users',

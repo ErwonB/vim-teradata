@@ -78,8 +78,12 @@ vim.api.nvim_create_autocmd({ "TextChanged", "BufEnter", "BufWritePost" }, {
 })
 
 
-vim.api.nvim_buf_create_user_command(bufnr, 'TD', bteq.query_syntax, { nargs = '*', range = true, bang = true })
-vim.api.nvim_buf_create_user_command(bufnr, 'TDO', bteq.query_output, { nargs = '*', range = true, bang = true })
+-- Node-based commands (support :nTD / :nTDO count syntax)
+vim.api.nvim_buf_create_user_command(bufnr, 'TD',  bteq.query_syntax,        { count = true })
+vim.api.nvim_buf_create_user_command(bufnr, 'TDO', bteq.query_output,        { count = true })
+-- Visual-selection commands (split on ';')
+vim.api.nvim_buf_create_user_command(bufnr, 'TDE', bteq.query_syntax_visual, { range = true })
+vim.api.nvim_buf_create_user_command(bufnr, 'TDV', bteq.query_output_visual, { range = true })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDH', ui.show_queries, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDR', picker.find_query_by_content, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDHelp', ui.display_help, { nargs = 0 })

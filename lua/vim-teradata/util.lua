@@ -428,6 +428,25 @@ function M.find_node_by_type(start_node, target_type)
     return nil
 end
 
+--- Collects `count` statement nodes: the given one + the next count-1 siblings.
+--- Walks next_named_sibling at the same tree level, skipping non-statement nodes.
+--- @param stmt_node TSNode  The starting statement node.
+--- @param count number      Total number of statements to collect.
+--- @param bufnr number      Buffer number.
+--- @return table            List of SQL text strings.
+function M.collect_next_sibling_statements(stmt_node, count, bufnr)
+    local stmts = { vim.treesitter.get_node_text(stmt_node, bufnr) }
+    local node = stmt_node
+    while #stmts < count do
+        node = node:next_named_sibling()
+        if not node then break end
+        if node:type() == 'statement' then
+            table.insert(stmts, vim.treesitter.get_node_text(node, bufnr))
+        end
+    end
+    return stmts
+end
+
 --- Find the next node of a specific type (searching up, forward, and down)
 -- @param target_type string The node type to look for
 -- @return TSNode|nil
