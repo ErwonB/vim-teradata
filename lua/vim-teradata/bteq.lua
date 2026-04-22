@@ -286,4 +286,82 @@ function M.query_output_visual(args)
     end)
 end
 
+--- Joins multiple SQL statements into BTEQ multistatement format.
+--- The ';' terminator of query N appears on the same line as the start of query N+1.
+--- @param sqls table list of SQL strings (without trailing ';')
+--- @return string the joined multistatement SQL
+local function join_multistatement(sqls)
+    if #sqls == 0 then return '' end
+    if #sqls == 1 then return sqls[1] end
+
+    local lines = {}
+    for i, sql in ipairs(sqls) do
+        local stmt_lines = vim.split(sql, '\n', { trimempty = true })
+        if i == 1 then
+            vim.list_extend(lines, stmt_lines)
+        else
+            -- Prepend ';' to the first line of the next statement (terminates previous query)
+            local first_line = ';' .. stmt_lines[1]
+            table.insert(lines, first_line)
+            for j = 2, #stmt_lines do
+                table.insert(lines, stmt_lines[j])
+            end
+        end
+    end
+    return table.concat(lines, '\n')
+end
+
+local function output_callback(res, context)
+    if res.rc == 0 then
+        local result_path = context.result_path
+        if vim.fn.getfsize(result_path) > 0 then
+            ui.display_output(result_path, context.query_id)
+            local actual_lines = util.extract_rows_found(res.log_content)
+            if actual_lines and actual_lines > config.options.retlimit then
+                vim.notify(
+                    string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
+                    vim.log.levels.WARN
+                )
+            end
+        else
+            vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
+        end
+    else
+        ui.display_error(res.msg)
+    end
+end
+
+-- Node-based multistatement output (supports count: :3TDM)
+function M.query_multistatement(args)
+    local count = (args.count and args.count > 0) and args.count or 1
+    local sqls = get_node_statements(count)
+    if #sqls == 0 then
+        return vim.notify('No SQL statements found.', vim.log.levels.WARN)
+    end
+    local joined = join_multistatement(sqls)
+    vim.notify(
+        #sqls .. ' statement(s) sent as multistatement',
+        vim.log.levels.INFO, { title = 'Teradata' }
+    )
+    run_single_query(joined, 'output', output_callback)
+end
+
+-- Visual-selection multistatement output
+function M.query_multistatement_visual(args)
+    local sql = get_visual_sql()
+    if not sql or sql:match('^%s*$') then
+        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
+    end
+    local sqls = split_sql_statements(sql)
+    if #sqls == 0 then
+        return vim.notify('No SQL statements found.', vim.log.levels.WARN)
+    end
+    local joined = join_multistatement(sqls)
+    vim.notify(
+        #sqls .. ' statement(s) sent as multistatement',
+        vim.log.levels.INFO, { title = 'Teradata' }
+    )
+    run_single_query(joined, 'output', output_callback)
+end
+
 return M

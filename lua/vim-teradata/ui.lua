@@ -277,6 +277,8 @@ function M.display_help()
         ':nTDO  output current + next n-1 statements',
         'TDE    syntax check visual selection (splits on ;)',
         'TDV    output visual selection (splits on ;)',
+        ':nTDM  multistatement output n nodes in 1 BTEQ job',
+        'TDMV   multistatement visual (splits on ; → 1 BTEQ job)',
         'TDH: Show query history',
         'TDR: Search query history with FZF',
         'TDU: Manage users',
