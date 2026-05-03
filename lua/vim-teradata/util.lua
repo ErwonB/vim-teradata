@@ -447,6 +447,23 @@ function M.collect_next_sibling_statements(stmt_node, count, bufnr)
     return stmts
 end
 
+--- Collects `count` statement *nodes*: the given one + the next count-1 siblings.
+--- @param stmt_node TSNode  The starting statement node.
+--- @param count number      Total number of statement nodes to collect.
+--- @return table            List of TSNode objects.
+function M.collect_next_sibling_statement_nodes(stmt_node, count)
+    local nodes = { stmt_node }
+    local node = stmt_node
+    while #nodes < count do
+        node = node:next_named_sibling()
+        if not node then break end
+        if node:type() == 'statement' then
+            table.insert(nodes, node)
+        end
+    end
+    return nodes
+end
+
 --- Find the next node of a specific type (searching up, forward, and down)
 -- @param target_type string The node type to look for
 -- @return TSNode|nil

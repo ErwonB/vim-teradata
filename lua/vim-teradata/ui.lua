@@ -286,7 +286,8 @@ function M.display_help()
         'TDB: Manage bookmarks',
         'TDBAdd: Add bookmark from visual selection',
         'TDJ: Jobs Manager',
-        'TDF: Format current statement',
+        ':nTDF: format current + next n-1 statements',
+        'TDFF: format all statements in buffer',
         'TDSync: export ddl for autocompletion',
         'TDHelp: Display this help',
     }

@@ -95,7 +95,8 @@ vim.api.nvim_buf_create_user_command(bufnr, 'TDS', ui.show_settings, { nargs = 0
 vim.api.nvim_buf_create_user_command(bufnr, 'TDB', ui.show_bookmarks, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDBAdd', bookmark.add_from_range, { range = true })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDJ', ui.show_jobs, { nargs = 0 })
-vim.api.nvim_buf_create_user_command(bufnr, 'TDF', ope.format_current_statement, { nargs = 0 })
+vim.api.nvim_buf_create_user_command(bufnr, 'TDF', ope.format_current_statement, { count = true })
+vim.api.nvim_buf_create_user_command(bufnr, 'TDFF', ope.format_all_statements, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDSync', util.export_db_data, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDCodeAction', code_actions.run, { nargs = 0 })
 

@@ -1228,8 +1228,38 @@ format_node = function(node, buf, indent_lvl, context)
     return table.concat(parts, "")
 end
 
---- Formats the SQL statement under the cursor
-function M.format_current_statement()
+--- Formats a list of statement nodes in-place (bottom-up to preserve ranges).
+local function format_statement_nodes(nodes, buf)
+    -- Sort descending by start_row so replacements don't shift earlier nodes
+    table.sort(nodes, function(a, b)
+        local r1 = a:range()
+        local r2 = b:range()
+        return r1 > r2
+    end)
+
+    for _, node in ipairs(nodes) do
+        local formatted = format_node(node, buf, 0)
+
+        formatted = formatted:gsub(" %.", ".")
+            :gsub("%. ", ".")
+            :gsub("%( %)", "()")
+            :gsub(" %( ", "(")
+            :gsub(" ,", ",")
+            :gsub("\n ", "\n" .. INDENT_STR)
+
+        local s_row, s_col, e_row, e_col = node:range()
+        local lines = vim.split(formatted, "\n")
+
+        local ok, err = pcall(api.nvim_buf_set_text, buf, s_row, s_col, e_row, e_col, lines)
+        if not ok then
+            vim.notify("Failed to apply formatting: " .. tostring(err), LOG_LEVELS.ERROR)
+        end
+    end
+end
+
+--- Formats the SQL statement(s) under the cursor.
+--- When called as :nTDF, formats n consecutive statements.
+function M.format_current_statement(args)
     local buf = api.nvim_get_current_buf()
 
     if not ensure_parser(buf) then return end
@@ -1244,25 +1274,33 @@ function M.format_current_statement()
         return
     end
 
-    local formatted = format_node(node, buf, 0)
+    local count = (args and args.count and args.count > 0) and args.count or 1
+    local nodes = util.collect_next_sibling_statement_nodes(node, count)
+    format_statement_nodes(nodes, buf)
+end
 
-    -- Post-processing sanitization (cleaning up artifact spaces from recursion)
-    -- Optimized replacements using patterns
-    formatted = formatted:gsub(" %.", ".")
-        :gsub("%. ", ".")
-        :gsub("%( %)", "()")
-        :gsub(" %( ", "(")
-        :gsub(" ,", ",")
-        :gsub("\n ", "\n" .. INDENT_STR)
+--- Formats all SQL statements in the current buffer.
+function M.format_all_statements()
+    local buf = api.nvim_get_current_buf()
+    local parser = ensure_parser(buf)
+    if not parser then return end
 
-    local s_row, s_col, e_row, e_col = node:range()
-    local lines = vim.split(formatted, "\n")
+    local tree = parser:parse()[1]
+    local root = tree:root()
 
-    -- Use pcall for API safety
-    local ok, err = pcall(api.nvim_buf_set_text, buf, s_row, s_col, e_row, e_col, lines)
-    if not ok then
-        vim.notify("Failed to apply formatting: " .. tostring(err), LOG_LEVELS.ERROR)
+    local nodes = {}
+    for child in root:iter_children() do
+        if child:type() == 'statement' then
+            table.insert(nodes, child)
+        end
     end
+
+    if #nodes == 0 then
+        vim.notify("No statements found in buffer.", LOG_LEVELS.WARN)
+        return
+    end
+
+    format_statement_nodes(nodes, buf)
 end
 
 --- copy the nearest ancestor node matching the given type
