@@ -433,6 +433,88 @@ local function find_all_tables_in_scope(scope_node, source)
     return tables
 end
 
+--- Checks if there is an ERROR node immediately after the statement
+--- @param statement_node table
+--- @return boolean
+local function has_adjacent_error(statement_node)
+    local next_sib = statement_node:next_sibling()
+    while next_sib and next_sib:type() == ';' do
+        return false
+    end
+    if next_sib and next_sib:type() == 'ERROR' then
+        local stmt_end_row = select(3, statement_node:range())
+        local err_start_row = select(1, next_sib:range())
+        -- Row proximity threshold (<= 1 row gap).
+        -- Can be relaxed or removed in the future if legitimate adjacent errors are further away.
+        if err_start_row <= stmt_end_row + 1 then
+            return true
+        end
+    end
+    return false
+end
+
+--- Try to perform error recovery by parsing a query with a dummy character inserted at cursor.
+--- @param bufnr integer
+--- @param row_1 integer
+--- @param col_0 integer
+--- @param context table
+--- @return boolean True if recovery produced results, false otherwise.
+local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
+    local modified_buf_text = try_build_parsable_query(bufnr, row_1 - 1, col_0)
+    local lang = "sql"
+    local parser = vim.treesitter.get_string_parser(modified_buf_text, lang)
+    local trees = parser:parse()
+    local cursor_pos_in_modified = row_1 - 1
+
+    if trees and #trees > 0 then
+        local root = trees[1]:root()
+        local fixed_statement_node = nil
+
+        local stmt_query = vim.treesitter.query.parse("sql", "(statement) @stmt")
+        for _, stmt_node, _ in stmt_query:iter_captures(root, modified_buf_text, 0, -1) do
+            local s_start_row, _, s_end_row, s_end_col = stmt_node:range()
+            if cursor_pos_in_modified >= s_start_row and
+                (cursor_pos_in_modified < s_end_row or
+                    (cursor_pos_in_modified == s_end_row and col_0 <= s_end_col)) then
+                fixed_statement_node = stmt_node
+                break
+            end
+        end
+        if not fixed_statement_node and root:named_child_count() > 0 then
+            fixed_statement_node = root:named_child(0)
+        end
+
+        if fixed_statement_node and fixed_statement_node:type() == 'statement' then
+            -- Identify scope in the modified tree
+            local node_at_cursor = fixed_statement_node:named_descendant_for_range(row_1 - 1, col_0,
+                row_1 - 1, col_0)
+            local scope_node = get_scope_node(node_at_cursor) or fixed_statement_node
+
+            context.tables = find_all_tables_in_scope(scope_node, modified_buf_text)
+            context.buffer_fields = find_all_fields_from_subquery(scope_node, modified_buf_text)
+
+            local function extend_unique(target, source)
+                local existing = {}
+                for _, v in ipairs(target) do
+                    existing[v] = true
+                end
+                for _, v in ipairs(source) do
+                    if not existing[v] then
+                        table.insert(target, v)
+                        existing[v] = true
+                    end
+                end
+            end
+
+            extend_unique(context.tables, find_all_tables_in_scope(scope_node, modified_buf_text))
+            extend_unique(context.buffer_fields, find_all_fields_from_subquery(scope_node, modified_buf_text))
+
+            return (context.tables and #context.tables > 0) or (context.buffer_fields and #context.buffer_fields > 0)
+        end
+    end
+    return false
+end
+
 ---
 --- Analyzes the SQL context at the cursor using Tree-sitter.
 --- @return table The context { type, db_name, tables, alias_prefix, ... }
@@ -521,6 +603,11 @@ function M.analyze_sql_context()
             scope_node = get_scope_node(cursor_node) or statement_node
             context.tables = find_all_tables_in_scope(scope_node, bufnr)
             context.buffer_fields = find_all_fields_from_subquery(scope_node, bufnr)
+            -- Fallback: If standard path found no useful results and there's an adjacent ERROR,
+            -- attempt error-recovery reparse
+            if has_adjacent_error(statement_node) then
+                try_error_recovery_reparse(bufnr, row_1, col_0, context)
+            end
         elseif has_sel_or_dml and statement_node then
             -- Error path: try to rebuild and parse
             local kw_node = nil
@@ -532,40 +619,7 @@ function M.analyze_sql_context()
             end
 
             if kw_node then
-                local modified_buf_text = try_build_parsable_query(bufnr, row_1 - 1, col_0)
-                local lang = "sql"
-                local parser = vim.treesitter.get_string_parser(modified_buf_text, lang)
-                local trees = parser:parse()
-
-                if trees and #trees > 0 then
-                    local root = trees[1]:root()
-                    local fixed_statement_node = nil
-                    local cursor_pos_in_modified = cursor_pos_0[1]
-
-                    local stmt_query = vim.treesitter.query.parse("sql", "(statement) @stmt")
-                    for _, stmt_node, _ in stmt_query:iter_captures(root, modified_buf_text, 0, -1) do
-                        local s_start_row, _, s_end_row, s_end_col = stmt_node:range()
-                        if cursor_pos_in_modified >= s_start_row and
-                            (cursor_pos_in_modified < s_end_row or
-                                (cursor_pos_in_modified == s_end_row and col_0 <= s_end_col)) then
-                            fixed_statement_node = stmt_node
-                            break
-                        end
-                    end
-                    if not fixed_statement_node and root:named_child_count() > 0 then
-                        fixed_statement_node = root:named_child(0)
-                    end
-
-                    if fixed_statement_node and fixed_statement_node:type() == 'statement' then
-                        -- Identify scope in the modified tree
-                        local node_at_cursor = fixed_statement_node:named_descendant_for_range(row_1 - 1, col_0,
-                            row_1 - 1, col_0)
-                        scope_node = get_scope_node(node_at_cursor) or fixed_statement_node
-
-                        context.tables = find_all_tables_in_scope(scope_node, modified_buf_text)
-                        context.buffer_fields = find_all_fields_from_subquery(scope_node, modified_buf_text)
-                    end
-                end
+                try_error_recovery_reparse(bufnr, row_1, col_0, context)
             end
         end
 
