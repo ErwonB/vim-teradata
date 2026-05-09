@@ -1,4 +1,5 @@
 local util = require('vim-teradata.util')
+local tsu  = require('vim-teradata.ts-util')
 local M = {}
 
 -- =============================================================================
@@ -279,7 +280,7 @@ end
 local function check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
     for _, select_expr_node in QUERIES.subquery_select:iter_captures(stmt_node, bufnr, 0, -1) do
         local seen_cols = {}
-        local exists_node = util.find_node_by_type(select_expr_node, NODE.EXISTS)
+        local exists_node = tsu.ancestor(select_expr_node, NODE.EXISTS)
         local sel_expr_txt = get_text(select_expr_node, bufnr)
         if not exists_node and sel_expr_txt ~= "*" then
             local _, cols = get_columns_from_select_expr(select_expr_node, bufnr)
@@ -447,9 +448,9 @@ function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
                     end
 
                     if subquery_node then
-                        local select_node = util.find_first_descendant_by_type(subquery_node, NODE.SELECT)
+                        local select_node = tsu.descendant(subquery_node, NODE.SELECT)
                         local select_expr = select_node and
-                            util.find_first_descendant_by_type(select_node, NODE.SELECT_EXPR)
+                            tsu.descendant(select_node, NODE.SELECT_EXPR)
 
                         if select_expr then
                             local expr_text = get_text(select_expr, bufnr)

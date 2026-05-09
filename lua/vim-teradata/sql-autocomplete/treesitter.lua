@@ -1,4 +1,5 @@
 local utils = require('vim-teradata.util')
+local tsu   = require('vim-teradata.ts-util')
 
 local M = {}
 
@@ -84,165 +85,6 @@ local Q = {
     obj_ref = vim.treesitter.query.parse("sql", [[ (object_reference) @obj ]]),
 }
 
-local function node_rows(n)
-    local sr, _, er, _ = n:range()
-    return sr, er + 1
-end
-
-local function any_capture(query, node, bufnr, start_row, end_row)
-    for _ in query:iter_captures(node, bufnr, start_row, end_row) do
-        return true
-    end
-    return false
-end
-
-local function get_line_prefix(row, col)
-    local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1] or ""
-    return line:sub(1, col)
-end
-
----
---- Finds the closest ancestor node that acts as a scope boundary (subquery or statement).
---- @param node TSNode? The starting node.
---- @return table|nil The scope node.
----
-local function get_scope_node(node)
-    local current = node
-    while current do
-        local type = current:type()
-        -- TODO create a list of those types of node
-        if type == 'subquery' or type == 'statement' then
-            return current
-        end
-        current = current:parent()
-    end
-    return nil
-end
-
----
---- Checks if a node is a direct descendant of the scope node
---- meaning it is not nested inside another intermediate subquery.
---- @param node table The node to check (e.g., a relation).
---- @param scope_node table The defining scope (subquery or statement).
---- @return boolean
----
-local function is_direct_scope_descendant(node, scope_node)
-    local current = node:parent()
-    while current do
-        if current == scope_node then return true end
-        -- If we hit an intermediate subquery before the scope node, it's nested too deep.
-        if current:type() == 'subquery' then return false end
-        current = current:parent()
-    end
-    return false
-end
-
----
---- Finds the enclosing statement node for a given node.
---- @param node table The starting Tree-sitter node.
---- @param bufnr number The buffer number.
---- @param cursor_row number The row number of the cursor (0-indexed).
---- @return table|nil The enclosing or relevant preceding statement node.
----
-local function get_enclosing_or_relevant_preceding_statement(node, bufnr, cursor_row)
-    bufnr = bufnr or 0
-    if not node then return nil end
-
-    local current = node
-    local root_node = nil
-    local original_node_start_row, _, _, _ = node:start()
-    original_node_start_row = math.max(original_node_start_row, cursor_row)
-
-    -- 1. Try to find the enclosing statement by going up the tree
-    while current do
-        local ntype = current:type()
-        if ntype == 'statement' then
-            return current
-        end
-        if ntype == 'program' then
-            root_node = current
-            break
-        end
-        local parent = current:parent()
-        if not parent then
-            -- If we reached the top without finding 'program', treat this as root
-            if ntype == 'program' then root_node = current end
-            break
-        end
-        current = parent
-    end
-
-    -- 2. If no enclosing statement found, but we identified the program root
-    if root_node then
-        local prev_type = nil
-        -- Iterate backwards to find the closest preceding statement
-        for i = 0, root_node:child_count() - 1 do
-            local child = root_node:child(root_node:child_count() - 1 - i)
-            if not child then goto continue end
-
-            local _, _, child_end_row, _ = child:range()
-
-            -- Check if this child ends at or before the cursor area
-            if child_end_row <= original_node_start_row then
-                if child:type() == 'statement' and prev_type ~= ';' then
-                    return child
-                end
-                prev_type = child:type()
-            end
-            ::continue::
-        end
-    end
-
-    -- 3. If we are at the top level (e.g. single line query parsed as ERROR or program -> ERROR)
-    -- 'current' holds the last node visited (likely 'program' or 'ERROR' root)
-    if current and current:type() == 'ERROR' then
-        return current
-    end
-
-    return nil
-end
-
-
----
---- Manual implementation of the missing 'child_by_field_name' helper.
---- @param node table The Tree-sitter node to search.
---- @param field_name string The name of the field to find.
---- @return table|nil The child node, or nil if not found.
----
-local function get_child_by_field_name(node, field_name)
-    if not node then
-        return nil
-    end
-    for i = 0, node:named_child_count() - 1 do
-        if node.field_name_for_child and node:field_name_for_child(i) == field_name then
-            return node:named_child(i)
-        end
-    end
-    return nil
-end
-
----
---- Try to build parsable query with dummy field
---- @param bufnr integer buffer number
---- @param row_0 integer row position
---- @param col_0 integer col position
---- @return string modified buffer string
-local function try_build_parsable_query(bufnr, row_0, col_0)
-    local dummy = "a"
-    local before = vim.api.nvim_buf_get_lines(bufnr, 0, row_0, false)
-    local line = vim.api.nvim_buf_get_lines(bufnr, row_0, row_0 + 1, false)[1] or ""
-    local line_byte_len = #line
-
-    local prefix = vim.api.nvim_buf_get_text(bufnr, row_0, 0, row_0, col_0, {})[1] or ""
-    local suffix = vim.api.nvim_buf_get_text(bufnr, row_0, col_0, row_0, line_byte_len, {})[1] or ""
-    local after = vim.api.nvim_buf_get_lines(bufnr, row_0 + 1, -1, false)
-
-    local parts = {}
-    vim.list_extend(parts, before)
-    table.insert(parts, prefix .. dummy .. suffix)
-    vim.list_extend(parts, after)
-    return table.concat(parts, "\n")
-end
 
 ---
 --- Finds all object_reference in a scope
@@ -256,11 +98,11 @@ local function find_all_object_reference(scope_node, source)
 
     for _, obj_node, _ in Q.obj_ref:iter_captures(scope_node, source, 0, -1) do
         -- Ensure object is part of the current scope
-        if not obj_node or not is_direct_scope_descendant(obj_node, scope_node) then
+        if not obj_node or not tsu.is_direct_scope_descendant(obj_node, scope_node) then
             goto continue
         end
 
-        local alias_node = get_child_by_field_name(obj_node, "alias")
+        local alias_node = tsu.child_by_field(obj_node, "alias")
         if not alias_node then
             for child in obj_node:iter_children() do
                 if child:type() == 'identifier' and child ~= obj_node then
@@ -271,9 +113,9 @@ local function find_all_object_reference(scope_node, source)
         end
 
         local _, schema_name, tbl_name = nil, nil, nil
-        local db_node = get_child_by_field_name(obj_node, "database")
-        local schema_node = get_child_by_field_name(obj_node, "schema")
-        local tbl_node = get_child_by_field_name(obj_node, "name")
+        local db_node = tsu.child_by_field(obj_node, "database")
+        local schema_node = tsu.child_by_field(obj_node, "schema")
+        local tbl_node = tsu.child_by_field(obj_node, "name")
 
         if schema_node then schema_name = vim.treesitter.get_node_text(schema_node, source) end
         if tbl_node then tbl_name = vim.treesitter.get_node_text(tbl_node, source) end
@@ -332,7 +174,7 @@ local function find_all_fields_from_subquery(scope_node, source)
         if subquery_node then
             -- Verify scoping: The subquery must be a direct child relation of the scope
             local relation_node = subquery_node:parent()
-            if relation_node and is_direct_scope_descendant(relation_node, scope_node) then
+            if relation_node and tsu.is_direct_scope_descendant(relation_node, scope_node) then
                 local subquery_alias = ""
                 if alias_node then
                     subquery_alias = vim.treesitter.get_node_text(alias_node, source)
@@ -370,7 +212,7 @@ local function find_all_tables_in_scope(scope_node, source)
     local tables = {}
 
     for _, rel_node, _ in Q.relation:iter_captures(scope_node, source, 0, -1) do
-        if not rel_node or not is_direct_scope_descendant(rel_node, scope_node) then
+        if not rel_node or not tsu.is_direct_scope_descendant(rel_node, scope_node) then
             goto continue
         end
 
@@ -383,7 +225,7 @@ local function find_all_tables_in_scope(scope_node, source)
             end
         end
 
-        local alias_node = get_child_by_field_name(rel_node, "alias")
+        local alias_node = tsu.child_by_field(rel_node, "alias")
         if not alias_node then
             for child in rel_node:iter_children() do
                 if child:type() == 'identifier' and child ~= obj_ref then
@@ -395,9 +237,9 @@ local function find_all_tables_in_scope(scope_node, source)
 
         if obj_ref then
             local _, schema_name, tbl_name = nil, nil, nil
-            local db_node = get_child_by_field_name(obj_ref, "database")
-            local schema_node = get_child_by_field_name(obj_ref, "schema")
-            local tbl_node = get_child_by_field_name(obj_ref, "name")
+            local db_node = tsu.child_by_field(obj_ref, "database")
+            local schema_node = tsu.child_by_field(obj_ref, "schema")
+            local tbl_node = tsu.child_by_field(obj_ref, "name")
 
             if schema_node then schema_name = vim.treesitter.get_node_text(schema_node, source) end
             if tbl_node then tbl_name = vim.treesitter.get_node_text(tbl_node, source) end
@@ -433,25 +275,6 @@ local function find_all_tables_in_scope(scope_node, source)
     return tables
 end
 
---- Checks if there is an ERROR node immediately after the statement
---- @param statement_node table
---- @return boolean
-local function has_adjacent_error(statement_node)
-    local next_sib = statement_node:next_sibling()
-    while next_sib and next_sib:type() == ';' do
-        return false
-    end
-    if next_sib and next_sib:type() == 'ERROR' then
-        local stmt_end_row = select(3, statement_node:range())
-        local err_start_row = select(1, next_sib:range())
-        -- Row proximity threshold (<= 1 row gap).
-        -- Can be relaxed or removed in the future if legitimate adjacent errors are further away.
-        if err_start_row <= stmt_end_row + 1 then
-            return true
-        end
-    end
-    return false
-end
 
 --- Try to perform error recovery by parsing a query with a dummy character inserted at cursor.
 --- @param bufnr integer
@@ -460,9 +283,8 @@ end
 --- @param context table
 --- @return boolean True if recovery produced results, false otherwise.
 local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
-    local modified_buf_text = try_build_parsable_query(bufnr, row_1 - 1, col_0)
-    local lang = "sql"
-    local parser = vim.treesitter.get_string_parser(modified_buf_text, lang)
+    local modified_buf_text = tsu.build_parsable_query_with_dummy(bufnr, row_1 - 1, col_0)
+    local parser = vim.treesitter.get_string_parser(modified_buf_text, "sql")
     local trees = parser:parse()
     local cursor_pos_in_modified = row_1 - 1
 
@@ -485,29 +307,12 @@ local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
         end
 
         if fixed_statement_node and fixed_statement_node:type() == 'statement' then
-            -- Identify scope in the modified tree
-            local node_at_cursor = fixed_statement_node:named_descendant_for_range(row_1 - 1, col_0,
-                row_1 - 1, col_0)
-            local scope_node = get_scope_node(node_at_cursor) or fixed_statement_node
+            local node_at_cursor = fixed_statement_node:named_descendant_for_range(
+                row_1 - 1, col_0, row_1 - 1, col_0)
+            local scope_node = tsu.scope_node(node_at_cursor) or fixed_statement_node
 
             context.tables = find_all_tables_in_scope(scope_node, modified_buf_text)
             context.buffer_fields = find_all_fields_from_subquery(scope_node, modified_buf_text)
-
-            local function extend_unique(target, source)
-                local existing = {}
-                for _, v in ipairs(target) do
-                    existing[v] = true
-                end
-                for _, v in ipairs(source) do
-                    if not existing[v] then
-                        table.insert(target, v)
-                        existing[v] = true
-                    end
-                end
-            end
-
-            extend_unique(context.tables, find_all_tables_in_scope(scope_node, modified_buf_text))
-            extend_unique(context.buffer_fields, find_all_fields_from_subquery(scope_node, modified_buf_text))
 
             return (context.tables and #context.tables > 0) or (context.buffer_fields and #context.buffer_fields > 0)
         end
@@ -526,7 +331,7 @@ function M.analyze_sql_context()
     local context = {}
 
     -- 1. Immediate Check for Table Context (DB.)
-    local line_prefix = get_line_prefix(row_1, col_0)
+    local line_prefix = tsu.line_prefix(bufnr, row_1, col_0)
     local before_dot_match = line_prefix:match("([%w_]+)%.([%w_]*)$")
 
     if before_dot_match and utils.is_a_db(before_dot_match) then
@@ -553,25 +358,25 @@ function M.analyze_sql_context()
         return context
     end
 
-    local statement_node = get_enclosing_or_relevant_preceding_statement(cursor_node, bufnr, row_1 - 1)
+    local statement_node = tsu.enclosing_or_preceding_statement(cursor_node, bufnr, row_1 - 1)
     if not statement_node then
         context.type = 'keywords'
         context.candidates = M.get_sql_keywords()
         return context
     end
 
-    local s_sr, s_er = node_rows(statement_node)
+    local s_sr, s_er = tsu.node_rows(statement_node)
     local cursor_error_node = nil
     local e_sr, e_er
     for _, node, _ in Q.has_error:iter_captures(cursor_node, bufnr, 0, -1) do
         cursor_error_node = node
-        e_sr, e_er = node_rows(cursor_error_node)
+        e_sr, e_er = tsu.node_rows(cursor_error_node)
         break
     end
 
-    local has_sel_or_dml = any_capture(Q.has_sel_or_dml, statement_node, bufnr, s_sr, s_er)
+    local has_sel_or_dml = tsu.any_capture(Q.has_sel_or_dml, statement_node, bufnr, s_sr, s_er)
     if (not has_sel_or_dml) and cursor_error_node and cursor_error_node ~= statement_node then
-        has_sel_or_dml = any_capture(Q.has_sel_or_dml, cursor_error_node, bufnr, e_sr, e_er)
+        has_sel_or_dml = tsu.any_capture(Q.has_sel_or_dml, cursor_error_node, bufnr, e_sr, e_er)
     end
 
     local has_where = false
@@ -600,12 +405,12 @@ function M.analyze_sql_context()
 
         if not has_error then
             -- Standard path: use scope relative to cursor
-            scope_node = get_scope_node(cursor_node) or statement_node
+            scope_node = tsu.scope_node(cursor_node) or statement_node
             context.tables = find_all_tables_in_scope(scope_node, bufnr)
             context.buffer_fields = find_all_fields_from_subquery(scope_node, bufnr)
             -- Fallback: If standard path found no useful results and there's an adjacent ERROR,
             -- attempt error-recovery reparse
-            if has_adjacent_error(statement_node) then
+            if tsu.has_adjacent_error(statement_node) then
                 try_error_recovery_reparse(bufnr, row_1, col_0, context)
             end
         elseif has_sel_or_dml and statement_node then

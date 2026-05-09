@@ -1,4 +1,5 @@
 local util = require('vim-teradata.util')
+local tsu  = require('vim-teradata.ts-util')
 local diag = require('vim-teradata.diagnostics')
 
 local M = {}
@@ -13,7 +14,7 @@ local M = {}
 local function get_cursor_statement(bufnr)
     local cursor_node = vim.treesitter.get_node({ bufnr = bufnr })
     if not cursor_node then return nil end
-    return util.find_node_by_type(cursor_node, "statement")
+    return tsu.ancestor(cursor_node, "statement")
 end
 
 ---Finds the alias identifier under cursor (works on definition AND on any usage like `alias.col`).
@@ -87,7 +88,7 @@ local function action_expand_star(bufnr)
         return
     end
 
-    local stmt_node = util.find_node_by_type(star_node, "statement")
+    local stmt_node = tsu.ancestor(star_node, "statement")
     if not stmt_node then
         vim.notify("Could not find enclosing statement.", vim.log.levels.WARN)
         return
@@ -241,7 +242,7 @@ end
 local function find_subquery_node(bufnr)
     local cursor_node = vim.treesitter.get_node({ bufnr = bufnr })
     if not cursor_node then return nil, nil end
-    local subquery_node = util.find_node_by_type(cursor_node, "subquery")
+    local subquery_node = tsu.ancestor(cursor_node, "subquery")
     if not subquery_node then return nil, nil end
     local parent = subquery_node:parent()
     if parent and parent:type() == "relation" then
@@ -259,7 +260,7 @@ local function action_extract_cte(bufnr)
         return
     end
 
-    local stmt_node = util.find_node_by_type(subquery_node, "statement")
+    local stmt_node = tsu.ancestor(subquery_node, "statement")
     if not stmt_node then
         vim.notify("Could not find enclosing statement.", vim.log.levels.WARN)
         return
@@ -532,8 +533,8 @@ local function action_transform_to_delete(bufnr)
         return
     end
 
-    local select_node = util.find_first_descendant_by_type(stmt_node, "select")
-    local from_node = util.find_first_descendant_by_type(stmt_node, "from")
+    local select_node = tsu.descendant(stmt_node, "select")
+    local from_node = tsu.descendant(stmt_node, "from")
 
     if not select_node or not from_node then
         vim.notify("Statement does not have a SELECT and FROM clause.", vim.log.levels.WARN)
@@ -577,8 +578,8 @@ local function action_transform_to_insert(bufnr)
         return
     end
 
-    local select_node = util.find_first_descendant_by_type(stmt_node, "select")
-    local from_node = util.find_first_descendant_by_type(stmt_node, "from")
+    local select_node = tsu.descendant(stmt_node, "select")
+    local from_node = tsu.descendant(stmt_node, "from")
 
     if not select_node or not from_node then
         vim.notify("Statement does not have a SELECT and FROM clause.", vim.log.levels.WARN)
@@ -715,8 +716,8 @@ local function action_transform_to_update(bufnr)
         return
     end
 
-    local select_node = util.find_first_descendant_by_type(stmt_node, "select")
-    local from_node   = util.find_first_descendant_by_type(stmt_node, "from")
+    local select_node = tsu.descendant(stmt_node, "select")
+    local from_node   = tsu.descendant(stmt_node, "from")
 
     if not select_node or not from_node then
         vim.notify("Statement does not have a SELECT and FROM clause.", vim.log.levels.WARN)
@@ -943,7 +944,7 @@ local function action_rename_alias(bufnr)
         return
     end
 
-    local stmt_node = util.find_node_by_type(alias_node, "statement")
+    local stmt_node = tsu.ancestor(alias_node, "statement")
     if not stmt_node then
         vim.notify("Could not find enclosing statement.", vim.log.levels.WARN)
         return
@@ -1077,8 +1078,8 @@ function M.run()
             })
         end
 
-        local select_node = util.find_first_descendant_by_type(stmt_node, "select")
-        local from_node = util.find_first_descendant_by_type(stmt_node, "from")
+        local select_node = tsu.descendant(stmt_node, "select")
+        local from_node = tsu.descendant(stmt_node, "from")
 
         if select_node and from_node then
             table.insert(actions, {

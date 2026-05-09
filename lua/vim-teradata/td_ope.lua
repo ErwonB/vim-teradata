@@ -1,4 +1,4 @@
-local util = require('vim-teradata.util')
+local tsu = require('vim-teradata.ts-util')
 local M = {}
 local api = vim.api
 local ts = vim.treesitter
@@ -74,15 +74,6 @@ local CREATE_TABLE_SECTIONS = {
 -- Forward declaration
 local format_node
 
--- Helper: Check if parser is available
-local function ensure_parser(buf)
-    local ok, parser = pcall(ts.get_parser, buf, "sql")
-    if not ok or not parser then
-        vim.notify("Tree-sitter parser for SQL not found.", LOG_LEVELS.ERROR)
-        return nil
-    end
-    return parser
-end
 
 
 
@@ -98,80 +89,6 @@ local function is_merge_statement(node)
     return false
 end
 
---- Selects a node and adjusts range to include delimiters (commas/semicolons)
-local function get_node_range_with_delimiters(target_node_type, buf)
-    local current_node = ts.get_node({ bufnr = buf })
-    if not current_node then return end
-
-    local node = util.find_node_by_type(current_node, target_node_type)
-    if not node then
-        vim.notify("Node '" .. target_node_type .. "' not found.", LOG_LEVELS.WARN)
-        return
-    end
-
-    local s_row, s_col, e_row, e_col = node:range()
-
-    if target_node_type == NODE.TERM then
-        local prev = node:prev_sibling()
-        local next = node:next_sibling()
-
-        -- Check previous sibling for comma
-        if prev and prev:type() == "," then
-            local cs_row, cs_col, _, _ = prev:range()
-            s_row = cs_row
-            s_col = cs_col
-            -- Check next sibling for comma if previous didn't match
-        elseif next and next:type() == "," then
-            local _, _, ce_row, ce_col = next:range()
-            e_row = ce_row
-            e_col = ce_col
-        end
-    elseif target_node_type == NODE.BINARY_EXPR then
-        local prev = node:prev_sibling()
-        local next = node:next_sibling()
-
-        -- Check previous sibling for and/or
-        if prev and (prev:type() == "keyword_and" or prev:type() == "keyword_or") then
-            local cs_row, cs_col, _, _ = prev:range()
-            s_row = cs_row
-            s_col = cs_col
-            -- Check next sibling for and/or if previous didn't match
-        elseif next and (next:type() == "keyword_and" or next:type() == "keyword_or") then
-            local _, _, ce_row, ce_col = next:range()
-            e_row = ce_row
-            e_col = ce_col
-        end
-
-
-        -- Edge case: only one binary_expression in WHERE
-        local parent = node:parent()
-        if parent and parent:type() == "where" then
-            local binary_count = 0
-            for child in parent:iter_children() do
-                if child:type() == "binary_expression" then
-                    binary_count = binary_count + 1
-                end
-            end
-
-            if binary_count == 1 then
-                local ws_row, ws_col, we_row, we_col = parent:range()
-                s_row = ws_row
-                s_col = ws_col
-                e_row = we_row
-                e_col = we_col
-            end
-        end
-    elseif target_node_type == NODE.STATEMENT then
-        local next = node:next_sibling()
-        if next and next:type() == ";" then
-            local _, _, se_row, se_col = next:range()
-            e_row = se_row
-            e_col = se_col
-        end
-    end
-
-    return s_row, s_col, e_row, e_col
-end
 
 
 --- Extract text and apply casing rules
@@ -1262,12 +1179,12 @@ end
 function M.format_current_statement(args)
     local buf = api.nvim_get_current_buf()
 
-    if not ensure_parser(buf) then return end
+    if not tsu.ensure_parser(buf) then return end
 
     local node = ts.get_node({ bufnr = buf, ignore_injections = false })
 
     -- Traverse up to find the statement
-    node = util.find_node_by_type(node, NODE.STATEMENT)
+    node = tsu.ancestor(node, NODE.STATEMENT)
 
     if not node then
         vim.notify("Cursor is not inside a valid SQL statement.", LOG_LEVELS.WARN)
@@ -1275,14 +1192,14 @@ function M.format_current_statement(args)
     end
 
     local count = (args and args.count and args.count > 0) and args.count or 1
-    local nodes = util.collect_next_sibling_statement_nodes(node, count)
+    local nodes = tsu.collect_next_sibling_statement_nodes(node, count)
     format_statement_nodes(nodes, buf)
 end
 
 --- Formats all SQL statements in the current buffer.
 function M.format_all_statements()
     local buf = api.nvim_get_current_buf()
-    local parser = ensure_parser(buf)
+    local parser = tsu.ensure_parser(buf)
     if not parser then return end
 
     local tree = parser:parse()[1]
@@ -1307,7 +1224,7 @@ end
 -- @param target_node_type string
 function M.copy_node(target_node_type)
     local buf = api.nvim_get_current_buf()
-    local s_row, s_col, e_row, e_col = get_node_range_with_delimiters(target_node_type, buf)
+    local s_row, s_col, e_row, e_col = tsu.node_range_with_delimiters(target_node_type, buf)
     if s_row and s_col and e_row and e_col then
         local lines = vim.api.nvim_buf_get_text(buf, s_row, s_col, e_row, e_col, {})
         local text = table.concat(lines, '\n')
@@ -1319,7 +1236,7 @@ end
 -- @param target_node_type string
 function M.delete_node(target_node_type)
     local buf = api.nvim_get_current_buf()
-    local s_row, s_col, e_row, e_col = get_node_range_with_delimiters(target_node_type, buf)
+    local s_row, s_col, e_row, e_col = tsu.node_range_with_delimiters(target_node_type, buf)
 
     if s_row and s_col and e_row and e_col then
         api.nvim_buf_set_text(buf, s_row, s_col, e_row, e_col, {})
@@ -1332,7 +1249,7 @@ function M.comment_node(target_node_type)
     local buf = api.nvim_get_current_buf()
     local left, right = "/*", "*/"
 
-    local s_row, s_col, e_row, e_col = get_node_range_with_delimiters(target_node_type, buf)
+    local s_row, s_col, e_row, e_col = tsu.node_range_with_delimiters(target_node_type, buf)
 
     if s_row and s_col and e_row and e_col then
         -- Apply right side first to avoid index shifting if on same line (though ranges handles this)
@@ -1397,7 +1314,7 @@ end
 --- Moves cursor to the next node of the given type
 -- @param target_node_type string (e.g. "statement")
 function M.jump_to_next(target_node_type)
-    local node = util.find_next_node_by_type(target_node_type)
+    local node = tsu.next_node_by_type(target_node_type)
     if node then
         local r, c, _, _ = node:range()
         api.nvim_win_set_cursor(0, { r + 1, c })
@@ -1409,7 +1326,7 @@ end
 --- Moves cursor to the previous node of the given type
 -- @param target_node_type string (e.g. "statement")
 function M.jump_to_prev(target_node_type)
-    local node = util.find_prev_node_by_type(target_node_type)
+    local node = tsu.prev_node_by_type(target_node_type)
     if node then
         local r, c, _, _ = node:range()
         api.nvim_win_set_cursor(0, { r + 1, c })

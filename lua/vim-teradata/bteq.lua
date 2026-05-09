@@ -1,5 +1,6 @@
 local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
+local tsu  = require('vim-teradata.ts-util')
 local ui = require('vim-teradata.ui')
 
 local M = {}
@@ -83,9 +84,10 @@ end
 local function get_node_statements(count)
     local buf = vim.api.nvim_get_current_buf()
     local current_node = vim.treesitter.get_node({ bufnr = buf })
-    local stmt_node = util.find_node_by_type(current_node, "statement")
+    local stmt_node = tsu.ancestor(current_node, "statement")
     if not stmt_node then return {} end
-    return util.collect_next_sibling_statements(stmt_node, count, buf)
+    local nodes = tsu.collect_next_sibling_statement_nodes(stmt_node, count)
+    return vim.tbl_map(function(n) return vim.treesitter.get_node_text(n, buf) end, nodes)
 end
 
 local function run_single_query(sql, operation, handle_result)
