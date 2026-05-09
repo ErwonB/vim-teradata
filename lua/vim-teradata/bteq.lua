@@ -44,7 +44,7 @@ end
 --- @param script_lines table The script lines to send to BTEQ.
 --- @param on_done function The callback function(res).
 local function start_job(script_lines, on_done)
-    vim.system({ 'bteq' }, {
+    return vim.system({ 'bteq' }, {
         stdin = table.concat(script_lines, '\n'),
         text = true,
     }, function(result)
