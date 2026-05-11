@@ -926,7 +926,108 @@ local function action_autocomplete_join(bufnr)
 end
 
 -- =============================================================================
--- Action 8: Rename Alias
+-- Action 8: Expand GROUP BY Ordinals
+-- =============================================================================
+
+---Finds the group_by node under or enclosing the cursor.
+---@param bufnr number
+---@return TSNode|nil
+local function find_group_by_node(bufnr)
+    local n = vim.treesitter.get_node({ bufnr = bufnr })
+    while n do
+        if n:type() == "group_by" then return n end
+        if n:type() == "statement" then break end
+        n = n:parent()
+    end
+    return nil
+end
+
+---Finds the select_expression that shares the same query scope as group_by_node.
+---@param gb_node TSNode
+---@return TSNode|nil
+local function find_select_expr_for_group_by(gb_node)
+    local scope = tsu.ancestor(gb_node, { statement = true, subquery = true })
+    if not scope then return nil end
+    local sel_node = tsu.descendant(scope, "select")
+    return sel_node and tsu.descendant(sel_node, "select_expression")
+end
+
+---Expands GROUP BY ordinal positions to the corresponding SELECT expressions.
+---@param bufnr number
+local function action_expand_group_by_ordinals(bufnr)
+    local gb = find_group_by_node(bufnr)
+    if not gb then
+        vim.notify("Cursor is not on a GROUP BY clause.", vim.log.levels.WARN)
+        return
+    end
+
+    local sel_expr = find_select_expr_for_group_by(gb)
+    if not sel_expr then
+        vim.notify("Could not resolve SELECT list for this GROUP BY.", vim.log.levels.WARN)
+        return
+    end
+
+    -- Build the ordered list of SELECT term texts (prefer alias, else full expression)
+    local terms = {}
+    for child in sel_expr:iter_children() do
+        if child:type() == "term" then
+            local alias_node = child:field("alias")[1]
+            local value_node = child:named_child(0)
+            local txt
+            if alias_node then
+                txt = diag.get_text(alias_node, bufnr)
+            elseif value_node then
+                txt = diag.get_text(value_node, bufnr)
+            end
+            table.insert(terms, txt or "")
+        end
+    end
+
+    -- Collect ordinal literal children of group_by
+    local edits = {}
+    for child in gb:iter_children() do
+        local raw = diag.get_text(child, bufnr) or ""
+        local n = tonumber(raw:match("^%s*(%d+)%s*$"))
+        if n then
+            if n < 1 or n > #terms then
+                vim.notify(
+                    string.format("GROUP BY ordinal %d is out of range (SELECT has %d terms).", n, #terms),
+                    vim.log.levels.WARN)
+                return
+            end
+            local replacement = terms[n]
+            if not replacement or replacement == "" then
+                vim.notify(string.format("Could not resolve SELECT term at position %d.", n), vim.log.levels.WARN)
+                return
+            end
+            if replacement == "*" then
+                vim.notify("SELECT contains * — expand it first before expanding GROUP BY ordinals.",
+                    vim.log.levels.WARN)
+                return
+            end
+            local sr, sc, er, ec = child:range()
+            table.insert(edits, { sr = sr, sc = sc, er = er, ec = ec, text = replacement })
+        end
+    end
+
+    if #edits == 0 then
+        vim.notify("No GROUP BY ordinals found to expand.", vim.log.levels.INFO)
+        return
+    end
+
+    -- Apply bottom-to-top to preserve byte ranges
+    table.sort(edits, function(a, b)
+        if a.sr == b.sr then return a.sc > b.sc end
+        return a.sr > b.sr
+    end)
+    for _, e in ipairs(edits) do
+        vim.api.nvim_buf_set_text(bufnr, e.sr, e.sc, e.er, e.ec, vim.split(e.text, "\n"))
+    end
+    vim.notify(string.format("Expanded %d GROUP BY ordinal(s).", #edits), vim.log.levels.INFO)
+end
+
+-- =============================================================================
+-- Action 9: Rename Alias
 -- =============================================================================
 
 ---Renames the alias everywhere in the current statement.
@@ -1093,6 +1194,22 @@ function M.run()
             table.insert(actions, {
                 title = "Transform SELECT to UPDATE statement",
                 fn = function() action_transform_to_update(bufnr) end,
+            })
+        end
+    end
+
+    -- Check: Expand GROUP BY ordinals
+    local gb = find_group_by_node(bufnr)
+    if gb then
+        local has_ordinal = false
+        for child in gb:iter_children() do
+            local raw = diag.get_text(child, bufnr) or ""
+            if raw:match("^%s*%d+%s*$") then has_ordinal = true; break end
+        end
+        if has_ordinal then
+            table.insert(actions, {
+                title = "Expand GROUP BY ordinals to expressions",
+                fn = function() action_expand_group_by_ordinals(bufnr) end,
             })
         end
     end

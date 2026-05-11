@@ -26,6 +26,18 @@ local NODE = {
     SET_OPE = "set_operation",
     TERM = "term",
     FIELD = "field",
+    GROUP_BY = "group_by",
+    INVOCATION = "invocation",
+    LITERAL = "literal",
+    JOIN = "join",
+}
+
+local AGGREGATE_FNS = {
+    COUNT = true, SUM = true, AVG = true, MIN = true, MAX = true,
+    STDDEV = true, STDDEV_POP = true, STDDEV_SAMP = true,
+    VAR_POP = true, VAR_SAMP = true, VARIANCE = true,
+    KURTOSIS = true, SKEW = true, CORR = true,
+    COVAR_POP = true, COVAR_SAMP = true,
 }
 
 -- =============================================================================
@@ -100,7 +112,13 @@ local QUERIES = {
     (field name: (identifier) @col)
   ]]),
 
-    syntax_error = parse_query("sql", [[ (ERROR) @error ]])
+    syntax_error = parse_query("sql", [[ (ERROR) @error ]]),
+
+    join_nodes     = parse_query("sql", [[ (join) @join ]]),
+    select_exprs   = parse_query("sql", [[ (select (select_expression) @sel_expr) ]]),
+    group_by_nodes = parse_query("sql", [[ (group_by) @gb ]]),
+    cte_select_exp = parse_query("sql", [[ (cte (statement (select (select_expression) @cte_sel_expr))) ]]),
+    invocation_nod = parse_query("sql", [[ (invocation) @inv ]]),
 }
 
 -- =============================================================================
@@ -169,6 +187,59 @@ local function get_syntax_error_message(err_node, bufnr)
         return string.format('Unexpected token near "%s" (in %s).', near, ctx)
     end
     return "Syntax error."
+end
+
+---Returns a flat list of AND-conjuncts from a binary_expression tree.
+---@param node TSNode
+---@return TSNode[]
+local function flatten_and_conjuncts(node)
+    if node:type() ~= "binary_expression" then return { node } end
+    local has_and = false
+    for c in node:iter_children() do
+        if c:type() == "keyword_and" then has_and = true; break end
+    end
+    if not has_and then return { node } end
+    local out = {}
+    for c in node:iter_children() do
+        if c:type() ~= "keyword_and" then
+            vim.list_extend(out, flatten_and_conjuncts(c))
+        end
+    end
+    return #out > 0 and out or { node }
+end
+
+---Returns true if inv_node is a call to a known aggregate function.
+---@param inv_node TSNode
+---@param bufnr number
+---@return boolean
+local function is_aggregate_invocation(inv_node, bufnr)
+    for c in inv_node:iter_children() do
+        if c:type() == NODE.OBJ_REF then
+            local name_id = nil
+            for part in c:iter_children() do
+                if part:type() == NODE.IDENTIFIER then name_id = part end
+            end
+            if name_id then
+                return AGGREGATE_FNS[normalize(get_text(name_id, bufnr) or "")] == true
+            end
+        end
+    end
+    return false
+end
+
+---Returns true if node is a descendant of an aggregate invocation, stopping at select_expression.
+---@param node TSNode
+---@param bufnr number
+---@return boolean
+local function is_under_aggregate(node, bufnr)
+    local p = node:parent()
+    while p do
+        local t = p:type()
+        if t == NODE.SELECT_EXPR then return false end
+        if t == NODE.INVOCATION and is_aggregate_invocation(p, bufnr) then return true end
+        p = p:parent()
+    end
+    return false
 end
 
 --- Checks if a captured node is actually inside a nested subquery or set operation
@@ -848,6 +919,217 @@ local function check_undefined_alias(scope_nodes, bufnr, diagnostics)
 end
 
 -- =============================================================================
+-- Logic: New Statement-level Checks
+-- =============================================================================
+
+local function check_select_star_in_subquery(stmt_node, bufnr, diagnostics)
+    for _, expr in QUERIES.subquery_select:iter_captures(stmt_node, bufnr, 0, -1) do
+        if tsu.ancestor(expr, NODE.EXISTS) then goto continue end
+        if get_text(expr, bufnr) == "*" then
+            add_diagnostic(diagnostics, expr, bufnr, SEVERITY.INFO,
+                "SELECT * inside subquery — list columns explicitly to guard against schema drift.")
+        end
+        ::continue::
+    end
+    for _, expr in QUERIES.cte_select_exp:iter_captures(stmt_node, bufnr, 0, -1) do
+        if get_text(expr, bufnr) == "*" then
+            add_diagnostic(diagnostics, expr, bufnr, SEVERITY.INFO,
+                "SELECT * inside CTE — list columns explicitly to guard against schema drift.")
+        end
+    end
+end
+
+local function check_group_by_ordinal(stmt_node, bufnr, diagnostics)
+    for _, gb in QUERIES.group_by_nodes:iter_captures(stmt_node, bufnr, 0, -1) do
+        for child in gb:iter_children() do
+            if child:type() == NODE.LITERAL then
+                local txt = get_text(child, bufnr) or ""
+                if txt:match("^%d+$") then
+                    add_diagnostic(diagnostics, child, bufnr, SEVERITY.INFO,
+                        string.format('GROUP BY uses ordinal %s — prefer an explicit column name.', txt))
+                end
+            end
+        end
+    end
+end
+
+local function check_duplicate_columns_in_select(stmt_node, bufnr, diagnostics)
+    for _, sel_expr in QUERIES.select_exprs:iter_captures(stmt_node, bufnr, 0, -1) do
+        local seen_alias = {}
+        local seen_expr  = {}
+        for term in sel_expr:iter_children() do
+            if term:type() ~= NODE.TERM then goto next_term end
+            local alias_node = term:field("alias")[1]
+            local value_node = term:named_child(0)
+            local alias_key  = alias_node and normalize(get_text(alias_node, bufnr) or "")
+            local val_text   = value_node and get_text(value_node, bufnr)
+            local expr_key   = val_text and val_text:gsub("%s+", " "):upper()
+
+            if alias_key then
+                if seen_alias[alias_key] then
+                    add_diagnostic(diagnostics, term, bufnr, SEVERITY.WARN,
+                        string.format('Duplicate output alias "%s" in SELECT list.', alias_key))
+                else
+                    seen_alias[alias_key] = true
+                end
+            elseif expr_key then
+                if seen_expr[expr_key] then
+                    add_diagnostic(diagnostics, term, bufnr, SEVERITY.WARN,
+                        string.format('Duplicate expression in SELECT list: %s', val_text))
+                else
+                    seen_expr[expr_key] = true
+                end
+            end
+            ::next_term::
+        end
+    end
+end
+
+local function check_unused_cte(stmt_node, bufnr, diagnostics, cte_defs)
+    if next(cte_defs) == nil then return end
+    local referenced = {}
+    for _, rel in QUERIES.relation:iter_captures(stmt_node, bufnr, 0, -1) do
+        local obj_ref
+        for c in rel:iter_children() do
+            if c:type() == NODE.OBJ_REF then obj_ref = c; break end
+        end
+        if not obj_ref then goto continue end
+        local parts = {}
+        for p in obj_ref:iter_children() do
+            if p:type() == NODE.IDENTIFIER then table.insert(parts, get_text(p, bufnr)) end
+        end
+        if #parts == 1 then
+            referenced[normalize(parts[1])] = true
+        end
+        ::continue::
+    end
+    for name_norm, def in pairs(cte_defs) do
+        if not referenced[name_norm] then
+            add_diagnostic(diagnostics, def.node, bufnr, SEVERITY.WARN,
+                string.format('CTE "%s" is defined but never referenced.', def.name))
+        end
+    end
+end
+
+-- =============================================================================
+-- Logic: New Per-scope Checks
+-- =============================================================================
+
+local function check_duplicate_join_conditions(scope_nodes, bufnr, diagnostics)
+    for _, node in ipairs(scope_nodes) do
+        for _, join in QUERIES.join_nodes:iter_captures(node, bufnr, 0, -1) do
+            if is_nested_in_subquery(join, node) then goto continue end
+            local pred = join:field("predicate")[1]
+            if not pred then goto continue end
+            local seen = {}
+            for _, conj in ipairs(flatten_and_conjuncts(pred)) do
+                local raw = get_text(conj, bufnr) or ""
+                local key = raw:gsub("%s+", " "):upper()
+                local lhs, rhs = key:match("^(.+)%s*=%s*(.+)$")
+                if lhs and rhs then
+                    lhs = lhs:gsub("^%s+", ""):gsub("%s+$", "")
+                    rhs = rhs:gsub("^%s+", ""):gsub("%s+$", "")
+                    if lhs > rhs then key = rhs .. " = " .. lhs end
+                end
+                if seen[key] then
+                    add_diagnostic(diagnostics, conj, bufnr, SEVERITY.WARN,
+                        "Duplicate join condition in ON clause.")
+                else
+                    seen[key] = true
+                end
+            end
+            ::continue::
+        end
+    end
+end
+
+local function check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
+    local sel_expr, gb_node
+    for _, n in ipairs(scope_nodes) do
+        -- select is a direct child of statement
+        if not sel_expr and n:type() == NODE.SELECT then
+            sel_expr = tsu.descendant(n, NODE.SELECT_EXPR)
+        end
+        -- group_by lives inside `from`, so search recursively with scope guard
+        if not gb_node then
+            for _, gb in QUERIES.group_by_nodes:iter_captures(n, bufnr, 0, -1) do
+                if not is_nested_in_subquery(gb, n) then
+                    gb_node = gb; break
+                end
+            end
+        end
+    end
+    if not sel_expr then return end
+
+    -- Detect aggregation: GROUP BY present, or aggregate invocation in SELECT list
+    local has_aggregate = false
+    for _, inv in QUERIES.invocation_nod:iter_captures(sel_expr, bufnr, 0, -1) do
+        if is_aggregate_invocation(inv, bufnr) then has_aggregate = true; break end
+    end
+    if not gb_node and not has_aggregate then return end
+
+    -- Collect GROUP BY expressions, resolving ordinals against SELECT terms
+    local select_terms = {}
+    for t in sel_expr:iter_children() do
+        if t:type() == NODE.TERM then table.insert(select_terms, t) end
+    end
+
+    local gb_field_names = {}
+    local gb_expr_texts  = {}
+
+    local function index_gb_expression(expr_node)
+        local txt = (get_text(expr_node, bufnr) or ""):gsub("%s+", " "):upper()
+        gb_expr_texts[txt] = true
+        for _, f in QUERIES.bare_field:iter_captures(expr_node, bufnr, 0, -1) do
+            gb_field_names[normalize_col(get_text(f, bufnr) or "")] = true
+        end
+    end
+
+    if gb_node then
+        for child in gb_node:iter_children() do
+            local t = child:type()
+            if t == "keyword_group" or t == "keyword_by" or t == "," then goto skip_gb end
+            local raw = (get_text(child, bufnr) or ""):gsub("%s+", "")
+            local ordinal = tonumber(raw:match("^(%d+)$"))
+            if ordinal then
+                local resolved = select_terms[ordinal]
+                if resolved then
+                    local alias = resolved:field("alias")[1]
+                    local value = resolved:named_child(0)
+                    if alias then
+                        gb_field_names[normalize_col(get_text(alias, bufnr) or "")] = true
+                    elseif value then
+                        index_gb_expression(value)
+                    end
+                end
+            else
+                index_gb_expression(child)
+            end
+            ::skip_gb::
+        end
+    end
+
+    -- Flag bare columns in SELECT not covered by GROUP BY and not under an aggregate
+    for _, term in ipairs(select_terms) do
+        local value = term:named_child(0)
+        if not value then goto next_term end
+        local val_text = (get_text(value, bufnr) or ""):gsub("%s+", " "):upper()
+        if gb_expr_texts[val_text] then goto next_term end
+
+        for _, col in QUERIES.bare_field:iter_captures(term, bufnr, 0, -1) do
+            if is_under_aggregate(col, bufnr) then goto next_col end
+            local name = normalize_col(get_text(col, bufnr) or "")
+            if not gb_field_names[name] then
+                add_diagnostic(diagnostics, col, bufnr, SEVERITY.ERROR,
+                    string.format('"%s" must appear in GROUP BY or be wrapped in an aggregate.', name))
+            end
+            ::next_col::
+        end
+        ::next_term::
+    end
+end
+
+-- =============================================================================
 -- Main Processing Logic (Scope Builder)
 -- =============================================================================
 
@@ -913,19 +1195,23 @@ local function process_statement(stmt_node, bufnr, diagnostics)
     local cte_defs = get_cte_definitions(stmt_node, bufnr)
 
     check_union_column_compatibility(stmt_node, bufnr, diagnostics)
-
     check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
+    check_select_star_in_subquery(stmt_node, bufnr, diagnostics)
+    check_group_by_ordinal(stmt_node, bufnr, diagnostics)
+    check_duplicate_columns_in_select(stmt_node, bufnr, diagnostics)
+    check_unused_cte(stmt_node, bufnr, diagnostics, cte_defs)
 
     local scopes = get_query_scopes(stmt_node)
 
     for _, scope_nodes in ipairs(scopes) do
-        -- Pass CTE definitions to analyze_relations
         local relation_map, active_tables, has_unqualified = analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
         local output_aliases = get_output_aliases(scope_nodes, bufnr)
         check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified,
             output_aliases)
         check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified)
         check_undefined_alias(scope_nodes, bufnr, diagnostics)
+        check_duplicate_join_conditions(scope_nodes, bufnr, diagnostics)
+        check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
     end
 end
 
