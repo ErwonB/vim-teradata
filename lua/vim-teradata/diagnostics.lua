@@ -311,7 +311,12 @@ local function check_union_column_compatibility(stmt_node, bufnr, diagnostics)
     for _, union_node in QUERIES.union_block:iter_captures(stmt_node, bufnr, 0, -1) do
         local select_exprs = {}
         for _, node in QUERIES.union_select:iter_captures(union_node, bufnr, 0, -1) do
-            table.insert(select_exprs, node)
+            local parent = node:parent()
+            if parent then parent = parent:parent() end
+            if parent == union_node then
+                table.insert(select_exprs, node)
+            end
+
         end
 
         if #select_exprs < 2 then goto continue end
