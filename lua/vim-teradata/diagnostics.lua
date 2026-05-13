@@ -1116,6 +1116,12 @@ local function check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
         local val_text = (get_text(value, bufnr) or ""):gsub("%s+", " "):upper()
         if gb_expr_texts[val_text] then goto next_term end
 
+        local term_alias = term:field("alias")[1]
+        if term_alias then
+            local alias_name = normalize_col(get_text(term_alias, bufnr) or "")
+            if gb_field_names[alias_name] then goto next_term end
+        end
+
         for _, col in QUERIES.bare_field:iter_captures(term, bufnr, 0, -1) do
             if is_under_aggregate(col, bufnr) then goto next_col end
             local name = normalize_col(get_text(col, bufnr) or "")
