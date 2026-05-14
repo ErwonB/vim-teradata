@@ -19,7 +19,7 @@ function M.get_sql_keywords()
         return {}
     end
 
-    local symbols = lang_inspect('sql')
+    local symbols = lang_inspect('teradata')
 
     for name, is_named in pairs(symbols.symbols) do
         local word = nil
@@ -49,7 +49,7 @@ function M.get_sql_keywords()
 end
 
 local Q = {
-    has_sel_or_dml = vim.treesitter.query.parse("sql", [[
+    has_sel_or_dml = vim.treesitter.query.parse("teradata", [[
     [(delete) (keyword_delete)
      (update) (keyword_update)
      (insert) (keyword_insert)
@@ -57,20 +57,20 @@ local Q = {
      (keyword_show) (keyword_merge)
      (from) (keyword_from)] @sel
   ]]),
-    has_where = vim.treesitter.query.parse("sql", [[
+    has_where = vim.treesitter.query.parse("teradata", [[
     [(where) (keyword_where) (order_by)] @where
   ]]),
-    has_error = vim.treesitter.query.parse("sql", [[
+    has_error = vim.treesitter.query.parse("teradata", [[
     (ERROR) @error
   ]]),
-    subq_with_alias = vim.treesitter.query.parse("sql", [[
+    subq_with_alias = vim.treesitter.query.parse("teradata", [[
     (relation
       (subquery) @subquery
       (keyword_as)?
       alias: (identifier)? @subquery_alias
     )
   ]]),
-    select_expression = vim.treesitter.query.parse("sql", [[
+    select_expression = vim.treesitter.query.parse("teradata", [[
   ((select_expression
      (term
        alias: (identifier) @col) @item))
@@ -81,8 +81,8 @@ local Q = {
          name: (identifier) @col)) @item))
 
 ]]),
-    relation = vim.treesitter.query.parse("sql", [[ (relation) @rel ]]),
-    obj_ref = vim.treesitter.query.parse("sql", [[ (object_reference) @obj ]]),
+    relation = vim.treesitter.query.parse("teradata", [[ (relation) @rel ]]),
+    obj_ref = vim.treesitter.query.parse("teradata", [[ (object_reference) @obj ]]),
 }
 
 
@@ -284,7 +284,7 @@ end
 --- @return boolean True if recovery produced results, false otherwise.
 local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
     local modified_buf_text = tsu.build_parsable_query_with_dummy(bufnr, row_1 - 1, col_0)
-    local parser = vim.treesitter.get_string_parser(modified_buf_text, "sql")
+    local parser = vim.treesitter.get_string_parser(modified_buf_text, "teradata")
     local trees = parser:parse()
     local cursor_pos_in_modified = row_1 - 1
 
@@ -292,7 +292,7 @@ local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
         local root = trees[1]:root()
         local fixed_statement_node = nil
 
-        local stmt_query = vim.treesitter.query.parse("sql", "(statement) @stmt")
+        local stmt_query = vim.treesitter.query.parse("teradata", "(statement) @stmt")
         for _, stmt_node, _ in stmt_query:iter_captures(root, modified_buf_text, 0, -1) do
             local s_start_row, _, s_end_row, s_end_col = stmt_node:range()
             if cursor_pos_in_modified >= s_start_row and

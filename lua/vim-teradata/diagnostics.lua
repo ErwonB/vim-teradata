@@ -78,22 +78,22 @@ local ts_query = vim.treesitter.query
 local parse_query = ts_query.parse or ts_query.parse_query
 
 local QUERIES = {
-    alias_def = parse_query("sql", [[ (relation alias: (identifier) @alias_definition) ]]),
-    alias_use = parse_query("sql",
+    alias_def = parse_query("teradata", [[ (relation alias: (identifier) @alias_definition) ]]),
+    alias_use = parse_query("teradata",
         [[ (select_expression (term value: (field (object_reference name: (identifier) @alias_usage)))) ]]),
-    union_select = parse_query("sql", [[ (set_operation (select (select_expression) @select_expr)) ]]),
-    union_block = parse_query("sql", [[ (set_operation) @union_block ]]),
-    subquery_select = parse_query("sql", [[ (subquery (select (select_expression) @sub_select_expr)) ]]),
-    relation = parse_query("sql", [[ (relation) @relation ]]),
-    statement = parse_query("sql", [[ (statement) @stmt ]]),
-    cte_def = parse_query("sql", [[
+    union_select = parse_query("teradata", [[ (set_operation (select (select_expression) @select_expr)) ]]),
+    union_block = parse_query("teradata", [[ (set_operation) @union_block ]]),
+    subquery_select = parse_query("teradata", [[ (subquery (select (select_expression) @sub_select_expr)) ]]),
+    relation = parse_query("teradata", [[ (relation) @relation ]]),
+    statement = parse_query("teradata", [[ (statement) @stmt ]]),
+    cte_def = parse_query("teradata", [[
         (cte
             (identifier) @cte_name
             (statement) @cte_body
         ) @cte
     ]]),
 
-    select_output_alias = parse_query("sql", [[
+    select_output_alias = parse_query("teradata", [[
     (select_expression
       (term
         alias: (identifier) @output_alias
@@ -101,24 +101,24 @@ local QUERIES = {
     )
   ]]),
 
-    qualified_field = parse_query("sql", [[
+    qualified_field = parse_query("teradata", [[
     (field
       (object_reference name: (identifier) @qualifier)
       name: (identifier) @col_name
     ) @field
   ]]),
 
-    bare_field = parse_query("sql", [[
+    bare_field = parse_query("teradata", [[
     (field name: (identifier) @col)
   ]]),
 
-    syntax_error = parse_query("sql", [[ (ERROR) @error ]]),
+    syntax_error = parse_query("teradata", [[ (ERROR) @error ]]),
 
-    join_nodes     = parse_query("sql", [[ (join) @join ]]),
-    select_exprs   = parse_query("sql", [[ (select (select_expression) @sel_expr) ]]),
-    group_by_nodes = parse_query("sql", [[ (group_by) @gb ]]),
-    cte_select_exp = parse_query("sql", [[ (cte (statement (select (select_expression) @cte_sel_expr))) ]]),
-    invocation_nod = parse_query("sql", [[ (invocation) @inv ]]),
+    join_nodes     = parse_query("teradata", [[ (join) @join ]]),
+    select_exprs   = parse_query("teradata", [[ (select (select_expression) @sel_expr) ]]),
+    group_by_nodes = parse_query("teradata", [[ (group_by) @gb ]]),
+    cte_select_exp = parse_query("teradata", [[ (cte (statement (select (select_expression) @cte_sel_expr))) ]]),
+    invocation_nod = parse_query("teradata", [[ (invocation) @inv ]]),
 }
 
 -- =============================================================================
@@ -1233,7 +1233,7 @@ end
 function M.update_diagnostics(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
-    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "sql")
+    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "teradata")
     if not ok or not parser then return end
 
     local trees = parser:parse()

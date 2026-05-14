@@ -1102,7 +1102,7 @@ end
 function M.run()
     local bufnr = vim.api.nvim_get_current_buf()
 
-    local ok, _ = pcall(vim.treesitter.get_parser, bufnr, "sql")
+    local ok, _ = pcall(vim.treesitter.get_parser, bufnr, "teradata")
     if not ok then
         vim.notify("Tree-sitter parser for SQL not found.", vim.log.levels.ERROR)
         return

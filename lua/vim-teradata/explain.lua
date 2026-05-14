@@ -118,8 +118,8 @@ function M.process_results(bufnr, query, raw_lines)
         vim.notify("EXPLAIN plan formatted with spool resolution + cost highlights", vim.log.levels.INFO)
     elseif lower:match("^show") then
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, raw_lines)
-        vim.bo[bufnr].filetype = "sql"
-        pcall(vim.treesitter.start, bufnr, "sql")
+        vim.bo[bufnr].filetype = "teradata"
+        pcall(vim.treesitter.start, bufnr, "teradata")
 
         vim.notify("SHOW output highlighted with SQL Tree-sitter", vim.log.levels.INFO)
     end

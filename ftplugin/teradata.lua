@@ -47,8 +47,6 @@ end
 
 local bufnr = vim.api.nvim_get_current_buf()
 
--- 1. Normal teradata files -> SQL Treesitter highlighting
-vim.treesitter.language.register("sql", "teradata")
 pcall(vim.treesitter.start, bufnr)
 
 -- 2. Only *.depl -> SQL + region restriction

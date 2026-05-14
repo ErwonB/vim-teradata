@@ -20,7 +20,7 @@ local function analyze_sql_context()
     local context
     local buf = vim.api.nvim_get_current_buf()
 
-    local ok, parser = pcall(vim.treesitter.get_parser, buf, 'sql')
+    local ok, parser = pcall(vim.treesitter.get_parser, buf, 'teradata')
     if not ok or not parser then
         vim.notify('Could not load sql treesitter parser to enable sql autocompletion', vim.log.levels.INFO)
     else

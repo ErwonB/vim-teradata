@@ -20,7 +20,7 @@ end
 function M.restrict_sql_regions(buf)
     buf = buf or 0
 
-    local ok, parser = pcall(vim.treesitter.get_parser, buf, 'sql')
+    local ok, parser = pcall(vim.treesitter.get_parser, buf, 'teradata')
     if not ok or not parser then
         return
     end
