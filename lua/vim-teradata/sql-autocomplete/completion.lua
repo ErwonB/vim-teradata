@@ -1,5 +1,5 @@
 local utils = require('vim-teradata.util')
-local ts = require('vim-teradata.sql-autocomplete.treesitter')
+local ts    = require('vim-teradata.sql-autocomplete.treesitter')
 
 -- LSP CompletionItemKind integers (protocol-neutral)
 local Kind = {
@@ -39,7 +39,7 @@ end
 function M.complete_manual(findstart)
     if findstart == 1 then
         local line = vim.api.nvim_get_current_line()
-        local col = vim.api.nvim_win_get_cursor(0)[2]
+        local col  = vim.api.nvim_win_get_cursor(0)[2]
         while col > 0 and line:sub(col, col):match('%w') do
             col = col - 1
         end
@@ -47,7 +47,7 @@ function M.complete_manual(findstart)
     else
         local context = analyze_sql_context()
 
-        local items = {}
+        local items      = {}
         local res
         local fzf_options = ""
 
@@ -68,7 +68,7 @@ function M.complete_manual(findstart)
                 candidate_entries = context.buffer_fields
             end
 
-            local seen_lists = {}
+            local seen_lists       = {}
             local unique_field_lists = {}
 
             for _, entry in ipairs(candidate_entries) do
@@ -79,7 +79,7 @@ function M.complete_manual(findstart)
                 end
             end
 
-            local seen_fields = {}
+            local seen_fields  = {}
             local final_flat_list = {}
 
             for _, list in ipairs(unique_field_lists) do
@@ -104,9 +104,9 @@ function M.complete_manual(findstart)
         items = res and res or {}
 
         return {
-            items = items,
+            items       = items,
             fzf_options = fzf_options,
-            context = context,
+            context     = context,
         }
     end
 end
@@ -114,9 +114,9 @@ end
 --- Provides filtered SQL completion items based on the current context and input base.
 --- @return table Filtered completion items.
 function M.complete_items()
-    local context = analyze_sql_context()
+    local context     = analyze_sql_context()
 
-    local raw_items = {}
+    local raw_items   = {}
 
     local context_results
     local context_kind = Kind.Text
@@ -139,7 +139,7 @@ function M.complete_items()
             candidate_entries = context.buffer_fields
         end
 
-        local seen_lists = {}
+        local seen_lists       = {}
         local unique_field_lists = {}
         for _, entry in ipairs(candidate_entries) do
             local list = entry.field_list
@@ -149,7 +149,7 @@ function M.complete_items()
             end
         end
 
-        local seen_fields = {}
+        local seen_fields  = {}
         local final_flat_list = {}
         for _, list in ipairs(unique_field_lists) do
             for _, field_name in ipairs(list) do
@@ -163,38 +163,57 @@ function M.complete_items()
         context_results = context_results or {}
         vim.list_extend(context_results, final_flat_list)
     elseif context.type == 'tables' then
-        context_kind = Kind.Struct
+        context_kind    = Kind.Struct
         context_results = utils.get_tables(context.db_name)
     elseif context.type == 'databases' then
-        context_kind = Kind.Module
+        context_kind    = Kind.Module
         context_results = utils.get_databases()
     elseif context.type == 'keywords' then
-        context_kind = Kind.Keyword
+        context_kind    = Kind.Keyword
         context_results = context.candidates
     end
 
     context_results = context_results or {}
     for _, item_str in ipairs(context_results) do
         table.insert(raw_items, {
-            kind = context_kind,
+            kind     = context_kind,
             sortText = "1_" .. item_str,
-            label = item_str,
+            label    = item_str,
         })
     end
 
-    -- If Context is Columns, Inject Keywords and functions with Lower Priority
-    if context.type == 'columns' then
-        local keywords = ts.get_sql_keywords()
-        for _, kw in ipairs(keywords) do
+    -- -----------------------------------------------------------------------
+    -- Keyword injection for non-keyword contexts (columns / tables / databases)
+    --
+    -- When the previous token has a clear follow set, those keywords are
+    -- injected at the SAME priority level ("1_") as the primary context
+    -- results, so they appear at the top alongside columns/tables.
+    --
+    -- The `keywords` context already carries the right candidates in
+    -- context.candidates and doesn't reach this block.
+    -- -----------------------------------------------------------------------
+    if context.type == 'columns' or context.type == 'tables' or context.type == 'databases' then
+        local buf    = vim.api.nvim_get_current_buf()
+        local cursor = vim.api.nvim_win_get_cursor(0)
+        local row_1, col_0 = cursor[1], cursor[2]
+
+        local filtered_keywords, is_filtered = ts.get_keywords_for_context_with_flag(buf, row_1, col_0)
+        local sort_prefix = is_filtered and "1_" or "2_"
+
+        for _, kw in ipairs(filtered_keywords) do
             table.insert(raw_items, {
-                kind = Kind.Keyword,
-                sortText = "2_" .. kw,
-                label = kw,
+                kind     = Kind.Keyword,
+                sortText = sort_prefix .. kw,
+                label    = kw,
             })
         end
-        local td_functions = require("vim-teradata.sql-autocomplete.td_functions")
-        for _, kw in ipairs(td_functions) do
-            table.insert(raw_items, kw)
+
+        -- TD functions are always low priority, never filtered
+        if context.type == 'columns' then
+            local td_functions = require("vim-teradata.sql-autocomplete.td_functions")
+            for _, fn in ipairs(td_functions) do
+                table.insert(raw_items, fn)
+            end
         end
     end
 

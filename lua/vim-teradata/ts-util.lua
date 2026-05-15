@@ -2,10 +2,10 @@ local M = {}
 
 -- Checks if a parser is available for `lang` in `bufnr`.
 ---@param bufnr integer
----@param lang? string  defaults to "sql"
+---@param lang? string  defaults to "teradata"
 ---@return vim.treesitter.LanguageTree|nil
 function M.ensure_parser(bufnr, lang)
-    lang = lang or "sql"
+    lang = lang or "teradata"
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
     if not ok or not parser then
         vim.notify("Tree-sitter parser for " .. lang .. " not found.", vim.log.levels.ERROR)
@@ -389,6 +389,69 @@ function M.node_range_with_delimiters(target_type, bufnr)
     end
 
     return s_row, s_col, e_row, e_col
+end
+
+-- ---------------------------------------------------------------------------
+-- Grammar-aware keyword context
+-- ---------------------------------------------------------------------------
+
+-- Returns the keyword name (without "keyword_" prefix, lowercase) that
+-- immediately precedes the word currently being typed, or nil if none found.
+--
+-- Strategy: tokenise the line prefix up to the cursor.
+--   • If the prefix ends in a non-space character, the last token is the
+--     partial word being typed — skip it and examine the one before it.
+--   • If the prefix ends in a space, all tokens are complete — examine the
+--     last one.
+-- The candidate is then verified against the loaded teradata grammar's symbol
+-- table to guard against false positives from identifiers or literals.
+--
+-- This lexical fallback is intentionally simple and handles the primary
+-- real-world case: the user typed a keyword, pressed space, and is about to
+-- type (or trigger completion for) the next token.  The tree-sitter parse
+-- is usually an ERROR node at this point, so a node-walk would be unreliable.
+--
+---@param bufnr integer
+---@param row_1 integer  1-indexed row
+---@param col_0 integer  0-indexed byte column
+---@return string|nil  e.g. "inner", "nonsequenced", "left"
+function M.previous_keyword_at_cursor(bufnr, row_1, col_0)
+    local prefix = M.line_prefix(bufnr, row_1, col_0)
+
+    -- Split on whitespace
+    local tokens = {}
+    for tok in prefix:gmatch('%S+') do
+        table.insert(tokens, tok)
+    end
+
+    if #tokens == 0 then return nil end
+
+    -- Determine which token to examine:
+    --   Prefix ends with non-space → last token is the partial word being
+    --   typed; the previous keyword is the one before it.
+    --   Prefix ends with space     → cursor is right after a completed token.
+    local target_idx
+    if prefix:sub(-1):match('%S') then
+        target_idx = #tokens - 1
+    else
+        target_idx = #tokens
+    end
+
+    if target_idx < 1 then return nil end
+
+    local candidate = tokens[target_idx]:lower()
+
+    -- Verify it is a keyword_<candidate> symbol in the loaded teradata grammar.
+    local ok, symbols = pcall(function()
+        return vim.treesitter.language.inspect('teradata').symbols
+    end)
+    if not ok or not symbols then return nil end
+
+    if symbols['keyword_' .. candidate] ~= nil then
+        return candidate
+    end
+
+    return nil
 end
 
 return M

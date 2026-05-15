@@ -82,7 +82,7 @@ local Q = {
 
 ]]),
     relation = vim.treesitter.query.parse("teradata", [[ (relation) @rel ]]),
-    obj_ref = vim.treesitter.query.parse("teradata", [[ (object_reference) @obj ]]),
+    obj_ref  = vim.treesitter.query.parse("teradata", [[ (object_reference) @obj ]]),
 }
 
 
@@ -113,12 +113,12 @@ local function find_all_object_reference(scope_node, source)
         end
 
         local _, schema_name, tbl_name = nil, nil, nil
-        local db_node = tsu.child_by_field(obj_node, "database")
+        local db_node    = tsu.child_by_field(obj_node, "database")
         local schema_node = tsu.child_by_field(obj_node, "schema")
-        local tbl_node = tsu.child_by_field(obj_node, "name")
+        local tbl_node   = tsu.child_by_field(obj_node, "name")
 
         if schema_node then schema_name = vim.treesitter.get_node_text(schema_node, source) end
-        if tbl_node then tbl_name = vim.treesitter.get_node_text(tbl_node, source) end
+        if tbl_node    then tbl_name    = vim.treesitter.get_node_text(tbl_node,    source) end
 
         if not db_node and not schema_node and not tbl_node then
             local children = {}
@@ -129,10 +129,10 @@ local function find_all_object_reference(scope_node, source)
                 tbl_name = vim.treesitter.get_node_text(children[1], source)
             elseif #children == 2 then
                 schema_name = vim.treesitter.get_node_text(children[1], source)
-                tbl_name = vim.treesitter.get_node_text(children[2], source)
+                tbl_name    = vim.treesitter.get_node_text(children[2], source)
             elseif #children == 3 then
                 schema_name = vim.treesitter.get_node_text(children[2], source)
-                tbl_name = vim.treesitter.get_node_text(children[3], source)
+                tbl_name    = vim.treesitter.get_node_text(children[3], source)
             end
         end
 
@@ -142,7 +142,7 @@ local function find_all_object_reference(scope_node, source)
             table.insert(tables, {
                 db_name = string.upper(schema_name),
                 tb_name = string.upper(tbl_name),
-                alias = string.upper(alias_str),
+                alias   = string.upper(alias_str),
             })
         end
         ::continue::
@@ -237,12 +237,12 @@ local function find_all_tables_in_scope(scope_node, source)
 
         if obj_ref then
             local _, schema_name, tbl_name = nil, nil, nil
-            local db_node = tsu.child_by_field(obj_ref, "database")
+            local db_node    = tsu.child_by_field(obj_ref, "database")
             local schema_node = tsu.child_by_field(obj_ref, "schema")
-            local tbl_node = tsu.child_by_field(obj_ref, "name")
+            local tbl_node   = tsu.child_by_field(obj_ref, "name")
 
             if schema_node then schema_name = vim.treesitter.get_node_text(schema_node, source) end
-            if tbl_node then tbl_name = vim.treesitter.get_node_text(tbl_node, source) end
+            if tbl_node    then tbl_name    = vim.treesitter.get_node_text(tbl_node,    source) end
 
             if not db_node and not schema_node and not tbl_node then
                 local children = {}
@@ -253,10 +253,10 @@ local function find_all_tables_in_scope(scope_node, source)
                     tbl_name = vim.treesitter.get_node_text(children[1], source)
                 elseif #children == 2 then
                     schema_name = vim.treesitter.get_node_text(children[1], source)
-                    tbl_name = vim.treesitter.get_node_text(children[2], source)
+                    tbl_name    = vim.treesitter.get_node_text(children[2], source)
                 elseif #children == 3 then
                     schema_name = vim.treesitter.get_node_text(children[2], source)
-                    tbl_name = vim.treesitter.get_node_text(children[3], source)
+                    tbl_name    = vim.treesitter.get_node_text(children[3], source)
                 end
             end
 
@@ -266,7 +266,7 @@ local function find_all_tables_in_scope(scope_node, source)
                 table.insert(tables, {
                     db_name = string.upper(schema_name),
                     tb_name = string.upper(tbl_name),
-                    alias = string.upper(alias_str),
+                    alias   = string.upper(alias_str),
                 })
             end
         end
@@ -285,7 +285,7 @@ end
 local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
     local modified_buf_text = tsu.build_parsable_query_with_dummy(bufnr, row_1 - 1, col_0)
     local parser = vim.treesitter.get_string_parser(modified_buf_text, "teradata")
-    local trees = parser:parse()
+    local trees  = parser:parse()
     local cursor_pos_in_modified = row_1 - 1
 
     if trees and #trees > 0 then
@@ -311,7 +311,7 @@ local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
                 row_1 - 1, col_0, row_1 - 1, col_0)
             local scope_node = tsu.scope_node(node_at_cursor) or fixed_statement_node
 
-            context.tables = find_all_tables_in_scope(scope_node, modified_buf_text)
+            context.tables        = find_all_tables_in_scope(scope_node, modified_buf_text)
             context.buffer_fields = find_all_fields_from_subquery(scope_node, modified_buf_text)
 
             return (context.tables and #context.tables > 0) or (context.buffer_fields and #context.buffer_fields > 0)
@@ -335,13 +335,13 @@ function M.analyze_sql_context()
     local before_dot_match = line_prefix:match("([%w_]+)%.([%w_]*)$")
 
     if before_dot_match and utils.is_a_db(before_dot_match) then
-        context.type = 'tables'
+        context.type    = 'tables'
         context.db_name = string.upper(before_dot_match)
         return context
     end
 
     local key_dbs = { from = true, join = true, into = true }
-    local before_current = line_prefix:match("([%w_]+)% ([%w_]*)$")
+    local before_current    = line_prefix:match("([%w_]+)% ([%w_]*)$")
     local two_before_current = line_prefix:match("([%w_]+)% ([%w_]+)% $")
     if (before_current and key_dbs[before_current:lower()])
         or (two_before_current and two_before_current:lower() == "show")
@@ -350,18 +350,18 @@ function M.analyze_sql_context()
     end
 
     local cursor_pos_0 = { row_1 - 1, col_0 }
-    local cursor_node = vim.treesitter.get_node({ bufnr = 0, pos = cursor_pos_0 })
+    local cursor_node  = vim.treesitter.get_node({ bufnr = 0, pos = cursor_pos_0 })
 
     if not cursor_node then
-        context.type = 'keywords'
-        context.candidates = M.get_sql_keywords()
+        context.type       = 'keywords'
+        context.candidates = M.get_keywords_for_context(bufnr, row_1, col_0)
         return context
     end
 
     local statement_node = tsu.enclosing_or_preceding_statement(cursor_node, bufnr, row_1 - 1)
     if not statement_node then
-        context.type = 'keywords'
-        context.candidates = M.get_sql_keywords()
+        context.type       = 'keywords'
+        context.candidates = M.get_keywords_for_context(bufnr, row_1, col_0)
         return context
     end
 
@@ -381,7 +381,9 @@ function M.analyze_sql_context()
 
     local has_where = false
     local check_nodes = { statement_node }
-    if cursor_error_node and cursor_error_node ~= statement_node then table.insert(check_nodes, cursor_error_node) end
+    if cursor_error_node and cursor_error_node ~= statement_node then
+        table.insert(check_nodes, cursor_error_node)
+    end
 
     for _, n in ipairs(check_nodes) do
         for _, node, _ in Q.has_where:iter_captures(n, bufnr, 0, -1) do
@@ -405,8 +407,8 @@ function M.analyze_sql_context()
 
         if not has_error then
             -- Standard path: use scope relative to cursor
-            scope_node = tsu.scope_node(cursor_node) or statement_node
-            context.tables = find_all_tables_in_scope(scope_node, bufnr)
+            scope_node            = tsu.scope_node(cursor_node) or statement_node
+            context.tables        = find_all_tables_in_scope(scope_node, bufnr)
             context.buffer_fields = find_all_fields_from_subquery(scope_node, bufnr)
             -- Fallback: If standard path found no useful results and there's an adjacent ERROR,
             -- attempt error-recovery reparse
@@ -430,13 +432,13 @@ function M.analyze_sql_context()
 
         -- Fallback if no tables found (e.g. invalid query structure or DML like insert/update without FROM)
         if (not context.tables or #context.tables == 0) and (not context.buffer_fields or #context.buffer_fields == 0) then
-            scope_node = scope_node or statement_node
-            context.tables = find_all_object_reference(scope_node, bufnr)
+            scope_node            = scope_node or statement_node
+            context.tables        = find_all_object_reference(scope_node, bufnr)
             context.buffer_fields = find_all_fields_from_subquery(scope_node, bufnr)
         end
 
         if (context.tables and #context.tables > 0) or (context.buffer_fields and #context.buffer_fields > 0) then
-            context.type = 'columns'
+            context.type     = 'columns'
             context.is_where = has_where
             if before_dot_match then
                 context.alias_prefix = string.upper(before_dot_match)
@@ -445,10 +447,74 @@ function M.analyze_sql_context()
         end
     end
 
-    -- 3. Default to Dynamic Keyword Context
-    context.type = 'keywords'
-    context.candidates = M.get_sql_keywords()
+    -- 3. Grammar-aware keyword context
+    context.type       = 'keywords'
+    context.candidates = M.get_keywords_for_context(bufnr, row_1, col_0)
     return context
+end
+
+---
+--- Core keyword resolution.
+---
+--- Returns (candidates, is_filtered) where:
+---   candidates   — the list of keyword strings to offer
+---   is_filtered  — true when the list was narrowed by the grammar follow set
+---
+--- This is the single place that owns the follow-set lookup logic.
+--- Both public helpers below delegate here.
+---
+--- @param bufnr  integer
+--- @param row_1  integer  1-indexed row
+--- @param col_0  integer  0-indexed column
+--- @return string[], boolean
+local function resolve_keywords(bufnr, row_1, col_0)
+
+    local prev_kw = tsu.previous_keyword_at_cursor(bufnr, row_1, col_0)
+    if prev_kw then
+        local ok, follow_sets = pcall(require, 'vim-teradata.sql-autocomplete.follow_sets')
+        if ok and follow_sets then
+            local allowed = follow_sets['keyword_' .. prev_kw]
+            if allowed and #allowed > 0 then
+                return allowed, true
+            end
+        end
+    end
+
+    return M.get_sql_keywords(), false
+end
+
+
+---
+--- Returns the keyword candidate list for the current cursor position.
+---
+--- Used by analyze_sql_context() when context.type ends up as 'keywords'.
+--- Returns only the list; the filtered/unfiltered distinction is encoded in
+--- which list is returned.
+---
+--- @param bufnr  integer
+--- @param row_1  integer  1-indexed row
+--- @param col_0  integer  0-indexed column
+--- @return string[]
+function M.get_keywords_for_context(bufnr, row_1, col_0)
+    local candidates, _ = resolve_keywords(bufnr, row_1, col_0)
+    return candidates
+end
+
+
+---
+--- Returns the keyword candidate list AND a boolean flag indicating whether
+--- the list was narrowed by the grammar follow set.
+---
+--- Used by completion.lua when injecting keywords alongside non-keyword
+--- context results (columns / tables / databases), so it can promote filtered
+--- keywords to the same priority tier as the primary results.
+---
+--- @param bufnr  integer
+--- @param row_1  integer  1-indexed row
+--- @param col_0  integer  0-indexed column
+--- @return string[], boolean is_filtered
+function M.get_keywords_for_context_with_flag(bufnr, row_1, col_0)
+    return resolve_keywords(bufnr, row_1, col_0)
 end
 
 return M
