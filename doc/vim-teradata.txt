@@ -1,0 +1,749 @@
+*vim-teradata.txt*  Teradata SQL development for Neovim
+
+                                                              *vim-teradata*
+                  ____ ____ ____ ____ ____ ____ ____ ____ ~
+                 ||v |||i |||m |||- |||T |||D |||4 ||| ||~
+                 ||__|||__|||__|||__|||__|||__|||__|||__||~
+                 |/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|~
+
+         Fast, keyboard-first Teradata development inside Neovim ~
+
+==============================================================================
+CONTENTS                                               *vim-teradata-contents*
+
+    1. Introduction ........................... |vim-teradata-introduction|
+    2. Requirements ........................... |vim-teradata-requirements|
+    3. Installation ........................... |vim-teradata-installation|
+    4. Quickstart ............................. |vim-teradata-quickstart|
+    5. Configuration .......................... |vim-teradata-configuration|
+        5.1 setup() ........................... |vim-teradata-setup|
+        5.2 Options ........................... |vim-teradata-options|
+        5.3 Default keymaps ................... |vim-teradata-default-keymaps|
+    6. Connections ............................ |vim-teradata-connections|
+    7. Commands ............................... |vim-teradata-commands|
+        7.1 Query execution ................... |vim-teradata-cmd-query|
+        7.2 History & search .................. |vim-teradata-cmd-history|
+        7.3 Bookmarks ......................... |vim-teradata-cmd-bookmarks|
+        7.4 Jobs .............................. |vim-teradata-cmd-jobs|
+        7.5 Editing & formatting .............. |vim-teradata-cmd-edit|
+        7.6 Metadata & UI ..................... |vim-teradata-cmd-meta|
+    8. Mappings ............................... |vim-teradata-mappings|
+        8.1 Buffer mappings ................... |vim-teradata-buffer-mappings|
+        8.2 OPE operations .................... |vim-teradata-ope|
+        8.3 UI buffer mappings ................ |vim-teradata-ui-mappings|
+    9. User guide ............................. |vim-teradata-user-guide|
+        9.1 Running queries ................... |vim-teradata-guide-run|
+        9.2 Diagnostics ..................... |vim-teradata-guide-diagnostics|
+        9.3 Autocomplete ................... |vim-teradata-guide-autocomplete|
+        9.4 History ........................... |vim-teradata-guide-history|
+        9.5 Bookmarks ......................... |vim-teradata-guide-bookmarks|
+        9.6 Job manager ....................... |vim-teradata-guide-jobs|
+        9.7 Code actions ...................... |vim-teradata-guide-actions|
+        9.8 Editing & formatting .............. |vim-teradata-guide-format|
+    10. Filetypes ............................. |vim-teradata-filetypes|
+    11. Troubleshooting ....................... |vim-teradata-troubleshooting|
+    12. FAQ ................................... |vim-teradata-faq|
+    13. License ............................... |vim-teradata-license|
+    14. Changelog ............................. |vim-teradata-changelog|
+
+==============================================================================
+1. INTRODUCTION                                    *vim-teradata-introduction*
+
+vim-teradata is the core Neovim plugin for Teradata SQL development. It runs
+queries through Teradata BTEQ, provides on-the-fly diagnostics powered by a
+dedicated tree-sitter grammar, and offers schema-aware autocompletion of
+databases, tables, and columns.
+
+The plugin is part of a small ecosystem:
+
+    - vim-teradata ........... orchestration, queries, diagnostics
+    - tree-sitter-teradata ... Teradata-focused SQL grammar
+    - sql-autocomplete ....... metadata-driven completion source
+
+Key features ~
+
+    - Asynchronous query execution via BTEQ
+    - Job manager UI for in-flight queries
+    - Tree-sitter diagnostics (syntax errors)
+    - Schema-aware autocomplete (blink.cmp / nvim-cmp)
+    - Query history with optional FZF / Telescope / snacks search
+    - Bookmarks (global and per-user)
+    - Code actions and node-aware editing
+    - Multiple connection profiles backed by `tdwallet`
+
+Target audience: Teradata developers, DBAs, and analysts who know SQL.
+Neovim experience is not required.
+
+Non-goals: teaching SQL, generic Teradata setup, non-BTEQ clients.
+
+==============================================================================
+2. REQUIREMENTS                                    *vim-teradata-requirements*
+
+Neovim ~
+    Preferred: Neovim 0.12+ (provides `vim.pack.add`).
+    Minimum:   Neovim 0.10+ (tree-sitter API). Without tree-sitter you do
+               not get diagnostics, autocompletion or syntax highlighting.
+
+Operating systems ~
+    Linux, macOS, and Windows (including WSL) are supported. The only
+    OS-specific element is the tree-sitter parser library file.
+
+Teradata client ~
+    Install the latest Teradata Tools and Utilities (TTU). It provides:
+        - `bteq`     -- must be on $PATH
+        - `tdwallet` -- for passwordless secure logon
+    Confirmed with TTU 20; compatible with 17.10.
+
+Database privileges ~
+    For `:TDSync` (metadata refresh), the configured user needs read
+    access to `dbc.columnsv`.
+
+Optional dependencies ~
+    - A picker plugin: `fzf.lua`, `telescope.nvim`, `snacks.nvim`, or
+      `fzf.vim`. Required for |:TDR|.
+    - `ripgrep` (`rg`) and `bat` -- required for |:TDR|.
+    - `blink.cmp` or `nvim-cmp` for completion UI.
+
+==============================================================================
+3. INSTALLATION                                    *vim-teradata-installation*
+
+With the built-in `vim.pack` manager (Neovim 0.12+) >lua
+
+    vim.pack.add('ErwonB/vim-teradata')
+
+    require('vim-teradata').setup({
+      users = {
+        { log_mech = 'TD2', user = 'USER', tdpid = 'HOST' },
+      },
+    })
+<
+With `lazy.nvim` >lua
+
+    {
+      'ErwonB/vim-teradata',
+      ft = { 'sql', 'teradata' },
+      opts = {
+        users = {
+          { log_mech = 'TD2', user = 'USER', tdpid = 'HOST' },
+        },
+      },
+    }
+<
+With `packer.nvim` >lua
+
+    use({
+      'ErwonB/vim-teradata',
+      config = function()
+        require('vim-teradata').setup({
+          users = {
+            { log_mech = 'TD2', user = 'USER', tdpid = 'HOST' },
+          },
+        })
+      end,
+    })
+<
+Tree-sitter parser ~
+
+The Teradata grammar replaces the default `sql` parser for accurate
+syntax checking. Install the parser as described in the online docs at
+https://teradata-nvim.com/getting-started/treesitter/ then verify with: >
+
+    :checkhealth treesitter
+<
+The output should show that the `sql` parser is detected.
+
+Metadata sync ~
+
+After installation run |:TDSync| once to build the local catalog index
+(databases, tables, columns). Re-run it whenever the schema changes.
+
+==============================================================================
+4. QUICKSTART                                        *vim-teradata-quickstart*
+
+1. Install the plugin and the Teradata tree-sitter parser.
+
+2. Configure at least one user in your `init.lua`: >lua
+
+    require('vim-teradata').setup({
+      users = {
+        { log_mech = 'TD2', user = 'USER', tdpid = 'HOST' },
+      },
+      replacements = { ['${DB_NAME}'] = 'MY_DB' },
+    })
+<
+3. Build the metadata index (one-time / on catalog change): >
+
+    :TDSync
+<
+4. Open a `.sql` file. Completion becomes schema-aware after `FROM` and
+   `JOIN`.
+
+5. Run a query with |:TDO| and watch progress in |:TDJ|.
+
+6. Save useful queries: visually select text, then |:TDBAdd|, and manage
+   them with |:TDB|.
+
+Example ~
+>sql
+    -- placeholder replacement applied before BTEQ
+    SELECT *
+    FROM ${DB_NAME}.Orders o
+    JOIN ${DB_NAME}.OrderItems i
+      ON o.OrderId = i.OrderId
+    WHERE o.OrderDate >= DATE '2024-01-01'
+    QUALIFY ROW_NUMBER() OVER
+            (PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC) = 1;
+<
+==============================================================================
+5. CONFIGURATION                                  *vim-teradata-configuration*
+
+------------------------------------------------------------------------------
+5.1 setup()                                               *vim-teradata-setup*
+
+                                              *teradata.setup()* *:lua-setup*
+require('vim-teradata').setup({opts})
+
+    Configures the plugin and creates the filetype association. Must be
+    called once during startup (most plugin managers call it for you via
+    their `opts`/`config` hook).
+
+    {opts} is a table; all fields are optional except `users`.
+
+------------------------------------------------------------------------------
+5.2 Options                                             *vim-teradata-options*
+
+The following keys are accepted by |teradata.setup()|. The values shown
+below are the defaults.
+
+                                                      *vim-teradata-opt-users*
+users ~
+    Type: `table[]`           Default: `{}`
+
+    List of connection profiles. The first profile is the default. Each
+    entry is a table with: >lua
+
+        {
+          log_mech = 'TD2',   -- logon mechanism (TD2, LDAP, KRB5, ...)
+          user     = 'USER',  -- wallet-backed username
+          tdpid    = 'HOST',  -- Teradata host or IP
+        }
+<
+    Passwords are NEVER stored by vim-teradata. They are retrieved from
+    `tdwallet` at logon time using `$tdwallet(<user>)`.
+
+                                               *vim-teradata-opt-replacements*
+replacements ~
+    Type: `table<string,string>`    Default: `{}`
+
+    String substitutions applied to every query before it is sent to
+    BTEQ. Useful for portable scripts: >lua
+
+        replacements = {
+          ['${DB_NAME}']  = 'PROD_DB',
+          ['${WORK_DB}']  = 'WORK_DB_001',
+        }
+<
+                                                   *vim-teradata-opt-retlimit*
+retlimit ~
+    Type: `number`            Default: `100`
+
+    Maximum number of rows returned per |:TDO|/|:TDV| query. Controls
+    memory and latency.
+
+                                                         *vim-teradata-opt-ft*
+ft ~
+    Type: `string[]`          Default: `{ "sql", "teradata" }`
+
+    File extensions that activate the Teradata filetype. The plugin
+    registers each extension via `vim.filetype.add`. See
+    |vim-teradata-filetypes|.
+
+                                                     *vim-teradata-opt-picker*
+picker ~
+    Type: `string`            Default: `"auto"`
+
+    Picker backend used by |:TDR| and other selection UIs. One of:
+        "auto"      detect automatically
+        "fzf_vim"   junegunn/fzf.vim
+        "fzf_lua"   ibhagwan/fzf-lua
+        "snacks"    folke/snacks.nvim
+        "telescope" nvim-telescope/telescope.nvim
+
+                                                    *vim-teradata-opt-keymaps*
+keymaps ~
+    Type: `table<string,string|table>`   See |vim-teradata-default-keymaps|
+
+    Normal-mode mappings registered in every Teradata buffer to invoke
+    node-aware editing functions ("OPE operations"). Each entry maps a
+    key to either:
+
+        - a string: name of an OPE function applied at the cursor node, or
+        - a table `{ "func_name", { "node_type", ... } }`: function plus
+          the tree-sitter node type to act on around the cursor.
+
+    Example: >lua
+
+        keymaps = {
+          ["gcq"] = { "comment_node", { "statement" } },
+          ["gdw"] = { "delete_node",  { "where" } },
+          ["]s"]  = { "jump_to_next", { "statement" } },
+        }
+<
+    See |vim-teradata-ope| for the full list of available functions and node
+    types.
+
+                                                        *vim-teradata-opt-sep*
+sep ~
+    Type: `string`            Default: `"~"`
+
+    Field separator used in BTEQ result CSV files. Change only if your
+    data may contain `~`.
+
+                                                  *vim-teradata-opt-filter_db*
+filter_db ~
+    Type: `string|nil`        Default: `nil`
+
+    Optional Lua pattern that limits which database names are imported
+    by |:TDSync|. Useful on systems with many irrelevant catalogs.
+
+                                                *vim-teradata-opt-history_dir*
+                                              *vim-teradata-opt-bookmarks_dir*
+                                                   *vim-teradata-opt-data_dir*
+history_dir ~
+bookmarks_dir ~
+data_dir ~
+    Type: `string`
+
+    Paths used for history, bookmarks, and the autocomplete metadata
+    cache. Defaults derive from `vim.fn.stdpath('data') .. '/teradata'`.
+
+------------------------------------------------------------------------------
+5.3 Default keymaps                             *vim-teradata-default-keymaps*
+
+A reasonable starting point for the `keymaps` option: >lua
+
+    keymaps = {
+      ["gcu"] = "uncomment_node",
+      ["gcq"] = { "comment_node",  { "statement" } },
+      ["gcs"] = { "comment_node",  { "select_expression" } },
+      ["gcw"] = { "comment_node",  { "where" } },
+      ["gcf"] = { "comment_node",  { "term" } },
+      ["gcb"] = { "comment_node",  { "binary_expression" } },
+      ["gdq"] = { "delete_node",   { "statement" } },
+      ["gds"] = { "delete_node",   { "select_expression" } },
+      ["gdw"] = { "delete_node",   { "where" } },
+      ["gdf"] = { "delete_node",   { "term" } },
+      ["gdb"] = { "delete_node",   { "binary_expression" } },
+      ["grs"] = { "copy_node",     { "select_expression" } },
+      ["]s"]  = { "jump_to_next",  { "statement" } },
+      ["[s"]  = { "jump_to_prev",  { "statement" } },
+    }
+<
+==============================================================================
+6. CONNECTIONS                                      *vim-teradata-connections*
+
+Connections are defined in the `users` option (see |vim-teradata-opt-users|).
+The first entry is the default. Switch between profiles interactively
+with |:TDU|.
+
+Credentials ~
+    Passwords live in `tdwallet`. Make sure each `user` configured in
+    `vim-teradata` has a matching wallet entry on the host: >
+
+        tdwallet add <USER>
+<
+    vim-teradata never writes credentials to disk.
+
+Selecting a profile ~
+    Run |:TDU|. The list of users opens in a buffer. Mappings:
+
+        <CR>    select user under cursor
+        a       add a new user (interactive)
+        d       delete user under cursor
+
+The chosen profile is persisted under `history_dir/users.json` so it
+survives Neovim restarts.
+
+==============================================================================
+7. COMMANDS                                            *vim-teradata-commands*
+
+All `:TD*` commands are buffer-local. They are defined by the Teradata
+ftplugin and are available only in buffers whose filetype is `teradata`
+(see |vim-teradata-filetypes|).
+
+Several commands accept a count. `[N]` below denotes an optional count
+that defaults to 1. For example `:3TDO` runs the statement under the
+cursor plus the next two.
+
+------------------------------------------------------------------------------
+7.1 Query execution                                   *vim-teradata-cmd-query*
+
+                                                                       *:TD*
+:[N]TD          Syntax-check the current statement plus the next N-1
+                statements. Statement boundaries are detected via
+                tree-sitter, not naive `;` splitting. No execution.
+
+                                                                      *:TDE*
+:[range]TDE     Syntax-check the visual selection. The selection is
+                split on `;`. Used in visual mode after `:`.
+
+                                                                      *:TDO*
+:[N]TDO         Run the current statement plus the next N-1 statements
+                via BTEQ and display the results in a split. Honours
+                |vim-teradata-opt-retlimit|.
+
+                                                                      *:TDV*
+:[range]TDV     Run statements of the visual selection (split on `;`)
+                and show results. Visual-mode equivalent of |:TDO|.
+
+                                                                      *:TDM*
+:[N]TDM         Multistatement run: send the current statement plus the
+                next N-1 statements as a SINGLE BTEQ job. Useful for
+                transactions and dependent statements.
+
+                                                                     *:TDMV*
+:[range]TDMV    Multistatement run for the visual selection. Splits on
+                `;` but submits as one BTEQ job.
+
+------------------------------------------------------------------------------
+7.2 History & search                                *vim-teradata-cmd-history*
+
+                                                                      *:TDH*
+:TDH            Open the query history buffer. Each previously executed
+                query is listed with its ID; press <CR> to open the
+                query and its result side-by-side. See
+                |vim-teradata-guide-history|.
+
+                                                                      *:TDR*
+:TDR            Search through past queries by content. Requires
+                `ripgrep`, `bat`, and one of the supported pickers
+                (|vim-teradata-opt-picker|).
+
+------------------------------------------------------------------------------
+7.3 Bookmarks                                     *vim-teradata-cmd-bookmarks*
+
+                                                                      *:TDB*
+:TDB            Open the bookmark manager. Bookmarks are split between
+                "global" (shared across users) and "user" (per-profile).
+
+                                                                   *:TDBAdd*
+:[range]TDBAdd  Save the visual selection as a new bookmark. Prompts
+                for a name. See |vim-teradata-guide-bookmarks|.
+
+------------------------------------------------------------------------------
+7.4 Jobs                                               *vim-teradata-cmd-jobs*
+
+                                                                      *:TDJ*
+:TDJ            Open the Jobs Manager: a live view of in-flight and
+                completed BTEQ jobs. See |vim-teradata-guide-jobs|.
+
+------------------------------------------------------------------------------
+7.5 Editing & formatting                               *vim-teradata-cmd-edit*
+
+                                                                      *:TDF*
+:[N]TDF         Reformat the current statement plus the next N-1
+                statements using the built-in tree-sitter formatter.
+                EXPERIMENTAL.
+
+                                                                     *:TDFF*
+:TDFF           Reformat every statement in the current buffer.
+                EXPERIMENTAL.
+
+                                                              *:TDCodeAction*
+:TDCodeAction   Show available code actions at the cursor position
+                (e.g. rename alias, expand `*` to columns). See
+                |vim-teradata-guide-actions|.
+
+------------------------------------------------------------------------------
+7.6 Metadata & UI                                      *vim-teradata-cmd-meta*
+
+                                                                   *:TDSync*
+:TDSync         Build or refresh the local metadata index used by
+                autocomplete. Connects to the active user with TPT and
+                dumps catalog data into |vim-teradata-opt-data_dir|.
+
+                                                                      *:TDU*
+:TDU            Open the user manager (see |vim-teradata-connections|).
+
+                                                                      *:TDS*
+:TDS            Open the settings manager. Edit `retlimit`, `filter_db`
+                and `replacements` interactively.
+
+                                                                   *:TDHelp*
+:TDHelp         Open a quick reference of vim-teradata commands in a
+                split. Equivalent to a "cheat sheet".
+
+==============================================================================
+8. MAPPINGS                                            *vim-teradata-mappings*
+
+------------------------------------------------------------------------------
+8.1 Buffer mappings                             *vim-teradata-buffer-mappings*
+
+In every Teradata buffer the following mapping is defined:
+
+                                                *vim-teradata-i_CTRL-X_CTRL-U*
+i_CTRL-X CTRL-U    Trigger Teradata user-defined completion. Inserts
+                   schema-aware completion candidates (databases,
+                   tables, columns, functions). The same source is
+                   exposed automatically to `blink.cmp` and `nvim-cmp`
+                   when they are present.
+
+In addition, the entries of |vim-teradata-opt-keymaps| are installed as
+normal-mode mappings buffer-locally. See |vim-teradata-default-keymaps| for
+a recommended set.
+
+------------------------------------------------------------------------------
+8.2 OPE operations                                          *vim-teradata-ope*
+
+"OPE" (Operations on Parse Elements) refers to the suite of node-aware
+editing functions exposed by `vim-teradata.td_ope`. They take a
+tree-sitter node type as their target and act on the smallest enclosing
+node of that type at the cursor.
+
+Available functions ~
+
+    comment_node({type})        Comment out the node (`-- ` prefix per
+                                line).
+    uncomment_node()            Remove `-- ` prefixes inside the node
+                                under the cursor.
+    delete_node({type})         Delete the smallest enclosing node of
+                                {type}.
+    copy_node({type})           Yank the smallest enclosing node of
+                                {type} to the unnamed register.
+    jump_to_next({type})        Move cursor to the start of the next
+                                node of {type} in the buffer.
+    jump_to_prev({type})        Move cursor to the start of the previous
+                                node of {type} in the buffer.
+    format_current_statement()  See |:TDF|.
+    format_all_statements()     See |:TDFF|.
+
+Common node types ~
+
+    statement           one complete SQL statement
+    select_expression   the SELECT list
+    where               the WHERE clause
+    term                a single field/expression in a list
+    binary_expression   an `a OP b` predicate
+    cte                 one entry of a WITH clause
+
+A node type that does not exist at the cursor is a no-op; the operation
+emits a warning via |vim.notify()|.
+
+------------------------------------------------------------------------------
+8.3 UI buffer mappings                              *vim-teradata-ui-mappings*
+
+Each interactive buffer (|:TDU|, |:TDS|, |:TDB|, |:TDH|, |:TDJ|) defines
+its own local mappings. The common idiom is:
+
+    <CR>        accept / open the entry under the cursor
+    a           add a new entry
+    d           delete the entry under the cursor (with confirmation)
+    q           close the buffer
+
+Buffer-specific mappings are shown as virtual text on the last line of
+each buffer when it opens.
+
+==============================================================================
+9. USER GUIDE                                        *vim-teradata-user-guide*
+
+------------------------------------------------------------------------------
+9.1 Running queries                                   *vim-teradata-guide-run*
+
+The two primary commands are |:TDO| (node-based) and |:TDV| (visual).
+Both render the result set in a table-formatted split buffer and report
+Teradata errors as BTEQ would.
+
+Use |vim-teradata-opt-retlimit| to cap row counts. Very large result sets
+(roughly > 10k rows) work but are not the primary use case; prefer TPT
+for heavy exports.
+
+For dependent statements that must share a transaction or session
+state, use the multistatement variants |:TDM| / |:TDMV|.
+
+------------------------------------------------------------------------------
+9.2 Diagnostics                               *vim-teradata-guide-diagnostics*
+
+The Teradata tree-sitter parser flags syntax errors as you type. Errors
+appear through the standard |vim.diagnostic| interface: virtual text,
+signs, |:lopen|, and |vim.diagnostic.get()| all work normally.
+
+Diagnostics refresh on `TextChanged`, `BufEnter`, and `BufWritePost`.
+
+------------------------------------------------------------------------------
+9.3 Autocomplete                             *vim-teradata-guide-autocomplete*
+
+After running |:TDSync| once, completion becomes schema-aware:
+
+    - After `FROM ` / `JOIN `: complete databases, then tables.
+    - After `<table>.`:       complete columns of that table.
+    - Built-in Teradata functions are always suggested.
+
+Completion is exposed as a source to `blink.cmp` and `nvim-cmp`. If
+neither is installed, trigger completion manually with `i_CTRL-X CTRL-U`
+(see |vim-teradata-buffer-mappings|).
+
+The metadata cache lives under |vim-teradata-opt-data_dir|. Re-run |:TDSync|
+whenever a DDL change should be visible to the editor.
+
+------------------------------------------------------------------------------
+9.4 History                                       *vim-teradata-guide-history*
+
+Every query you run via |:TDO|, |:TDV|, |:TDM|, |:TDMV| is recorded:
+
+    history_dir/queries/<id>.sql
+    history_dir/resultsets/<id>.csv
+
+Use |:TDH| to browse, |:TDR| to grep through history (requires a picker).
+
+------------------------------------------------------------------------------
+9.5 Bookmarks                                   *vim-teradata-guide-bookmarks*
+
+Bookmarks are named, reusable SQL snippets stored on disk. Two scopes:
+
+    global  shared across all configured users
+    user    private to the currently active profile
+
+Add ~
+    Visually select a query, then |:TDBAdd|. You will be prompted for a
+    name and a scope.
+
+Manage ~
+    |:TDB| opens the bookmark manager. Press <CR> to load a bookmark
+    into a new split.
+
+------------------------------------------------------------------------------
+9.6 Job manager                                      *vim-teradata-guide-jobs*
+
+|:TDJ| opens the Job Manager. It lists every BTEQ job started in the
+session with its state (running / done / failed), elapsed time and a
+reference to the source query. Press <CR> to jump to the job's log.
+
+Because BTEQ jobs run asynchronously (`vim.system`) you can keep
+editing while queries execute and check progress in |:TDJ| anytime.
+
+------------------------------------------------------------------------------
+9.7 Code actions                                  *vim-teradata-guide-actions*
+
+|:TDCodeAction| inspects the syntax tree at the cursor and offers
+applicable refactorings. Examples (depending on context):
+
+    - Rename alias (renames every occurrence in the enclosing statement)
+    - Expand `*` to explicit column list (requires synced metadata)
+    - Toggle column qualification with the table alias
+
+Actions are presented through |vim.ui.select()|, so any picker that
+hooks into it (telescope, snacks, fzf-lua, dressing.nvim ...) is used
+automatically.
+
+------------------------------------------------------------------------------
+9.8 Editing & formatting                           *vim-teradata-guide-format*
+
+The OPE functions (see |vim-teradata-ope|) let you comment, delete, copy,
+and navigate by SQL node type rather than by line. Combined with
+|:TDF| / |:TDFF| (experimental formatter) they give you a structured
+editing workflow:
+
+    gcq    comment the statement under the cursor
+    gdw    delete the WHERE clause
+    ]s     jump to the next statement
+    :TDF   reformat current statement
+
+==============================================================================
+10. FILETYPES                                         *vim-teradata-filetypes*
+
+vim-teradata registers the `teradata` filetype for every extension in
+|vim-teradata-opt-ft|. Default extensions: `.sql`, `.teradata`.
+
+Special handling ~
+
+`.depl` files (Teradata deployment scripts) contain SQL embedded in a
+non-SQL host language. The ftplugin restricts tree-sitter parsing to
+the actual SQL regions of the buffer and refreshes that mapping on
+`BufReadPost`, `BufWritePost`, `TextChanged`, and `TextChangedI`.
+
+To add another extension: >lua
+
+    require('vim-teradata').setup({
+      ft = { 'sql', 'teradata', 'btq' },
+    })
+<
+==============================================================================
+11. TROUBLESHOOTING                             *vim-teradata-troubleshooting*
+
+`bteq: command not found` ~
+    BTEQ is not on `$PATH`. Install TTU and re-open Neovim from a shell
+    where `which bteq` succeeds.
+
+`tdwallet ... no entry` ~
+    No password is stored for the configured user. Run >
+
+        tdwallet add <USER>
+<
+    on the host first, then retry.
+
+No diagnostics or syntax highlighting ~
+    The tree-sitter parser is missing. Run: >
+
+        :checkhealth treesitter
+<
+    and follow the install steps for the parser.
+
+`:TDSync` errors with permission denied on dbc.columnsv ~
+    Grant SELECT on `dbc.columnsv` to the user used for sync. This is
+    the only database privilege the plugin needs.
+
+Completion returns nothing ~
+    1. Confirm a successful |:TDSync| has run.
+    2. Confirm the cache directory contains JSON files: >
+
+        :echo stdpath('data') . '/teradata/sql-autocomplete'
+<
+    3. With `blink.cmp` / `nvim-cmp`, verify `td_sql_completion` is in
+       the active source list.
+
+`:TDR` does nothing ~
+    A picker is missing. Install one of the supported pickers (see
+    |vim-teradata-opt-picker|) and either `ripgrep` and `bat`.
+
+==============================================================================
+12. FAQ                                                     *vim-teradata-faq*
+
+Q: Does vim-teradata store my password? ~
+A: No. Authentication goes through `tdwallet`; passwords never touch the
+   plugin's data directory.
+
+Q: Can I use vim-teradata with vanilla Vim? ~
+A: No. The plugin uses Lua, `vim.system`, `vim.diagnostic`, and the
+   built-in tree-sitter API. Neovim 0.10+ is required.
+
+Q: Can I run multiple queries in parallel? ~
+A: Yes. Every |:TDO| spawns an independent BTEQ job. Track them with
+   |:TDJ|.
+
+Q: How do I run a `BEGIN TRANSACTION ... COMMIT;` block? ~
+A: Use |:TDM| or |:TDMV| so every statement is sent in the same BTEQ
+   session.
+
+Q: Why is the formatter marked experimental? ~
+A: |:TDF| / |:TDFF| work for common DML/DDL but may reorder comments or
+   re-indent unusual constructs. Always diff before committing.
+
+Q: How do I change the connection for a single query? ~
+A: Switch active user via |:TDU| before running, then switch back.
+
+==============================================================================
+13. LICENSE                                             *vim-teradata-license*
+
+vim-teradata is distributed under the MIT License.
+
+Project home: https://github.com/ErwonB/vim-teradata
+Documentation: https://teradata-nvim.com
+
+==============================================================================
+14. CHANGELOG                                         *vim-teradata-changelog*
+
+See the project's GitHub releases page:
+https://github.com/ErwonB/vim-teradata/releases
+
+==============================================================================
+vim:tw=78:ts=8:sw=4:et:ft=help:norl:
