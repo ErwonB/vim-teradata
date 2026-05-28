@@ -219,54 +219,11 @@ function M.query_syntax(args)
     end)
 end
 
--- Visual-selection syntax check (splits on ';')
-function M.query_syntax_visual(args)
-    local sql = get_visual_sql()
-    if not sql or sql:match('^%s*$') then
-        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
-    end
-    local sqls = split_sql_statements(sql)
-    run_multiple(sqls, 'syntax', function(res)
-        if res.rc == 0 then
-            vim.notify('No syntax errors.', vim.log.levels.INFO, { title = 'Teradata' })
-        else
-            ui.display_error(res.msg)
-        end
-    end)
-end
 
 -- Node-based output (supports count: :3TDO)
 function M.query_output(args)
     local count = (args.count and args.count > 0) and args.count or 1
     local sqls = get_node_statements(count)
-    run_multiple(sqls, 'output', function(res, context)
-        if res.rc == 0 then
-            local result_path = context.result_path
-            if vim.fn.getfsize(result_path) > 0 then
-                ui.display_output(result_path, context.query_id)
-                local actual_lines = util.extract_rows_found(res.log_content)
-                if actual_lines and actual_lines > config.options.retlimit then
-                    vim.notify(
-                        string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
-                        vim.log.levels.WARN
-                    )
-                end
-            else
-                vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
-            end
-        else
-            ui.display_error(res.msg)
-        end
-    end)
-end
-
--- Visual-selection output (splits on ';')
-function M.query_output_visual(args)
-    local sql = get_visual_sql()
-    if not sql or sql:match('^%s*$') then
-        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
-    end
-    local sqls = split_sql_statements(sql)
     run_multiple(sqls, 'output', function(res, context)
         if res.rc == 0 then
             local result_path = context.result_path
@@ -349,7 +306,7 @@ function M.query_multistatement(args)
 end
 
 -- Visual-selection multistatement output
-function M.query_multistatement_visual(args)
+function M.query_multistatement_visual()
     local sql = get_visual_sql()
     if not sql or sql:match('^%s*$') then
         return vim.notify('No SQL in selection.', vim.log.levels.WARN)
@@ -364,6 +321,26 @@ function M.query_multistatement_visual(args)
         vim.log.levels.INFO, { title = 'Teradata' }
     )
     run_single_query(joined, 'output', output_callback)
+end
+
+-- Visual-selection output 
+function M.query_output_visual()
+    local sql = get_visual_sql()
+    if not sql or sql:match('^%s*$') then
+        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
+    end
+    vim.notify('Selection sent as single BTEQ job', vim.log.levels.INFO, { title = 'Teradata' })
+    run_single_query(sql, 'output', output_callback)
+end
+
+-- Visual-selection syntax check
+function M.query_syntax_visual()
+    local sql = get_visual_sql()
+    if not sql or sql:match('^%s*$') then
+        return vim.notify('No SQL in selection.', vim.log.levels.WARN)
+    end
+    vim.notify('Selection sent as single BTEQ job', vim.log.levels.INFO, { title = 'Teradata' })
+    run_single_query(sql, 'syntax', output_callback)
 end
 
 return M

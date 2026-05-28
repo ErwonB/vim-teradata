@@ -275,8 +275,8 @@ function M.display_help()
     local help_text = {
         ':nTD   syntax check current + next n-1 statements',
         ':nTDO  output current + next n-1 statements',
-        'TDE    syntax check visual selection (splits on ;)',
-        'TDV    output visual selection (splits on ;)',
+        'TDE    syntax check visual selection',
+        'TDV    output visual selection',
         ':nTDM  multistatement output n nodes in 1 BTEQ job',
         'TDMV   multistatement visual (splits on ; → 1 BTEQ job)',
         'TDH: Show query history',
