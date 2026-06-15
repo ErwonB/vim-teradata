@@ -2,7 +2,7 @@ local util = require('vim-teradata.util')
 local tsu  = require('vim-teradata.ts-util')
 local diag = require('vim-teradata.diagnostics')
 
-local M = {}
+local M    = {}
 
 -- =============================================================================
 -- Helpers
@@ -1094,6 +1094,126 @@ local function action_rename_alias(bufnr)
     end)
 end
 
+
+-- =============================================================================
+-- Action 10: Add LOCK TABLE ... FOR ACCESS for all tables in the query
+-- =============================================================================
+
+-- =============================================================================
+-- Action: Add LOCK TABLE ... FOR ACCESS for all tables in the query
+-- =============================================================================
+
+---Builds a fully-qualified (or bare) table name from a relation entry.
+---@param rel table
+---@return string|nil
+local function lock_table_name(rel)
+    if not rel or rel.derived or not rel.table then return nil end
+    if rel.db and rel.db ~= "" then
+        return rel.db .. "." .. rel.table
+    end
+    return rel.table
+end
+
+---Reads an object_reference into a "schema.name" (or "name") string.
+---@param obj_ref TSNode
+---@param bufnr number
+---@return string|nil
+local function object_reference_name(obj_ref, bufnr)
+    local name_node = obj_ref:field("name")[1]
+    if not name_node then return nil end
+    local name = diag.get_text(name_node, bufnr)
+    if not name then return nil end
+    local schema_node = obj_ref:field("schema")[1]
+    if schema_node then
+        local schema = diag.get_text(schema_node, bufnr)
+        if schema and schema ~= "" then
+            return schema .. "." .. name
+        end
+    end
+    return name
+end
+
+---Prepends `lock table <t> for access` lines for any table not already locked.
+---@param bufnr number
+local function action_add_locks(bufnr)
+    local stmt_node = get_cursor_statement(bufnr)
+    if not stmt_node then
+        vim.notify("Cursor is not inside a SQL statement.", vim.log.levels.WARN)
+        return
+    end
+
+    local cte_defs = diag.get_cte_definitions(stmt_node, bufnr)
+    local scopes   = diag.get_query_scopes(stmt_node)
+    if #scopes == 0 then
+        vim.notify("No query scopes found.", vim.log.levels.WARN)
+        return
+    end
+
+    -- CTE names must not be locked (they are not real tables)
+    local cte_names = {}
+    for name, _ in pairs(cte_defs or {}) do
+        cte_names[name:upper()] = true
+    end
+
+    -- 1. Find an existing lock_clause in the statement and read the names it
+    --    already locks, so we can skip those tables.
+    local lock_clause = tsu.descendant(stmt_node, "lock_clause")
+    local already_locked = {}
+    if lock_clause then
+        for child in lock_clause:iter_children() do
+            if child:type() == "object_reference" then
+                local name = object_reference_name(child, bufnr)
+                if name then
+                    already_locked[name:upper()] = true
+                end
+            end
+        end
+    end
+
+    -- 2. Collect distinct base tables across every scope, preserving first-seen
+    --    order and skipping CTEs and tables that are already locked.
+    local seen = {}
+    local ordered = {}
+    for _, scope_nodes in ipairs(scopes) do
+        local _, active_tables = diag.analyze_relations(scope_nodes, bufnr, {}, cte_defs)
+        for _, rel in ipairs(active_tables or {}) do
+            local name = lock_table_name(rel)
+            if name and not cte_names[(rel.table or ""):upper()] then
+                local key = name:upper()
+                if not seen[key] and not already_locked[key] then
+                    seen[key] = true
+                    table.insert(ordered, name)
+                end
+            end
+        end
+    end
+
+    if #ordered == 0 then
+        vim.notify("All tables are already locked.", vim.log.levels.INFO)
+        return
+    end
+
+    -- 3. Build the new lock lines.
+    local lock_lines = {}
+    for _, name in ipairs(ordered) do
+        table.insert(lock_lines, string.format("lock table %s for access", name))
+    end
+
+    -- 4. Insert: append to the existing lock_clause if present, else prepend to
+    --    the start of the statement.
+    if lock_clause then
+        local lc_sr, _, lc_er, _ = lock_clause:range()
+        -- Insert right after the last line of the existing lock_clause.
+        vim.api.nvim_buf_set_lines(bufnr, lc_er + 1, lc_er + 1, false, lock_lines)
+        local _ = lc_sr
+    else
+        local stmt_sr, _, _, _ = stmt_node:range()
+        vim.api.nvim_buf_set_lines(bufnr, stmt_sr, stmt_sr, false, lock_lines)
+    end
+
+    vim.notify(string.format("Added %d lock table statement(s).", #ordered), vim.log.levels.INFO)
+end
+
 -- =============================================================================
 -- Public API
 -- =============================================================================
@@ -1196,6 +1316,13 @@ function M.run()
                 fn = function() action_transform_to_update(bufnr) end,
             })
         end
+
+        if from_node then
+            table.insert(actions, {
+                title = "Add LOCK TABLE ... FOR ACCESS for all tables",
+                fn = function() action_add_locks(bufnr) end,
+            })
+        end
     end
 
     -- Check: Expand GROUP BY ordinals
@@ -1204,7 +1331,9 @@ function M.run()
         local has_ordinal = false
         for child in gb:iter_children() do
             local raw = diag.get_text(child, bufnr) or ""
-            if raw:match("^%s*%d+%s*$") then has_ordinal = true; break end
+            if raw:match("^%s*%d+%s*$") then
+                has_ordinal = true; break
+            end
         end
         if has_ordinal then
             table.insert(actions, {
