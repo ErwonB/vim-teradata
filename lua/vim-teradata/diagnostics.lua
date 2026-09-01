@@ -30,6 +30,8 @@ local NODE = {
     INVOCATION = "invocation",
     LITERAL = "literal",
     JOIN = "join",
+    CURSOR_PARAMETER = "cursor_parameter",
+    WINDOW_FUNCTION = "window_function",
 }
 
 local AGGREGATE_FNS = {
@@ -38,7 +40,10 @@ local AGGREGATE_FNS = {
     VAR_POP = true, VAR_SAMP = true, VARIANCE = true,
     KURTOSIS = true, SKEW = true, CORR = true,
     COVAR_POP = true, COVAR_SAMP = true,
+    MEDIAN = true, PERCENTILE_DISC = true, PERCENTILE_CONT = true,
+    PERCENT_RANK = true, RANK = true, CUME_DIST = true,
 }
+
 
 -- =============================================================================
 -- Schema Loading & Caching
@@ -227,6 +232,20 @@ local function is_aggregate_invocation(inv_node, bufnr)
     return false
 end
 
+---Returns true if node is inside a window_function (OVER ...) before hitting select_expression.
+---@param node TSNode
+---@return boolean
+local function is_under_window(node)
+    local p = node:parent()
+    while p do
+        local t = p:type()
+        if t == NODE.SELECT_EXPR then return false end
+        if t == NODE.WINDOW_FUNCTION then return true end
+        p = p:parent()
+    end
+    return false
+end
+
 ---Returns true if node is a descendant of an aggregate invocation, stopping at select_expression.
 ---@param node TSNode
 ---@param bufnr number
@@ -398,6 +417,20 @@ end
 local function get_cte_definitions(stmt_node, bufnr)
     local cte_defs = {}
 
+    -- Pre-pass: register every CTE name so recursive self-references resolve.
+    for _, m, _ in QUERIES.cte_def:iter_matches(stmt_node, bufnr, 0, -1) do
+        for capid, n in pairs(m) do
+            if QUERIES.cte_def.captures[capid] == "cte_name" then
+                local nm = get_text(n[1], bufnr)
+                if nm then
+                    -- Seed with node/name so check_unused_cte never sees nil.
+                    cte_defs[normalize(nm)] = { name = nm, columns = {}, node = n[1] }
+                end
+            end
+        end
+    end
+
+    -- Main pass: fill in columns, overwriting the seed entries.
     for _, cte_def_match, _ in QUERIES.cte_def:iter_matches(stmt_node, bufnr, 0, -1) do
         local cte_name_node
         local cte_body_node
@@ -407,53 +440,56 @@ local function get_cte_definitions(stmt_node, bufnr)
         end
 
         local cte_name = get_text(cte_name_node, bufnr)
+        if not (cte_name and cte_body_node) then goto next_cte end  -- was: continue
 
-        if cte_name and cte_body_node then
-            local select_node = nil
-            for child in cte_body_node:iter_children() do
-                if child:type() == NODE.SELECT then
-                    select_node = child
-                    break
-                end
+        local select_node = nil
+        for child in cte_body_node:iter_children() do
+            if child:type() == NODE.SELECT then
+                select_node = child
+                break
             end
+        end
 
-            if not select_node then return cte_defs end
-            local select_expr = nil
-            for child in select_node:iter_children() do
-                if child:type() == NODE.SELECT_EXPR then
-                    select_expr = child
-                    break
-                end
+        -- ← was: `return cte_defs` here, which aborted the whole function early
+        if not select_node then goto next_cte end
+
+        local select_expr = nil
+        for child in select_node:iter_children() do
+            if child:type() == NODE.SELECT_EXPR then
+                select_expr = child
+                break
             end
+        end
 
-            local cols = {}
-            if select_expr then
-                if get_text(select_expr, bufnr) == "*" then
-                    -- Expansion logic for CTEs
-                    local inner_scopes = get_query_scopes(cte_body_node)
-                    if #inner_scopes > 0 then
-                        local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs)
-                        for _, rel in ipairs(inner_active) do
-                            if rel.db and rel.table then
-                                local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or {}
-                                for _, c in ipairs(schema_cols) do table.insert(cols, { name = c }) end
-                            elseif rel.columns then
-                                for _, c in ipairs(rel.columns) do table.insert(cols, { name = c.name }) end
-                            end
+        local cols = {}
+        if select_expr then
+            if get_text(select_expr, bufnr) == "*" then
+                local inner_scopes = get_query_scopes(cte_body_node)
+                if #inner_scopes > 0 then
+                    local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs)
+                    for _, rel in ipairs(inner_active) do
+                        if rel.db and rel.table then
+                            local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or {}
+                            for _, c in ipairs(schema_cols) do table.insert(cols, { name = c }) end
+                        elseif rel.columns then
+                            for _, c in ipairs(rel.columns) do table.insert(cols, { name = c.name }) end
                         end
                     end
-                else
-                    _, cols = get_columns_from_select_expr(select_expr, bufnr)
                 end
+            else
+                _, cols = get_columns_from_select_expr(select_expr, bufnr)
             end
-
-            cte_defs[normalize(cte_name)] = {
-                name = cte_name,
-                columns = cols,
-                node = cte_name_node,
-            }
         end
+
+        cte_defs[normalize(cte_name)] = {
+            name     = cte_name,
+            columns  = cols,
+            node     = cte_name_node,
+        }
+
+        ::next_cte::
     end
+
     return cte_defs
 end
 
@@ -1069,7 +1105,7 @@ local function check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
     -- Detect aggregation: GROUP BY present, or aggregate invocation in SELECT list
     local has_aggregate = false
     for _, inv in QUERIES.invocation_nod:iter_captures(sel_expr, bufnr, 0, -1) do
-        if is_aggregate_invocation(inv, bufnr) then has_aggregate = true; break end
+        if is_aggregate_invocation(inv, bufnr) and not is_under_window(inv, bufnr) then has_aggregate = true; break end
     end
     if not gb_node and not has_aggregate then return end
 
@@ -1129,6 +1165,7 @@ local function check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
 
         for _, col in QUERIES.bare_field:iter_captures(term, bufnr, 0, -1) do
             if is_under_aggregate(col, bufnr) then goto next_col end
+            if is_under_window(col, bufnr) then goto next_col end
             local name = normalize_col(get_text(col, bufnr) or "")
             if not gb_field_names[name] then
                 add_diagnostic(diagnostics, col, bufnr, SEVERITY.ERROR,
