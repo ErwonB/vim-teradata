@@ -39,7 +39,8 @@ CONTENTS                                               *vim-teradata-contents*
         9.5 Bookmarks ......................... |vim-teradata-guide-bookmarks|
         9.6 Job manager ....................... |vim-teradata-guide-jobs|
         9.7 Code actions ...................... |vim-teradata-guide-actions|
-        9.8 Editing & formatting .............. |vim-teradata-guide-format|
+        9.8 Editing results ................... |vim-teradata-guide-editing|
+        9.9 Editing & formatting .............. |vim-teradata-guide-format|
     10. Filetypes ............................. |vim-teradata-filetypes|
     11. Troubleshooting ....................... |vim-teradata-troubleshooting|
     12. FAQ ................................... |vim-teradata-faq|
@@ -298,6 +299,34 @@ sep ~
 
     Field separator used in BTEQ result CSV files. Change only if your
     data may contain `~`.
+
+                                             *vim-teradata-opt-edit_enabled*
+edit_enabled ~
+    Type: `boolean`           Default: `true`
+
+    Enables in-grid editing of query results. See
+    |vim-teradata-guide-editing|.
+
+                                          *vim-teradata-opt-preview_updates*
+preview_updates ~
+    Type: `boolean`           Default: `true`
+
+    When true, saving edits opens the generated UPDATE statements in a
+    scratch buffer; nothing is sent to BTEQ until you press <CR> there.
+
+                                               *vim-teradata-opt-null_token*
+null_token ~
+    Type: `string`            Default: `"NULL"`
+
+    Text BTEQ uses to render NULL in result exports (`.set null`). The
+    same token typed into a cell in edit mode means SQL NULL. A real
+    string equal to the token is indistinguishable from NULL.
+
+                                             *vim-teradata-opt-edit_keymaps*
+edit_keymaps ~
+    Type: `table`   Default: `{ toggle = "E", save = "S", cancel = "C" }`
+
+    Result-buffer local mappings for edit mode.
 
                                                   *vim-teradata-opt-filter_db*
 filter_db ~
@@ -636,7 +665,48 @@ hooks into it (telescope, snacks, fzf-lua, dressing.nvim ...) is used
 automatically.
 
 ------------------------------------------------------------------------------
-9.8 Editing & formatting                           *vim-teradata-guide-format*
+9.8 Editing results                              *vim-teradata-guide-editing*
+
+Results from |:TDO| / |:TDV| can be edited and written back as UPDATE
+statements.
+
+    <E>    toggle edit mode
+    <CR>   change the cell under the cursor (in edit mode)
+    <X>    set the cell under the cursor to NULL
+    <S>    save: generate the UPDATE statements
+    <C>    cancel: discard pending changes
+
+Values are changed through a prompt, not by typing over the grid: the
+buffer stays read-only and is redrawn from the data after each change.
+This keeps column alignment irrelevant - a value containing spaces or a
+`|` can never be mis-parsed. Changed cells are highlighted and the hint
+line shows how many changes are pending.
+
+Multiple cells on multiple rows can be changed before saving; nothing is
+sent to the database until <S>.
+
+Which columns can be edited ~
+    Only select items of the form `X`, `a.x`, `a.x AS X` or `a.x X` map
+    back to a real column. Everything else (functions, expressions,
+    literals, `*`) is dimmed and read-only.
+
+Single-table SELECT ~
+    The WHERE clause matches EVERY editable column against its original
+    value ("matchall"); NULL originals become `IS NULL`. Since this is
+    not a key, several identical rows may be updated - the number of rows
+    changed is always reported.
+
+SELECT with joins ~
+    Edited columns are traced to their table through the syntax tree, but
+    you are asked which columns form the WHERE clause - once per table
+    that has edits. The choice is remembered for the buffer.
+
+Not editable ~
+    `SELECT *`, DISTINCT, GROUP BY / HAVING, set operations, CTEs,
+    derived tables, multistatement results (|:TDM|), EXPLAIN and SHOW.
+
+------------------------------------------------------------------------------
+9.9 Editing & formatting                           *vim-teradata-guide-format*
 
 The OPE functions (see |vim-teradata-ope|) let you comment, delete, copy,
 and navigate by SQL node type rather than by line. Combined with

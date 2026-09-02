@@ -27,6 +27,7 @@ local function build_script(sql, user_obj, options, output_path)
         '.set titledashes off',
         '.set session charset \'UTF8\'',
         '.set separator \'' .. config.options.sep .. '\'',
+        '.set null \'' .. (config.options.null_token or 'NULL') .. '\'',
         '.EXPORT FILE = ' .. output_path .. ';',
         '.set WIDTH 1048575',
     })
@@ -290,6 +291,7 @@ local function output_callback(res, context)
     end
 end
 
+
 -- Node-based multistatement output (supports count: :3TDM)
 function M.query_multistatement(args)
     local count = (args.count and args.count > 0) and args.count or 1
@@ -341,6 +343,56 @@ function M.query_syntax_visual()
     end
     vim.notify('Selection sent as single BTEQ job', vim.log.levels.INFO, { title = 'Teradata' })
     run_single_query(sql, 'syntax', output_callback)
+end
+
+--- Runs a list of UPDATE statements in a single BTEQ job, inside one transaction.
+--- @param statements string[] statements WITHOUT trailing ';'
+--- @param on_done fun(res: table, counts: table)  counts[i] = rows changed by statement i
+function M.run_updates(statements, on_done)
+    if #statements == 0 then return end
+
+    local current_user = util.get_current_user()
+    if not current_user then
+        return vim.notify('No Teradata user configured.', vim.log.levels.ERROR)
+    end
+
+    local body = {
+        '.logmech ' .. current_user.log_mech,
+        '.logon ' .. current_user.tdpid .. '/' .. current_user.user ..
+            ',$tdwallet(' .. current_user.user .. ');',
+        '.set titledashes off',
+        '.set session charset \'UTF8\'',
+        '.set errorlevel severity 8 exitcode 8',
+        'BT;',
+    }
+    for _, stmt in ipairs(statements) do
+        vim.list_extend(body, vim.fn.split(util.replace_env_vars(stmt), '\n'))
+        table.insert(body, ';')
+    end
+    vim.list_extend(body, { 'ET;', '.LOGOFF', '.EXIT' })
+
+    local id = util.get_unique_query_id()
+    util.jobs_add({
+        id = id, operation = 'update', status = 'running',
+        user = current_user.user, message = 'Started',
+        started_at = os.time(),
+    })
+
+    local handle = start_job(body, function(res)
+        vim.schedule(function()
+            local counts = util.extract_rows_changed(res.log_content)
+            util.jobs_update(id, {
+                status = (res.rc == 0) and 'ok' or 'error',
+                rows = counts[1],
+                message = (res.rc == 0) and 'OK'
+                    or ((res.msg or ''):match('[^\n]*$') or 'Error'),
+                finished_at = os.time(),
+            })
+            ui.refresh_jobs_if_open()
+            on_done(res, counts)
+        end)
+    end)
+    util.jobs_update(id, { handle = handle })
 end
 
 return M

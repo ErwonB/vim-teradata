@@ -31,6 +31,20 @@ M.defaults = {
     replacements = {},
     -- csv separator for result query file
     sep = "~",
+    -- master switch for in-grid editing of query results
+    edit_enabled = true,
+    -- show the generated UPDATE statements in a buffer before executing them
+    preview_updates = false,
+    -- token BTEQ uses for NULL in exports; typing it in a cell means SQL NULL
+    null_token = 'NULL',
+    -- result-buffer local mappings for edit mode
+    edit_keymaps = {
+        toggle    = 'E',      -- enter / leave edit mode
+        edit_cell = '<cr>',   -- change the cell under the cursor (also bound to <CR> in edit mode)
+        set_null  = 'X',      -- set the cell under the cursor to SQL NULL
+        save      = 'S',      -- generate the UPDATE statements
+        cancel    = 'C',      -- discard pending changes
+    },
     -- Users list
     users = {},
     current_user_index = nil,

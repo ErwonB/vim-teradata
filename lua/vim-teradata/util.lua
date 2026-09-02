@@ -322,6 +322,19 @@ function M.extract_rows_found(log_content)
     return nil
 end
 
+--- Extracts the per-statement "N rows changed" counts from a BTEQ log.
+--- @param log_content table list of log lines
+--- @return table list of numbers, in statement order
+function M.extract_rows_changed(log_content)
+    local counts = {}
+    for _, line in ipairs(log_content or {}) do
+        local n = line:match('%*%*%*%s+Update completed%.%s+(%d+)%s+rows? changed')
+            or line:match('%*%*%*%s+Update completed%.%s+One row changed') and '1'
+        if n then table.insert(counts, tonumber(n)) end
+    end
+    return counts
+end
+
 --- Replaces placeholder variables in an SQL string.
 --- @param sql string The SQL query.
 --- @return string The SQL query with variables replaced.
@@ -343,6 +356,13 @@ function M.check_executables(commands)
         end
     end
     return true, ""
+end
+
+function M.get_current_user()
+    if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
+        return nil
+    end
+    return config.options.users[config.options.current_user_index]
 end
 
 function M.load_config()

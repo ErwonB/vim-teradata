@@ -44,6 +44,12 @@ function M.display_output(file_path, query_id)
     vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', vim.deepcopy(header))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', {})
 
+    local row_ids, col_ids = {}, {}
+    for i = 1, #data do row_ids[i] = i end
+    for i = 1, #header do col_ids[i] = i end
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', row_ids)
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_col_ids', col_ids)
+
     local query_path = util.get_history_path('queries_dir_name') ..
         '/' .. vim.fn.fnamemodify(file_path, ":t:r") .. '.sql'
     local original_query = table.concat(vim.fn.readfile(query_path), "\n")
@@ -126,6 +132,8 @@ function M.display_output(file_path, query_id)
             { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
         )
 
+        pcall(function() require('vim-teradata.edit').decorate(bufnr) end)
+
         vim.bo.modifiable = false
     end
 
@@ -144,125 +152,158 @@ function M.display_output(file_path, query_id)
         return nil
     end
 
-    vim.keymap.set('n', '<cr>', function()
-        local lnum = vim.fn.line('.')
-        if lnum <= 2 then return end
-        local col_idx = get_column_from_cursor()
-        if not col_idx then return end
-        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-        local row_idx = lnum - 2
-        if not displayed_data[row_idx] then return end
-        local filter_value = displayed_data[row_idx][col_idx]
-        local new_displayed_data = {}
-        for _, row in ipairs(displayed_data) do
-            if row[col_idx] and row[col_idx] == filter_value then
-                table.insert(new_displayed_data, row)
-            end
-        end
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', new_displayed_data)
-        populate_buffer()
-    end, { buffer = bufnr, silent = true, nowait = true })
-
-    vim.keymap.set('n', '-', function()
-        local col_idx_to_remove = get_column_from_cursor()
-        if not col_idx_to_remove then return end
-        local displayed_header    = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-        local displayed_data      = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-        local removed_columns     = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
-
-        local removed_header      = table.remove(displayed_header, col_idx_to_remove)
-        local removed_column_data = {}
-        for _, row in ipairs(displayed_data) do
-            table.insert(removed_column_data, table.remove(row, col_idx_to_remove))
-        end
-        table.insert(removed_columns, {
-            index = col_idx_to_remove,
-            header = removed_header,
-            data = removed_column_data
-        })
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
-        populate_buffer()
-    end, { buffer = bufnr, silent = true, nowait = true })
-
-    vim.keymap.set('n', '<bs>', function()
-        local removed_columns = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
-        if #removed_columns == 0 then
-            return vim.notify("No columns to restore.", vim.log.levels.WARN)
-        end
-        local col_to_restore   = table.remove(removed_columns)
-        local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-        local displayed_data   = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-
-        table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
-        for i, row in ipairs(displayed_data) do
-            table.insert(row, col_to_restore.index, col_to_restore.data[i] or '')
-        end
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
-        populate_buffer()
-    end, { buffer = bufnr, silent = true, nowait = true })
-
-    vim.keymap.set('n', 'u', function()
-        local all_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_all_data')
-        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-        if #displayed_data == #all_data then
-            vim.notify("No filters to reset.", vim.log.levels.INFO)
-            return
-        end
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(all_data))
-        populate_buffer()
-        vim.notify("Filters reset.", vim.log.levels.INFO)
-    end, { buffer = bufnr, silent = true, nowait = true })
-
-    local function sort_column(ascending)
-        -- local lnum = vim.fn.line('.')
-        -- if lnum == 2 then return end
-
-        local col_idx = get_column_from_cursor()
-        if not col_idx then return end
-
-        local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-
-        table.sort(displayed_data, function(a, b)
-            local val_a = a[col_idx] or ""
-            local val_b = b[col_idx] or ""
-
-            local num_a = tonumber(val_a)
-            local num_b = tonumber(val_b)
-
-            if num_a and num_b then
-                if ascending then
-                    return num_a < num_b
-                else
-                    return num_a > num_b
+    local function bind_grid_maps()
+        vim.keymap.set('n', '<cr>', function()
+            local lnum = vim.fn.line('.')
+            if lnum <= 2 then return end
+            local col_idx = get_column_from_cursor()
+            if not col_idx then return end
+            local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            local row_idx = lnum - 2
+            if not displayed_data[row_idx] then return end
+            local filter_value = displayed_data[row_idx][col_idx]
+            local displayed_ids = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_ids')
+            local new_displayed_data, new_displayed_ids = {}, {}
+            for i, row in ipairs(displayed_data) do
+                if row[col_idx] and row[col_idx] == filter_value then
+                    table.insert(new_displayed_data, row)
+                    table.insert(new_displayed_ids, displayed_ids[i])
                 end
             end
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', new_displayed_data)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', new_displayed_ids)
+            populate_buffer()
+        end, { buffer = bufnr, silent = true, nowait = true })
 
-            if ascending then
-                return val_a < val_b
-            else
-                return val_a > val_b
+        vim.keymap.set('n', '-', function()
+            local col_idx_to_remove = get_column_from_cursor()
+            if not col_idx_to_remove then return end
+            local displayed_header    = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
+            local displayed_data      = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            local removed_columns     = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
+            local col_ids             = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_col_ids')
+
+            local removed_col_id      = table.remove(col_ids, col_idx_to_remove)
+            local removed_header      = table.remove(displayed_header, col_idx_to_remove)
+            local removed_column_data = {}
+            for _, row in ipairs(displayed_data) do
+                table.insert(removed_column_data, table.remove(row, col_idx_to_remove))
             end
-        end)
+            table.insert(removed_columns, {
+                index = col_idx_to_remove,
+                col_id = removed_col_id,
+                header = removed_header,
+                data = removed_column_data
+            })
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_col_ids', col_ids)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
+            populate_buffer()
+        end, { buffer = bufnr, silent = true, nowait = true })
 
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
-        populate_buffer()
-        local dir = ascending and "ascending" or "descending"
-        vim.notify("Sorted column " .. col_idx .. " " .. dir, vim.log.levels.INFO)
+        vim.keymap.set('n', '<bs>', function()
+            local removed_columns = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
+            if #removed_columns == 0 then
+                return vim.notify("No columns to restore.", vim.log.levels.WARN)
+            end
+            local col_to_restore   = table.remove(removed_columns)
+            local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
+            local displayed_data   = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            local col_ids          = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_col_ids')
+
+            table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
+            for i, row in ipairs(displayed_data) do
+                table.insert(row, col_to_restore.index, col_to_restore.data[i] or '')
+            end
+            table.insert(col_ids, col_to_restore.index, col_to_restore.col_id)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_col_ids', col_ids)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
+            populate_buffer()
+        end, { buffer = bufnr, silent = true, nowait = true })
+
+        vim.keymap.set('n', 'u', function()
+            local all_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_all_data')
+            local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            if #displayed_data == #all_data then
+                vim.notify("No filters to reset.", vim.log.levels.INFO)
+                return
+            end
+            local ids = {}
+            for i = 1, #all_data do ids[i] = i end
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(all_data))
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', ids)
+            populate_buffer()
+            vim.notify("Filters reset.", vim.log.levels.INFO)
+        end, { buffer = bufnr, silent = true, nowait = true })
+
+        local function sort_column(ascending)
+            -- local lnum = vim.fn.line('.')
+            -- if lnum == 2 then return end
+
+            local col_idx = get_column_from_cursor()
+            if not col_idx then return end
+
+            local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            local displayed_ids  = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_ids')
+
+            local perm = {}
+            for i = 1, #displayed_data do perm[i] = i end
+            table.sort(perm, function(ia, ib)
+                local val_a = displayed_data[ia][col_idx] or ""
+                local val_b = displayed_data[ib][col_idx] or ""
+
+                local num_a = tonumber(val_a)
+                local num_b = tonumber(val_b)
+
+                if num_a and num_b then
+                    if ascending then
+                        return num_a < num_b
+                    else
+                        return num_a > num_b
+                    end
+                end
+
+                if ascending then
+                    return val_a < val_b
+                else
+                    return val_a > val_b
+                end
+            end)
+
+            local sorted_data, sorted_ids = {}, {}
+            for i, p in ipairs(perm) do
+                sorted_data[i] = displayed_data[p]
+                sorted_ids[i]  = displayed_ids[p]
+            end
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', sorted_data)
+            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', sorted_ids)
+            populate_buffer()
+            local dir = ascending and "ascending" or "descending"
+            vim.notify("Sorted column " .. col_idx .. " " .. dir, vim.log.levels.INFO)
+        end
+
+        vim.keymap.set('n', '<Up>', function()
+            sort_column(true)
+        end, { buffer = bufnr, silent = true, nowait = true })
+
+        vim.keymap.set('n', '<Down>', function()
+            sort_column(false)
+        end, { buffer = bufnr, silent = true, nowait = true })
     end
-
-    vim.keymap.set('n', '<Up>', function()
-        sort_column(true)
-    end, { buffer = bufnr, silent = true, nowait = true })
-
-    vim.keymap.set('n', '<Down>', function()
-        sort_column(false)
-    end, { buffer = bufnr, silent = true, nowait = true })
+    bind_grid_maps()
 
     populate_buffer()
+
+    if config.options.edit_enabled and original_query then
+        require('vim-teradata.edit').attach(bufnr, original_query, {
+            data             = vim.deepcopy(data),
+            populate         = populate_buffer,
+            rebind_grid_maps = bind_grid_maps,
+        })
+    end
 end
 
 --- Displays an error message from a BTEQ execution.
@@ -289,6 +330,7 @@ function M.display_help()
         ':nTDF: format current + next n-1 statements',
         'TDFF: format all statements in buffer',
         'TDSync: export ddl for autocompletion',
+        'Result buffer: <E> edit mode, <CR> edit cell, <X> set NULL, <S> save, <C> cancel',
         'TDHelp: Display this help',
     }
     vim.cmd('belowright 13split')
