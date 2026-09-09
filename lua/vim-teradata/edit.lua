@@ -750,6 +750,12 @@ end
 --- `<cr>` is repurposed as "edit the cell under the cursor".
 local GRID_MAPS = { '<cr>', '-', '<bs>', 'u', '<Up>', '<Down>' }
 
+local function is_cr(key)
+    if not key then return false end
+    local k = key:lower()
+    return k == '<cr>' or k == '<enter>' or k == '<return>'
+end
+
 local function lock_grid_maps(bufnr)
     local maps = config.options.edit_keymaps
     for _, lhs in ipairs(GRID_MAPS) do
@@ -763,14 +769,22 @@ local function lock_grid_maps(bufnr)
             end, { buffer = bufnr, silent = true, nowait = true })
         end
     end
+    if maps.edit_cell and not is_cr(maps.edit_cell) then
+        vim.keymap.set('n', maps.edit_cell, function() M.edit_cell(bufnr) end,
+            { buffer = bufnr, silent = true, nowait = true })
+    end
 end
 
 local function unlock_grid_maps(bufnr)
     -- ui.display_output re-registers the grid mappings through populate_buffer's
     -- owner; simply deleting ours restores nothing, so ui exposes a re-bind hook.
     local st = state[bufnr]
+    local maps = config.options.edit_keymaps
     for _, lhs in ipairs(GRID_MAPS) do
         pcall(vim.keymap.del, 'n', lhs, { buffer = bufnr })
+    end
+    if maps.edit_cell and not is_cr(maps.edit_cell) then
+        pcall(vim.keymap.del, 'n', maps.edit_cell, { buffer = bufnr })
     end
     if st and st.rebind_grid_maps then st.rebind_grid_maps() end
 end
@@ -975,8 +989,6 @@ function M.attach(bufnr, sql, opts)
     vim.keymap.set('n', maps.save, function() M.save(bufnr) end,
         { buffer = bufnr, silent = true, nowait = true })
     vim.keymap.set('n', maps.cancel, function() M.cancel(bufnr) end,
-        { buffer = bufnr, silent = true, nowait = true })
-    vim.keymap.set('n', maps.edit_cell, function() M.edit_cell(bufnr) end,
         { buffer = bufnr, silent = true, nowait = true })
     vim.keymap.set('n', maps.set_null, function() M.set_cell_null(bufnr) end,
         { buffer = bufnr, silent = true, nowait = true })
