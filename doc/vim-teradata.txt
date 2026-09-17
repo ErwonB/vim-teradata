@@ -328,7 +328,28 @@ edit_keymaps ~
 
     Result-buffer local mappings for edit mode.
 
-                                                  *vim-teradata-opt-filter_db*
+                                           *vim-teradata-opt-rerun_keymaps*
+rerun_keymaps ~
+    Type: `table`   Default: `{ sql = "g.", result = "." }`
+
+    Mappings that re-run the latest query (see |:TDRerun|).
+
+        sql     installed in every Teradata buffer.
+        result  installed in every result buffer.
+
+    The two defaults differ on purpose: in a Teradata buffer `.` must keep
+    its normal meaning (repeat the last change), so the mnemonic `g.` is
+    used instead. A result buffer is 'nofile' and non-modifiable, there is
+    no change to repeat, so plain `.` is free there.
+
+    Set either entry to `nil` or `""` to skip that mapping: >lua
+
+        rerun_keymaps = { sql = '<leader>rr', result = '.' }
+<
+    While a result buffer is in edit mode the mapping refuses to run and
+    asks you to save or cancel first.
+
+                                                   *vim-teradata-opt-filter_db*
 filter_db ~
     Type: `string|nil`        Default: `nil`
 
@@ -434,6 +455,21 @@ cursor plus the next two.
 :[range]TDMV    Multistatement run for the visual selection. Splits on
                 `;` but submits as one BTEQ job.
 
+                                                                  *:TDRerun*
+:TDRerun        Re-run the most recent query, exactly as it was sent. The
+                re-run is a new BTEQ job: it gets its own history id and
+                its own line in |:TDJ|. Also bound to `g.` in Teradata
+                buffers and to `.` in result buffers, see
+                |vim-teradata-opt-rerun_keymaps|.
+
+                The refreshed grid replaces the result of the latest query
+                wherever that result is on screen: press the key inside
+                that buffer, or from the Teradata buffer you ran it from,
+                and the same window is reused. If the result window has
+                been closed, or you are looking at an OLDER result, the
+                new grid opens in its own split, so nothing you are still
+                reading is thrown away.
+
 ------------------------------------------------------------------------------
 7.2 History & search                                *vim-teradata-cmd-history*
 
@@ -520,6 +556,11 @@ i_CTRL-X CTRL-U    Trigger Teradata user-defined completion. Inserts
 In addition, the entries of |vim-teradata-opt-keymaps| are installed as
 normal-mode mappings buffer-locally. See |vim-teradata-default-keymaps| for
 a recommended set.
+
+                                                        *vim-teradata-g_dot*
+g.                 Re-run the latest query (|:TDRerun|). In result buffers
+                   the same action is bound to `.` instead. Both keys come
+                   from |vim-teradata-opt-rerun_keymaps|.
 
 ------------------------------------------------------------------------------
 8.2 OPE operations                                          *vim-teradata-ope*

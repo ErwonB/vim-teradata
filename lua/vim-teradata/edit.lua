@@ -1002,6 +1002,15 @@ function M.attach(bufnr, sql, opts)
     M.decorate(bufnr)
 end
 
+--- Returns true when `bufnr` is in edit mode, i.e. the grid is locked and
+--- there may be pending changes. Anything that rebuilds the grid must bail.
+--- @param bufnr integer
+--- @return boolean
+function M.is_editing(bufnr)
+    local st = state[bufnr]
+    return st ~= nil and st.editing == true
+end
+
 --- Exposed for tests.
 function M._state(bufnr) return state[bufnr] end
 

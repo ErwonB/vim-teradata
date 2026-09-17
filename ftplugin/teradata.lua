@@ -97,6 +97,7 @@ vim.api.nvim_buf_create_user_command(bufnr, 'TDF', ope.format_current_statement,
 vim.api.nvim_buf_create_user_command(bufnr, 'TDFF', ope.format_all_statements, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDSync', util.export_db_data, { nargs = 0 })
 vim.api.nvim_buf_create_user_command(bufnr, 'TDCodeAction', code_actions.run, { nargs = 0 })
+vim.api.nvim_buf_create_user_command(bufnr, 'TDRerun', function() bteq.rerun_latest() end, { nargs = 0 })
 
 -- Setup Autocomplete Provider
 local registered = register_td_provider()
@@ -137,3 +138,14 @@ for key, action in pairs(config.options.keymaps) do
 
     vim.keymap.set('n', key, keymap_func, { desc = description, buffer = bufnr })
 end
+
+-- Re-run the latest query. Deliberately not '.': that stays Vim's repeat.
+local rerun_key = (config.options.rerun_keymaps or {}).sql
+if rerun_key and rerun_key ~= '' then
+    vim.keymap.set('n', rerun_key, function() bteq.rerun_latest() end, {
+        desc = 'Teradata: re-run latest query',
+        buffer = bufnr,
+        silent = true,
+    })
+end
+

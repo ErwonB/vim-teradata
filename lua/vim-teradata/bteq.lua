@@ -91,6 +91,37 @@ local function get_node_statements(count)
     return vim.tbl_map(function(n) return vim.treesitter.get_node_text(n, buf) end, nodes)
 end
 
+-- The most recent 'output' job, as submitted to BTEQ. Written by
+-- run_single_query, replayed by M.rerun_latest(). Only 'output' jobs are
+-- tracked: a syntax check has no result set to refresh.
+--- @type table|nil  { sql = string, id = string }
+local last_run = nil
+
+--- Returns true when `id` is the id of the most recent output query.
+--- @param id string|nil
+--- @return boolean
+function M.is_latest_query(id)
+    return last_run ~= nil and id ~= nil and tostring(id) == last_run.id
+end
+
+--- Finds the window that currently displays the result buffer of query `id`.
+--- Windows of the current tabpage win over windows of other tabpages.
+--- @param id string|nil
+--- @return integer|nil winid
+local function find_result_win(id)
+    if not id then return nil end
+    local function scan(wins)
+        for _, win in ipairs(wins) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            local ok, buf_id = pcall(vim.api.nvim_buf_get_var, buf, 'teradata_query_id')
+            if ok and tostring(buf_id) == tostring(id) then
+                return win
+            end
+        end
+    end
+    return scan(vim.api.nvim_tabpage_list_wins(0)) or scan(vim.api.nvim_list_wins())
+end
+
 local function run_single_query(sql, operation, handle_result)
     if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
@@ -127,6 +158,9 @@ local function run_single_query(sql, operation, handle_result)
         output_path = util.get_history_path('resultsets_dir_name') .. '/' .. id .. '.csv'
         vim.fn.writefile(vim.split(sql, '\n'), query_path)
         context = { query_id = id, result_path = output_path }
+        -- Keep the raw SQL, not clean_sql: a re-run must go through the same
+        -- replacement / terminator handling as the original submission.
+        last_run = { sql = sql, id = id }
     else
         output_path = vim.fn.tempname()
     end
@@ -271,11 +305,13 @@ local function join_multistatement(sqls)
     return table.concat(lines, '\n')
 end
 
-local function output_callback(res, context)
+--- @param display_opts table|nil forwarded to ui.display_output,
+---                      e.g. { reuse_win = 1001 }
+local function output_callback_with(res, context, display_opts)
     if res.rc == 0 then
         local result_path = context.result_path
         if vim.fn.getfsize(result_path) > 0 then
-            ui.display_output(result_path, context.query_id)
+            ui.display_output(result_path, context.query_id, display_opts)
             local actual_lines = util.extract_rows_found(res.log_content)
             if actual_lines and actual_lines > config.options.retlimit then
                 vim.notify(
@@ -290,6 +326,37 @@ local function output_callback(res, context)
         ui.display_error(res.msg)
     end
 end
+
+local function output_callback(res, context)
+    output_callback_with(res, context)
+end
+
+--- Re-runs the SQL of the latest output query as a brand new BTEQ job, so it
+--- gets its own history id and its own line in the job manager.
+--- @param opts table|nil { reuse_win = integer }  window whose result buffer
+---             is replaced by the new grid. Optional: when it is absent or
+---             stale, the window still showing the previous result of this
+---             same query is used, so `g.` from a SQL buffer refreshes the
+---             grid on screen instead of stacking another split.
+function M.rerun_latest(opts)
+    if not last_run then
+        return vim.notify('No query has been run yet.', vim.log.levels.WARN, { title = 'Teradata' })
+    end
+
+    local reuse_win = opts and opts.reuse_win or nil
+    -- Captured now: run_single_query overwrites last_run with the id of the job
+    -- it is about to start, so by callback time last_run.id is the NEW result.
+    local prev_id = last_run.id
+
+    run_single_query(last_run.sql, 'output', function(res, context)
+        local target = reuse_win
+        if not target or not vim.api.nvim_win_is_valid(target) then
+            target = find_result_win(prev_id)
+        end
+        output_callback_with(res, context, { reuse_win = target })
+    end)
+end
+
 
 
 -- Node-based multistatement output (supports count: :3TDM)

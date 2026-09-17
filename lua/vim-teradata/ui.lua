@@ -4,10 +4,40 @@ local bookmark = require('vim-teradata.bookmark')
 local explain = require('vim-teradata.explain')
 local M = {}
 
+--- Binds "re-run the latest query" in a result buffer.
+--- When the buffer holds the result of the LATEST query the fresh grid replaces
+--- it in this very window; for any older result the new grid opens in its own
+--- split, so browsing history is never destructive.
+--- @param bufnr integer
+--- @param result_id string id of the query that produced this buffer
+local function bind_rerun_map(bufnr, result_id)
+    local key = (config.options.rerun_keymaps or {}).result
+    if not key or key == '' then return end
+    vim.keymap.set('n', key, function()
+        if require('vim-teradata.edit').is_editing(bufnr) then
+            return vim.notify('Save or cancel your edits before re-running.',
+                vim.log.levels.WARN, { title = 'Teradata' })
+        end
+        local bteq = require('vim-teradata.bteq')
+        local reuse_win = nil
+        if bteq.is_latest_query(result_id) then
+            reuse_win = vim.api.nvim_get_current_win()
+        end
+        bteq.rerun_latest({ reuse_win = reuse_win })
+    end, {
+        buffer = bufnr,
+        silent = true,
+        nowait = true,
+        desc = 'Teradata: re-run latest query',
+    })
+end
+
 --- Post-processes and displays a query result file in a custom interactive buffer.
 --- @param file_path string Path to the result file.
 --- @param query_id string|nil Optional query ID for buffer naming.
-function M.display_output(file_path, query_id)
+--- @param opts table|nil { reuse_win = integer } replace the result buffer
+---             already shown in that window instead of opening a new split.
+function M.display_output(file_path, query_id, opts)
     local lines = vim.fn.readfile(file_path)
     if #lines == 0 then
         vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
@@ -29,14 +59,30 @@ function M.display_output(file_path, query_id)
         data[i] = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, row)
     end
 
-    vim.cmd.set('splitbelow')
     local buffer_name = query_id and 'Teradata Result - ' .. query_id or 'Teradata Result'
-    vim.cmd.split(buffer_name)
+    local reuse_win = opts and opts.reuse_win or nil
+    if reuse_win and vim.api.nvim_win_is_valid(reuse_win) then
+        -- Same query as the one already on screen: swap the grid in place instead
+        -- of stacking another split. The outgoing buffer is bufhidden=wipe, so it
+        -- and its edit state are discarded by :enew.
+        vim.api.nvim_set_current_win(reuse_win)
+        vim.cmd.enew()
+        pcall(vim.api.nvim_buf_set_name, 0, buffer_name)
+    else
+        vim.cmd.set('splitbelow')
+        vim.cmd.split(buffer_name)
+    end
     vim.bo.buftype = 'nofile'
     vim.bo.bufhidden = 'wipe'
     vim.bo.swapfile = false
     vim.opt_local.wrap = false
     local bufnr = vim.api.nvim_get_current_buf()
+
+    -- History files are named <id>.csv, so the id is recoverable even when
+    -- display_output is called without one (e.g. from the history browser).
+    local result_id = vim.fn.fnamemodify(file_path, ':t:r')
+    vim.api.nvim_buf_set_var(bufnr, 'teradata_query_id', result_id)
+    bind_rerun_map(bufnr, result_id)
 
     vim.api.nvim_buf_set_var(bufnr, 'teradata_all_data', vim.deepcopy(data))
     vim.api.nvim_buf_set_var(bufnr, 'teradata_all_header', vim.deepcopy(header))
@@ -320,6 +366,9 @@ function M.display_help()
         'TDV    output visual selection',
         ':nTDM  multistatement output n nodes in 1 BTEQ job',
         'TDMV   multistatement visual (splits on ; → 1 BTEQ job)',
+        string.format('%-6s re-run latest query (%s in a result buffer, or :TDRerun)',
+            (config.options.rerun_keymaps or {}).sql or 'g.',
+            (config.options.rerun_keymaps or {}).result or '.'),
         'TDH: Show query history',
         'TDR: Search query history with FZF',
         'TDU: Manage users',

@@ -45,6 +45,11 @@ M.defaults = {
         save      = 'S',      -- generate the UPDATE statements
         cancel    = 'C',      -- discard pending changes
     },
+    -- re-run the latest query; '.' echoes Vim's "repeat the last change"
+    rerun_keymaps = {
+        sql    = 'g.', -- teradata buffers ('.' is left to Vim's repeat)
+        result = '.',  -- result buffers (nothing to repeat there, so '.' is free)
+    },
     -- Users list
     users = {},
     current_user_index = nil,
