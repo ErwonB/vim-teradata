@@ -855,7 +855,7 @@ function M.show_jobs()
             line_to_id[i + 2] = id -- header + sep
         end
         local ns = vim.api.nvim_create_namespace("HelperBuffer")
-        local ext = '<Enter> Open  <k> Cancel  <d> Remove'
+        local ext = '<Enter> Open  <x> Cancel  <d> Remove'
         vim.bo.modifiable = true
         table.insert(lines, '')
         vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
@@ -908,7 +908,7 @@ function M.show_jobs()
         local job = util.jobs_get(id)
         if not job then return end
         if job.status == 'running' then
-            return vim.notify('Job is running. Cancel it first (k).', vim.log.levels.WARN)
+            return vim.notify('Job is running. Cancel it first (x).', vim.log.levels.WARN)
         end
         util.remove_files(job.query_path or '')
         util.remove_files(job.result_path or '')
