@@ -66,13 +66,14 @@ function M.pick_completion(items, context, opts, on_select)
     })
 end
 
-function M.pick_basic(columns, callback)
+function M.pick_basic(columns, callback, opts)
     local items = {}
     for _, c in ipairs(columns) do
         table.insert(items, { text = c, item = c })
     end
+    local title = (opts and opts.prompt) or "Select Columns (Tab to multi-select)"
     require("snacks").picker({
-        title = "Select Columns (Tab to multi-select)",
+        title = title,
         items = items,
         format = "text",
         layout = "select",
@@ -90,6 +91,30 @@ function M.pick_basic(columns, callback)
                     table.insert(result, item.item)
                 end
                 callback(result)
+            end,
+        }
+    })
+end
+
+function M.pick_one(items_list, callback, opts)
+    local items = {}
+    for _, it in ipairs(items_list) do
+        table.insert(items, { text = it, item = it })
+    end
+    local title = (opts and opts.prompt) or "Select Item"
+    require("snacks").picker({
+        title = title,
+        items = items,
+        format = "text",
+        layout = "select",
+        actions = {
+            confirm = function(p, item)
+                p:close()
+                if item then
+                    callback(item.item)
+                else
+                    callback(nil)
+                end
             end,
         }
     })

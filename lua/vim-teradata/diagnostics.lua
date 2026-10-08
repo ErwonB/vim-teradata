@@ -79,52 +79,62 @@ end
 -- Treesitter Queries
 -- =============================================================================
 
-local ts_query = vim.treesitter.query
-local parse_query = ts_query.parse or ts_query.parse_query
-
-local QUERIES = {
-    alias_def = parse_query("teradata", [[ (relation alias: (identifier) @alias_definition) ]]),
-    alias_use = parse_query("teradata",
-        [[ (select_expression (term value: (field (object_reference name: (identifier) @alias_usage)))) ]]),
-    union_select = parse_query("teradata", [[ (set_operation (select (select_expression) @select_expr)) ]]),
-    union_block = parse_query("teradata", [[ (set_operation) @union_block ]]),
-    subquery_select = parse_query("teradata", [[ (subquery (select (select_expression) @sub_select_expr)) ]]),
-    relation = parse_query("teradata", [[ (relation) @relation ]]),
-    statement = parse_query("teradata", [[ (statement) @stmt ]]),
-    cte_def = parse_query("teradata", [[
+local QUERY_SRC = {
+    alias_def = [[ (relation alias: (identifier) @alias_definition) ]],
+    alias_use = [[ (select_expression (term value: (field (object_reference name: (identifier) @alias_usage)))) ]],
+    union_select = [[ (set_operation (select (select_expression) @select_expr)) ]],
+    union_block = [[ (set_operation) @union_block ]],
+    subquery_select = [[ (subquery (select (select_expression) @sub_select_expr)) ]],
+    relation = [[ (relation) @relation ]],
+    statement = [[ (statement) @stmt ]],
+    cte_def = [[
         (cte
             (identifier) @cte_name
             (statement) @cte_body
         ) @cte
-    ]]),
+    ]],
 
-    select_output_alias = parse_query("teradata", [[
+    select_output_alias = [[
     (select_expression
       (term
         alias: (identifier) @output_alias
       )
     )
-  ]]),
+  ]],
 
-    qualified_field = parse_query("teradata", [[
+    qualified_field = [[
     (field
       (object_reference name: (identifier) @qualifier)
       name: (identifier) @col_name
     ) @field
-  ]]),
+  ]],
 
-    bare_field = parse_query("teradata", [[
+    bare_field = [[
     (field name: (identifier) @col)
-  ]]),
+  ]],
 
-    syntax_error = parse_query("teradata", [[ (ERROR) @error ]]),
+    syntax_error = [[ (ERROR) @error ]],
 
-    join_nodes     = parse_query("teradata", [[ (join) @join ]]),
-    select_exprs   = parse_query("teradata", [[ (select (select_expression) @sel_expr) ]]),
-    group_by_nodes = parse_query("teradata", [[ (group_by) @gb ]]),
-    cte_select_exp = parse_query("teradata", [[ (cte (statement (select (select_expression) @cte_sel_expr))) ]]),
-    invocation_nod = parse_query("teradata", [[ (invocation) @inv ]]),
+    join_nodes     = [[ (join) @join ]],
+    select_exprs   = [[ (select (select_expression) @sel_expr) ]],
+    group_by_nodes = [[ (group_by) @gb ]],
+    cte_select_exp = [[ (cte (statement (select (select_expression) @cte_sel_expr))) ]],
+    invocation_nod = [[ (invocation) @inv ]],
 }
+
+local QUERIES = setmetatable({}, {
+    __index = function(tbl, key)
+        local src = QUERY_SRC[key]
+        if not src then return nil end
+        local parse_fn = vim.treesitter.query.parse
+        local ok, q = pcall(parse_fn, "teradata", src)
+        if not ok then
+            return nil
+        end
+        rawset(tbl, key, q)
+        return q
+    end,
+})
 
 -- =============================================================================
 -- Helper Functions
@@ -497,7 +507,7 @@ end
 -- Logic: Schema Analysis (Scoped with boundary check)
 -- =============================================================================
 
-function analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
+analyze_relations = function(scope_nodes, bufnr, diagnostics, cte_defs)
     local relation_map = {}
     local active_tables_list = {}
     local temp_rels = {}
@@ -1181,7 +1191,7 @@ end
 -- Main Processing Logic (Scope Builder)
 -- =============================================================================
 
-function get_query_scopes(root_node)
+get_query_scopes = function(root_node)
     local scopes = {}
 
     local function traverse(node)
@@ -1267,35 +1277,77 @@ end
 -- Public API
 -- =============================================================================
 
+local last_tick = {}
+local warned_parser = false
+
+function M.invalidate(bufnr)
+    if bufnr then
+        last_tick[bufnr] = nil
+    end
+end
+
+function M.invalidate_all()
+    last_tick = {}
+end
+
+function M.forget(bufnr)
+    if bufnr then
+        last_tick[bufnr] = nil
+    end
+end
+
 function M.update_diagnostics(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
+    if not vim.api.nvim_buf_is_valid(bufnr) then return end
+
+    local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+    if last_tick[bufnr] == tick then
+        return
+    end
 
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "teradata")
-    if not ok or not parser then return end
-
-    local trees = parser:parse()
-    if not trees then return end
-
-    local diagnostics = {}
-    for _, tree in ipairs(trees) do
-        local root = tree:root()
-
-        for _, node in QUERIES.syntax_error:iter_captures(root, bufnr, 0, -1) do
-            add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR, get_syntax_error_message(node, bufnr))
+    if not ok or not parser then
+        if not warned_parser then
+            warned_parser = true
+            vim.notify("Teradata tree-sitter parser not available; diagnostics disabled", vim.log.levels.WARN)
         end
-
-        for _, stmt_node in QUERIES.statement:iter_captures(root, bufnr, 0, -1) do
-            process_statement(stmt_node, bufnr, diagnostics)
-        end
+        return
     end
-    vim.diagnostic.reset(NAMESPACE, bufnr)
-    vim.diagnostic.set(NAMESPACE, bufnr, diagnostics)
+
+    local parse_ok, trees = pcall(function() return parser:parse() end)
+    if not parse_ok or not trees or #trees == 0 then return end
+
+    local result = {}
+    local run_ok, err = pcall(function()
+        for _, tree in ipairs(trees) do
+            local root = tree:root()
+            if QUERIES.syntax_error then
+                for _, node in QUERIES.syntax_error:iter_captures(root, bufnr, 0, -1) do
+                    add_diagnostic(result, node, bufnr, SEVERITY.ERROR, get_syntax_error_message(node, bufnr))
+                end
+            end
+
+            if QUERIES.statement then
+                for _, stmt_node in QUERIES.statement:iter_captures(root, bufnr, 0, -1) do
+                    process_statement(stmt_node, bufnr, result)
+                end
+            end
+        end
+    end)
+
+    if not run_ok then
+        return
+    end
+
+    last_tick[bufnr] = tick
+    vim.diagnostic.set(NAMESPACE, bufnr, result)
 end
 
 -- =============================================================================
 -- Shared helpers (used by code_actions.lua)
 -- =============================================================================
 
+M.NAMESPACE = NAMESPACE
 M.QUERIES = QUERIES
 M.get_query_scopes = get_query_scopes
 M.analyze_relations = analyze_relations

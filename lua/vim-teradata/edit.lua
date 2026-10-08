@@ -16,6 +16,7 @@
 
 local config = require('vim-teradata.config')
 local tsu    = require('vim-teradata.ts-util')
+local grid   = require('vim-teradata.grid_state')
 
 local M = {}
 
@@ -248,9 +249,6 @@ function M.analyze(sql)
     if #statements > 1 then return no('multistatement results are not editable') end
 
     local stmt = statements[1]
-    if tsu.any_capture and root:has_error() then
-        -- keep going: BTEQ accepted the query, a grammar hiccup should not block us
-    end
 
     local select_node = tsu.child_by_type(stmt, 'select')
     if not select_node then return no('not a SELECT statement') end
@@ -411,8 +409,8 @@ end
 -- =============================================================================
 
 local function buf_var(bufnr, name, default)
-    local ok, value = pcall(vim.api.nvim_buf_get_var, bufnr, name)
-    if ok then return value end
+    local v = grid.get(bufnr, (name:gsub('^teradata_', '')))
+    if v ~= nil then return v end
     return default
 end
 
@@ -473,7 +471,7 @@ local function apply_to_grid(bufnr, i, j, value)
     local displayed = buf_var(bufnr, 'teradata_displayed_data')
     if not displayed or not displayed[i] then return end
     displayed[i][j] = value
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed)
+    grid.set(bufnr, 'displayed_data', displayed)
 end
 
 --- Computes the byte offset at which displayed column `j` starts.
@@ -815,7 +813,7 @@ function M.cancel(bufnr)
 
     -- restore the grid data as it was when edit mode was entered
     if st.grid_snapshot then
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', st.grid_snapshot)
+        grid.set(bufnr, 'displayed_data', st.grid_snapshot)
         st.grid_snapshot = nil
     end
 
@@ -864,7 +862,7 @@ local function execute(bufnr, statements)
                 end
             end
             if all_data then
-                vim.api.nvim_buf_set_var(bufnr, 'teradata_all_data', all_data)
+                grid.set(bufnr, 'all_data', all_data)
             end
 
             st.editing = false

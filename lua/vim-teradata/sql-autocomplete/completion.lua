@@ -13,25 +13,63 @@ local Kind = {
 
 local M = {}
 
+local warned_no_parser = false
+local ctx_cache = { key = nil, value = nil }
 
 --- Analyzes SQL context around the cursor to determine completion type and relevant tables or databases.
 --- @return table A context table containing completion type and metadata.
 local function analyze_sql_context()
-    local context
     local buf = vim.api.nvim_get_current_buf()
+    local cur = vim.api.nvim_win_get_cursor(0)
+    local key = table.concat({ buf, vim.api.nvim_buf_get_changedtick(buf), cur[1], cur[2] }, ':')
+    if ctx_cache.key == key then
+        return vim.tbl_extend('force', {}, ctx_cache.value) -- callers reassign fields; shallow copy is enough
+    end
 
     local ok, parser = pcall(vim.treesitter.get_parser, buf, 'teradata')
     if not ok or not parser then
-        vim.notify('Could not load sql treesitter parser to enable sql autocompletion', vim.log.levels.INFO)
-    else
-        context = ts.analyze_sql_context()
+        if not warned_no_parser then
+            warned_no_parser = true
+            vim.notify('[vim-teradata] teradata tree-sitter parser not found; SQL completion disabled (:checkhealth vim-teradata)',
+                vim.log.levels.WARN)
+        end
+        return {}
     end
-
-    return context or {}
+    local context = ts.analyze_sql_context() or {}
+    ctx_cache = { key = key, value = context }
+    return vim.tbl_extend('force', {}, context)
 end
 
+--- Flat, de-duplicated column candidates for a 'columns' context.
+local function collect_column_candidates(context)
+    local prefix = context.alias_prefix
+    local has_prefix = prefix and prefix ~= ''
+    local up = has_prefix and string.upper(prefix) or nil
 
+    if has_prefix then
+        context.tables = vim.tbl_filter(function(t) return t.alias == up end, context.tables or {})
+    end
+    local res = utils.get_columns(context.tables) or {}
 
+    local entries = context.buffer_fields or {}
+    if has_prefix then
+        entries = vim.tbl_filter(function(e) return string.upper(e.alias or '') == up end, entries)
+    end
+    local seen_lists, seen_fields = {}, {}
+    for _, entry in ipairs(entries) do
+        local list = entry.field_list
+        if list and not seen_lists[list] then
+            seen_lists[list] = true
+            for _, name in ipairs(list) do
+                if not seen_fields[name] then
+                    seen_fields[name] = true
+                    res[#res + 1] = name
+                end
+            end
+        end
+    end
+    return res
+end
 
 --- Provides manual SQL completion items or the start column for completion.
 --- @param findstart number Indicates whether to find the start column (1) or return completion items (0).
@@ -40,7 +78,7 @@ function M.complete_manual(findstart)
     if findstart == 1 then
         local line = vim.api.nvim_get_current_line()
         local col  = vim.api.nvim_win_get_cursor(0)[2]
-        while col > 0 and line:sub(col, col):match('%w') do
+        while col > 0 and line:sub(col, col):match('[%w_$#]') do
             col = col - 1
         end
         return col
@@ -52,47 +90,7 @@ function M.complete_manual(findstart)
         local fzf_options = ""
 
         if context.type == 'columns' then
-            if context.alias_prefix then
-                context.tables = vim.tbl_filter(function(item)
-                    return item.alias == string.upper(context.alias_prefix)
-                end, context.tables)
-            end
-            res = utils.get_columns(context.tables)
-            local candidate_entries
-
-            if context.alias_prefix and context.alias_prefix ~= "" then
-                candidate_entries = vim.tbl_filter(function(item)
-                    return string.upper(item.alias) == string.upper(context.alias_prefix)
-                end, context.buffer_fields)
-            else
-                candidate_entries = context.buffer_fields
-            end
-
-            local seen_lists       = {}
-            local unique_field_lists = {}
-
-            for _, entry in ipairs(candidate_entries) do
-                local list = entry.field_list
-                if not seen_lists[list] then
-                    seen_lists[list] = true
-                    table.insert(unique_field_lists, list)
-                end
-            end
-
-            local seen_fields  = {}
-            local final_flat_list = {}
-
-            for _, list in ipairs(unique_field_lists) do
-                for _, field_name in ipairs(list) do
-                    if not seen_fields[field_name] then
-                        seen_fields[field_name] = true
-                        table.insert(final_flat_list, field_name)
-                    end
-                end
-            end
-
-            res = res or {}
-            vim.list_extend(res, final_flat_list)
+            res = collect_column_candidates(context)
             fzf_options = "--multi"
         elseif context.type == 'tables' then
             res = utils.get_tables(context.db_name)
@@ -123,45 +121,7 @@ function M.complete_items()
 
     if context.type == 'columns' then
         context_kind = Kind.Field
-        if context.alias_prefix then
-            context.tables = vim.tbl_filter(function(item)
-                return item.alias == string.upper(context.alias_prefix)
-            end, context.tables)
-        end
-        context_results = utils.get_columns(context.tables)
-        local candidate_entries
-
-        if context.alias_prefix and context.alias_prefix ~= "" then
-            candidate_entries = vim.tbl_filter(function(item)
-                return string.upper(item.alias) == string.upper(context.alias_prefix)
-            end, context.buffer_fields)
-        else
-            candidate_entries = context.buffer_fields
-        end
-
-        local seen_lists       = {}
-        local unique_field_lists = {}
-        for _, entry in ipairs(candidate_entries) do
-            local list = entry.field_list
-            if not seen_lists[list] then
-                seen_lists[list] = true
-                table.insert(unique_field_lists, list)
-            end
-        end
-
-        local seen_fields  = {}
-        local final_flat_list = {}
-        for _, list in ipairs(unique_field_lists) do
-            for _, field_name in ipairs(list) do
-                if not seen_fields[field_name] then
-                    seen_fields[field_name] = true
-                    table.insert(final_flat_list, field_name)
-                end
-            end
-        end
-
-        context_results = context_results or {}
-        vim.list_extend(context_results, final_flat_list)
+        context_results = collect_column_candidates(context)
     elseif context.type == 'tables' then
         context_kind    = Kind.Struct
         context_results = utils.get_tables(context.db_name)
@@ -252,13 +212,12 @@ local function handle_selection(selected, context)
     -- Check if we are at the end of the line
     if target_col >= #current_line and #current_line > 0 then
         vim.api.nvim_win_set_cursor(0, { context.start_row + 1, #current_line - 1 })
-        vim.api.nvim_feedkeys('a', 'n', false)
+        vim.cmd.startinsert({ bang = true })
     else
         vim.api.nvim_win_set_cursor(0, { context.start_row + 1, target_col })
-        vim.api.nvim_feedkeys('i', 'n', false)
+        vim.cmd.startinsert()
     end
 end
-
 
 --- Triggers SQL completion and handles user selection.
 --- @return nil
@@ -268,7 +227,7 @@ function M.trigger_completion()
 
     local completion_data = M.complete_manual(0)
     if not completion_data or not next(completion_data.items) then
-        print("No completions found.")
+        vim.notify("No completions found.", vim.log.levels.INFO)
         return
     end
 
@@ -286,5 +245,22 @@ function M.trigger_completion()
         handle_selection
     )
 end
+
+--- 'omnifunc' implementation: <C-x><C-o> works with zero plugins.
+function M.omnifunc(findstart, base)
+    if findstart == 1 then
+        return M.complete_manual(1)
+    end
+    local b = (base or ''):lower()
+    local res = {}
+    for _, it in ipairs(M.complete_items()) do
+        if b == '' or it.label:lower():sub(1, #b) == b then
+            res[#res + 1] = { word = it.label, abbr = it.label }
+        end
+    end
+    return res
+end
+
+M._collect_column_candidates = collect_column_candidates
 
 return M

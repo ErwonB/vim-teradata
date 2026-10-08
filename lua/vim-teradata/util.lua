@@ -15,9 +15,72 @@ function M.remove_files(...)
     end
 end
 
+--- Splits SQL on top-level ';' ignoring ';' inside '...', "...", -- comments and /* */ comments.
+--- Limitation: BEGIN...END bodies of stored procedures contain top-level ';'; for those
+--- callers should prefer tree-sitter statement nodes.
+---@param sql string
+---@return string[]
+function M.split_statements(sql)
+    local stmts, start, i, n = {}, 1, 1, #sql
+    local function push(stop)
+        local s = sql:sub(start, stop):match('^%s*(.-)%s*$')
+        if s ~= '' then stmts[#stmts + 1] = s end
+    end
+    while i <= n do
+        local c, two = sql:sub(i, i), sql:sub(i, i + 1)
+        if c == "'" or c == '"' then
+            i = i + 1
+            while i <= n do
+                if sql:sub(i, i) == c then
+                    if sql:sub(i + 1, i + 1) == c then i = i + 2 else break end
+                else
+                    i = i + 1
+                end
+            end
+        elseif two == '--' then
+            i = sql:find('\n', i, true) or n
+        elseif two == '/*' then
+            local _, e = sql:find('*/', i + 2, true)
+            i = e or n
+        elseif c == ';' then
+            push(i - 1)
+            start = i + 1
+        end
+        i = i + 1
+    end
+    push(n)
+    return stmts
+end
+
+local _cache = {}
+--- Cached loader keyed by file mtime+size.
+function M.cached_read(path, loader)
+    local st = vim.uv.fs_stat(path)
+    if not st then return nil end
+    local key = ('%d:%d:%d'):format(st.mtime.sec, st.mtime.nsec, st.size)
+    local c = _cache[path]
+    if c and c.key == key then return c.value end
+    local v = loader(path)
+    _cache[path] = { key = key, value = v }
+    return v
+end
+
+--- Run `handler(item)` over `items` in slices, yielding to the event loop between slices.
+local function process_in_chunks(items, step, handler, done)
+    local i = 1
+    local function tick()
+        local stop = math.min(i + step - 1, #items)
+        for k = i, stop do handler(items[k]) end
+        i = stop + 1
+        if i <= #items then vim.schedule(tick) else done() end
+    end
+    tick()
+end
+
 --- Splits a temporary CSV file into per-database files and generates a summary file.
+--- @param on_done function|nil
 --- @return nil
-local function split_data_db_file_to_lua()
+local function split_data_db_file_to_lua(on_done)
     local input_filename = config.options.data_dir .. "/data_tmp.csv"
     local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
     local summary_filename = data_files_dir .. "/data.lua"
@@ -32,8 +95,15 @@ local function split_data_db_file_to_lua()
 
     local input_file = io.open(input_filename, "r")
     if not input_file then
+        if on_done then on_done() end
         return vim.notify("Error: Could not open the input file: " .. input_filename, vim.log.levels.ERROR)
     end
+
+    local lines = {}
+    for raw in input_file:lines() do
+        lines[#lines + 1] = raw
+    end
+    input_file:close()
 
     -- Helpers
     local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -57,7 +127,7 @@ local function split_data_db_file_to_lua()
     local unique_dbs = {} -- db -> true
 
     -- Parse lines
-    for raw in input_file:lines() do
+    process_in_chunks(lines, 5000, function(raw)
         local line = trim(raw or "")
         if line ~= "" then
             local parts = {}
@@ -74,56 +144,55 @@ local function split_data_db_file_to_lua()
                 vim.notify("Warning: Malformed line: " .. line, vim.log.levels.WARN)
             end
         end
-    end
-    input_file:close()
-
-    -- Write per-db files
-    for db_name, tables in pairs(per_db) do
-        local db_filename = data_files_dir .. "/" .. db_name .. ".lua"
-        local is_table = {}
-        table.insert(is_table, "is_table = {")
-        local f = io.open(db_filename, "w")
-        if f then
-            f:write("-- Auto-generated. Do not edit.\n")
-            f:write("return {\n")
-            for _, tname in ipairs(sorted_keys(tables)) do
-                table.insert(is_table, string.format('  ["%s"] = true,', escape_lua_string(tname)))
-                local cols = tables[tname]
-                table.sort(cols)
-                f:write(string.format('  ["%s"] = {', escape_lua_string(tname)))
-                for i, c in ipairs(cols) do
-                    f:write(string.format(' "%s"%s', escape_lua_string(c), i < #cols and "," or ""))
+    end, function()
+        -- Write per-db files
+        for db_name, tables in pairs(per_db) do
+            local db_filename = data_files_dir .. "/" .. db_name .. ".lua"
+            local is_table = {}
+            table.insert(is_table, "is_table = {")
+            local f = io.open(db_filename, "w")
+            if f then
+                f:write("-- Auto-generated. Do not edit.\n")
+                f:write("return {\n")
+                for _, tname in ipairs(sorted_keys(tables)) do
+                    table.insert(is_table, string.format('  ["%s"] = true,', escape_lua_string(tname)))
+                    local cols = tables[tname]
+                    table.sort(cols)
+                    f:write(string.format('  ["%s"] = {', escape_lua_string(tname)))
+                    for i, c in ipairs(cols) do
+                        f:write(string.format(' "%s"%s', escape_lua_string(c), i < #cols and "," or ""))
+                    end
+                    f:write(" },\n")
                 end
-                f:write(" },\n")
+                table.insert(is_table, "}")
+                f:write(table.concat(is_table, "\n"))
+                f:write("}\n")
+                f:close()
+            else
+                vim.notify("Error: Could not write file: " .. db_filename, vim.log.levels.ERROR)
             end
-            table.insert(is_table, "}")
-            f:write(table.concat(is_table, "\n"))
-            f:write("}\n")
-            f:close()
-        else
-            vim.notify("Error: Could not write file: " .. db_filename, vim.log.levels.ERROR)
         end
-    end
 
-    -- Write summary file
-    local summary_file = io.open(summary_filename, "w")
-    if summary_file then
-        summary_file:write("-- Auto-generated. Do not edit.\n")
-        summary_file:write("return {\n")
-        for _, db_name in ipairs(sorted_keys(unique_dbs)) do
-            summary_file:write(string.format('  ["%s"] = true,\n', escape_lua_string(db_name)))
+        -- Write summary file
+        local summary_file = io.open(summary_filename, "w")
+        if summary_file then
+            summary_file:write("-- Auto-generated. Do not edit.\n")
+            summary_file:write("return {\n")
+            for _, db_name in ipairs(sorted_keys(unique_dbs)) do
+                summary_file:write(string.format('  ["%s"] = true,\n', escape_lua_string(db_name)))
+            end
+            summary_file:write("}\n")
+            summary_file:close()
+        else
+            vim.notify("Error: Could not write summary file: " .. summary_filename, vim.log.levels.ERROR)
         end
-        summary_file:write("}\n")
-        summary_file:close()
-    else
-        vim.notify("Error: Could not write summary file: " .. summary_filename, vim.log.levels.ERROR)
-    end
+
+        if on_done then on_done() end
+    end)
 end
 
 local function load_databases(summary_file)
-    if not Schema.cache.db then
-        Schema.cache.db = assert(dofile(summary_file))
-    end
+    Schema.cache.db = M.cached_read(summary_file, dofile)
 end
 
 --- Return true if db_name is in the db file, false otherwise
@@ -173,9 +242,7 @@ local function load_tables(db_file, db)
     if not Schema.cache.tb then
         Schema.cache.tb = {}
     end
-    if not Schema.cache.tb[db] then
-        Schema.cache.tb[db] = assert(dofile(db_file))
-    end
+    Schema.cache.tb[db] = M.cached_read(db_file, dofile)
 end
 
 --- Return true if db_name is a the db files, false otherwise
@@ -189,7 +256,7 @@ function M.is_a_table(database, tablename)
     if vim.fn.filereadable(db_file) == 0 then return false end
 
     load_tables(db_file, db)
-    return Schema.cache.tb[db].is_table[tb]
+    return Schema.cache.tb[db] and Schema.cache.tb[db].is_table and Schema.cache.tb[db].is_table[tb]
 end
 
 --- Retrieves a list of unique tables from a database-specific CSV file.
@@ -205,7 +272,7 @@ function M.get_tables(database)
     load_tables(db_file, db)
 
     local tables = {}
-    for tb, _ in pairs(Schema.cache.tb[db].is_table or {}) do
+    for tb, _ in pairs((Schema.cache.tb[db] and Schema.cache.tb[db].is_table) or {}) do
         table.insert(tables, tb)
     end
     return tables
@@ -222,7 +289,7 @@ function M.is_a_column(database, tablename, columnname)
     if vim.fn.filereadable(db_file) == 0 then return false end
 
     load_tables(db_file, db)
-    for _, c in ipairs(Schema.cache.tb[db][tb] or {}) do
+    for _, c in ipairs((Schema.cache.tb[db] and Schema.cache.tb[db][tb]) or {}) do
         if c:upper() == col then
             return true
         end
@@ -242,7 +309,7 @@ function M.get_columns(table_db_tb)
 
             load_tables(db_file, item.db_name)
 
-            for _, col in ipairs(Schema.cache.tb[item.db_name][item.tb_name] or {}) do
+            for _, col in ipairs((Schema.cache.tb[item.db_name] and Schema.cache.tb[item.db_name][item.tb_name]) or {}) do
                 if col ~= "" and not seen[col] then
                     seen[col] = true
                     table.insert(acc, col)
@@ -258,29 +325,25 @@ end
 --- Runs a Teradata export script and processes the resulting data into structured files.
 --- @return nil
 function M.export_db_data()
-    local current_user = config.options.users[config.options.current_user_index]
-    local user = current_user.user
-    local tdpid = current_user.tdpid
-    local logon_mech = current_user.log_mech
-    local tpt_script = config.options.tpt_script
-
+    local current_user = M.get_current_user()
+    if not current_user then
+        return vim.notify('No Teradata user selected. Use :TDU.', vim.log.levels.WARN)
+    end
+    local tpt_script = require('vim-teradata.config').get_tpt_script()
+    if not tpt_script then
+        return vim.notify('TPT export script not found on runtimepath.', vim.log.levels.ERROR)
+    end
     local data_tmp = config.options.data_dir
-
+    if data_tmp:find("'", 1, true) then
+        return vim.notify("data_dir must not contain a single quote.", vim.log.levels.ERROR)
+    end
     local ok, msg = M.check_executables({ 'tbuild' })
-    if not ok then
-        return vim.notify(msg, vim.log.levels.ERROR)
-    end
-
-    if not user or not tdpid or not tpt_script or not logon_mech then
-        return vim.notify("Missing TD env variables", vim.log.levels.ERROR)
-    end
+    if not ok then return vim.notify(msg, vim.log.levels.ERROR) end
 
     local tbuild_command = {
-        "tbuild",
-        "-f",
-        tpt_script,
-        "-u",
-        string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'", user, logon_mech, tdpid, data_tmp)
+        'tbuild', '-f', tpt_script, '-u',
+        string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'",
+            current_user.user, current_user.log_mech, current_user.tdpid, data_tmp),
     }
 
     local data_tmp_file = data_tmp .. "/data_tmp.csv"
@@ -295,9 +358,14 @@ function M.export_db_data()
                 return
             end
 
-            split_data_db_file_to_lua()
-            M.remove_files(data_tmp_file)
-            vim.notify("TDSync: Completed successfully", vim.log.levels.INFO)
+            split_data_db_file_to_lua(function()
+                M.remove_files(data_tmp_file)
+                vim.notify("TDSync: Completed successfully", vim.log.levels.INFO)
+                local okd, diag = pcall(require, 'vim-teradata.diagnostics')
+                if okd and diag.invalidate_all then
+                    diag.invalidate_all()
+                end
+            end)
         end)
     end)
 end
@@ -368,10 +436,14 @@ end
 function M.load_config()
     local file = config.options.history_dir .. '/users.json'
     if vim.fn.filereadable(file) == 1 then
-        local content = vim.fn.readfile(file)
-        local data = vim.fn.json_decode(table.concat(content, '\n'))
-        config.options.users = data.users or {}
-        config.options.current_user_index = data.current_user_index
+        local ok, data = pcall(function()
+            local content = vim.fn.readfile(file)
+            return vim.fn.json_decode(table.concat(content, '\n'))
+        end)
+        if ok and type(data) == 'table' then
+            config.options.users = data.users or {}
+            config.options.current_user_index = data.current_user_index
+        end
     end
 end
 
@@ -384,6 +456,26 @@ function M.save_config()
     vim.fn.writefile({ vim.fn.json_encode(data) }, file)
 end
 
+function M.prune_history()
+    local max = config.options.history_max
+    if not max or max <= 0 then return end
+    local keep = {}
+    for _, j in ipairs(M.jobs_all()) do
+        if j.status == 'running' then
+            if j.query_path then keep[vim.fs.basename(j.query_path)] = true end
+            if j.result_path then keep[vim.fs.basename(j.result_path)] = true end
+        end
+    end
+    for _, name in ipairs({ 'queries_dir_name', 'resultsets_dir_name' }) do
+        local dir = M.get_history_path(name)
+        local files = vim.fn.readdir(dir)
+        table.sort(files) -- ids start with a timestamp: lexical == chronological
+        for i = 1, #files - max do
+            if not keep[files[i]] then vim.uv.fs_unlink(dir .. '/' .. files[i]) end
+        end
+    end
+end
+
 function M.formatString(s, width)
     local len = #s
     if len >= width then
@@ -393,10 +485,13 @@ function M.formatString(s, width)
     return padding .. s
 end
 
---- Generates a unique query ID based on timestamp and random number.
+--- Generates a unique query ID based on timestamp and a sequence/clock suffix.
 --- @return string The unique ID.
+local _seq = 0
 function M.get_unique_query_id()
-    return os.date('%Y%m%d%H%M%S_') .. math.random(1000, 9999)
+    _seq = _seq + 1
+    local us = math.floor(vim.uv.hrtime() / 1000)
+    return ('%s%02d%02d'):format(os.date('%Y%m%d%H%M%S_'), us % 100, _seq % 100)
 end
 
 -----------------------------------------------------------------------
@@ -441,10 +536,14 @@ end
 function M.jobs_cancel(id)
     local j = _jobs[id]
     if not j or j.status ~= 'running' or not j.handle then return false end
-    local ok = pcall(function() j.handle:kill(15) end) -- SIGTERM
+    -- Mark first so the exit callback sees 'canceled' and skips result handling.
     j.status = 'canceled'
     j.finished_at = os.time()
     j.message = 'Canceled'
+    local ok = pcall(function() j.handle:kill(15) end) -- SIGTERM
+    if not ok then
+        j.status, j.finished_at, j.message = 'running', nil, 'Started'
+    end
     return ok
 end
 

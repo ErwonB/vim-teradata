@@ -4,6 +4,10 @@ function source.new()
     return setmetatable({}, { __index = source })
 end
 
+function source:is_available()
+    return vim.bo.filetype == 'teradata'
+end
+
 function source:get_trigger_characters()
     return { '.' }
 end

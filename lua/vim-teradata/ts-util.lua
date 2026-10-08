@@ -208,6 +208,7 @@ end
 ---@param count integer
 ---@return TSNode[]
 function M.collect_next_sibling_statement_nodes(stmt_node, count)
+    if not stmt_node then return {} end
     local nodes = { stmt_node }
     local node = stmt_node
     while #nodes < count do

@@ -1,0 +1,33 @@
+local util = require('vim-teradata.util')
+
+test("single statement without semicolon", function()
+    local res = util.split_statements("SELECT 1 FROM tab")
+    assert(#res == 1, "expected 1 statement, got " .. #res)
+    assert(res[1] == "SELECT 1 FROM tab", "mismatch content: " .. res[1])
+end)
+
+test("multiple statements with semicolon", function()
+    local res = util.split_statements("SELECT 1; SELECT 2;")
+    assert(#res == 2, "expected 2 statements, got " .. #res)
+    assert(res[1] == "SELECT 1", "stmt 1 mismatch: " .. res[1])
+    assert(res[2] == "SELECT 2", "stmt 2 mismatch: " .. res[2])
+end)
+
+test("semicolon in single-quoted string", function()
+    local res = util.split_statements("SELECT 'hello;world' AS greeting; SELECT 2;")
+    assert(#res == 2, "expected 2 statements, got " .. #res)
+    assert(res[1] == "SELECT 'hello;world' AS greeting", "stmt 1 mismatch: " .. res[1])
+    assert(res[2] == "SELECT 2", "stmt 2 mismatch: " .. res[2])
+end)
+
+test("semicolon in line comment", function()
+    local res = util.split_statements("SELECT 1 -- this is a comment; with semi\n; SELECT 2;")
+    assert(#res == 2, "expected 2 statements, got " .. #res)
+    assert(res[2] == "SELECT 2", "stmt 2 mismatch: " .. res[2])
+end)
+
+test("semicolon in block comment", function()
+    local res = util.split_statements("SELECT /* comment; with ; semi */ 1; SELECT 2;")
+    assert(#res == 2, "expected 2 statements, got " .. #res)
+    assert(res[2] == "SELECT 2", "stmt 2 mismatch: " .. res[2])
+end)

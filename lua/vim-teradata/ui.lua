@@ -2,7 +2,67 @@ local config = require('vim-teradata.config')
 local util = require('vim-teradata.util')
 local bookmark = require('vim-teradata.bookmark')
 local explain = require('vim-teradata.explain')
+local grid = require('vim-teradata.grid_state')
+local debounce = require('vim-teradata.debounce')
+
 local M = {}
+
+--- Helper to run a periodic timer associated with a buffer.
+local function start_buf_timer(bufnr, interval_ms, fn)
+    local timer = assert(vim.uv.new_timer())
+    local function stop()
+        if not timer:is_closing() then
+            timer:stop()
+            timer:close()
+        end
+    end
+    timer:start(interval_ms, interval_ms, vim.schedule_wrap(function()
+        if not vim.api.nvim_buf_is_valid(bufnr) then return stop() end
+        fn()
+    end))
+    vim.api.nvim_create_autocmd({ 'BufWipeout', 'BufDelete', 'BufHidden' }, {
+        group = vim.api.nvim_create_augroup('VimTeradata', { clear = false }),
+        buffer = bufnr,
+        once = true,
+        callback = stop,
+    })
+end
+
+local function has_running_jobs()
+    for _, j in ipairs(util.jobs_all()) do
+        if j.status == 'running' then return true end
+    end
+    return false
+end
+
+--- Opens a named scratch split. If one with that name is already visible it is
+--- replaced in its own window (no stacked splits); the buffer is always fresh, so
+--- callers can safely (re)bind keymaps/autocmds that close over their local state.
+---@param name string
+---@param height integer|nil
+---@return integer bufnr
+function M.open_scratch(name, height)
+    local pat = '^' .. vim.fn.escape(name, '\\.*~[]$^') .. '$'
+    local existing = vim.fn.bufnr(pat)
+    local win = existing ~= -1 and vim.fn.bufwinid(existing) or -1
+
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].buftype = 'nofile'
+    vim.bo[buf].bufhidden = 'wipe'
+    vim.bo[buf].swapfile = false
+
+    if win ~= -1 then
+        vim.api.nvim_set_current_win(win)
+    else
+        vim.cmd(('belowright %dsplit'):format(height or 10))
+    end
+    vim.api.nvim_win_set_buf(0, buf)
+    if existing ~= -1 and vim.api.nvim_buf_is_valid(existing) then
+        vim.api.nvim_buf_delete(existing, { force = true })
+    end
+    pcall(vim.api.nvim_buf_set_name, buf, name)
+    return buf
+end
 
 --- Binds "re-run the latest query" in a result buffer.
 --- When the buffer holds the result of the LATEST query the fresh grid replaces
@@ -81,20 +141,20 @@ function M.display_output(file_path, query_id, opts)
     -- History files are named <id>.csv, so the id is recoverable even when
     -- display_output is called without one (e.g. from the history browser).
     local result_id = vim.fn.fnamemodify(file_path, ':t:r')
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_query_id', result_id)
+    grid.set(bufnr, 'query_id', result_id)
     bind_rerun_map(bufnr, result_id)
 
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_all_data', vim.deepcopy(data))
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_all_header', vim.deepcopy(header))
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(data))
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', vim.deepcopy(header))
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', {})
+    grid.set(bufnr, 'all_data', vim.deepcopy(data))
+    grid.set(bufnr, 'all_header', vim.deepcopy(header))
+    grid.set(bufnr, 'displayed_data', vim.deepcopy(data))
+    grid.set(bufnr, 'displayed_header', vim.deepcopy(header))
+    grid.set(bufnr, 'removed_columns', {})
 
     local row_ids, col_ids = {}, {}
     for i = 1, #data do row_ids[i] = i end
     for i = 1, #header do col_ids[i] = i end
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', row_ids)
-    vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_col_ids', col_ids)
+    grid.set(bufnr, 'displayed_ids', row_ids)
+    grid.set(bufnr, 'displayed_col_ids', col_ids)
 
     local query_path = util.get_history_path('queries_dir_name') ..
         '/' .. vim.fn.fnamemodify(file_path, ":t:r") .. '.sql'
@@ -113,13 +173,13 @@ function M.display_output(file_path, query_id, opts)
     end
 
     local function populate_buffer()
-        vim.bo.modifiable      = true
-        local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-        local displayed_data   = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+        vim.bo[bufnr].modifiable = true
+        local displayed_header = grid.get(bufnr, 'displayed_header') or {}
+        local displayed_data   = grid.get(bufnr, 'displayed_data') or {}
 
         if #displayed_header == 0 then
             vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "All columns removed. Press <BS> to restore." })
-            vim.bo.modifiable = false
+            vim.bo[bufnr].modifiable = false
             return
         end
 
@@ -133,7 +193,7 @@ function M.display_output(file_path, query_id, opts)
             end
             table.insert(col_widths, max_width)
         end
-        vim.api.nvim_buf_set_var(bufnr, 'teradata_column_widths', col_widths)
+        grid.set(bufnr, 'column_widths', col_widths)
 
         local buffer_lines = {}
         local visual_separator = ' | '
@@ -170,6 +230,7 @@ function M.display_output(file_path, query_id, opts)
         local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort'
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
+        vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
         vim.api.nvim_buf_set_extmark(
             bufnr,
             ns_id,
@@ -180,12 +241,12 @@ function M.display_output(file_path, query_id, opts)
 
         pcall(function() require('vim-teradata.edit').decorate(bufnr) end)
 
-        vim.bo.modifiable = false
+        vim.bo[bufnr].modifiable = false
     end
 
     local function get_column_from_cursor()
         local col = vim.fn.virtcol('.') - 1
-        local widths = vim.api.nvim_buf_get_var(bufnr, 'teradata_column_widths')
+        local widths = grid.get(bufnr, 'column_widths')
         if not widths then return nil end
         local current_pos = 0
         local visual_separator = ' | '
@@ -204,11 +265,11 @@ function M.display_output(file_path, query_id, opts)
             if lnum <= 2 then return end
             local col_idx = get_column_from_cursor()
             if not col_idx then return end
-            local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            local displayed_data = grid.get(bufnr, 'displayed_data') or {}
             local row_idx = lnum - 2
             if not displayed_data[row_idx] then return end
             local filter_value = displayed_data[row_idx][col_idx]
-            local displayed_ids = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_ids')
+            local displayed_ids = grid.get(bufnr, 'displayed_ids') or {}
             local new_displayed_data, new_displayed_ids = {}, {}
             for i, row in ipairs(displayed_data) do
                 if row[col_idx] and row[col_idx] == filter_value then
@@ -216,18 +277,18 @@ function M.display_output(file_path, query_id, opts)
                     table.insert(new_displayed_ids, displayed_ids[i])
                 end
             end
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', new_displayed_data)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', new_displayed_ids)
+            grid.set(bufnr, 'displayed_data', new_displayed_data)
+            grid.set(bufnr, 'displayed_ids', new_displayed_ids)
             populate_buffer()
-        end, { buffer = bufnr, silent = true, nowait = true })
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: filter by cell value' })
 
         vim.keymap.set('n', '-', function()
             local col_idx_to_remove = get_column_from_cursor()
             if not col_idx_to_remove then return end
-            local displayed_header    = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-            local displayed_data      = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-            local removed_columns     = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
-            local col_ids             = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_col_ids')
+            local displayed_header    = grid.get(bufnr, 'displayed_header') or {}
+            local displayed_data      = grid.get(bufnr, 'displayed_data') or {}
+            local removed_columns     = grid.get(bufnr, 'removed_columns') or {}
+            local col_ids             = grid.get(bufnr, 'displayed_col_ids') or {}
 
             local removed_col_id      = table.remove(col_ids, col_idx_to_remove)
             local removed_header      = table.remove(displayed_header, col_idx_to_remove)
@@ -241,59 +302,56 @@ function M.display_output(file_path, query_id, opts)
                 header = removed_header,
                 data = removed_column_data
             })
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_col_ids', col_ids)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
+            grid.set(bufnr, 'displayed_header', displayed_header)
+            grid.set(bufnr, 'displayed_data', displayed_data)
+            grid.set(bufnr, 'displayed_col_ids', col_ids)
+            grid.set(bufnr, 'removed_columns', removed_columns)
             populate_buffer()
-        end, { buffer = bufnr, silent = true, nowait = true })
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: remove column' })
 
         vim.keymap.set('n', '<bs>', function()
-            local removed_columns = vim.api.nvim_buf_get_var(bufnr, 'teradata_removed_columns')
+            local removed_columns = grid.get(bufnr, 'removed_columns') or {}
             if #removed_columns == 0 then
                 return vim.notify("No columns to restore.", vim.log.levels.WARN)
             end
             local col_to_restore   = table.remove(removed_columns)
-            local displayed_header = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_header')
-            local displayed_data   = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-            local col_ids          = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_col_ids')
+            local displayed_header = grid.get(bufnr, 'displayed_header') or {}
+            local displayed_data   = grid.get(bufnr, 'displayed_data') or {}
+            local col_ids          = grid.get(bufnr, 'displayed_col_ids') or {}
 
             table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
             for i, row in ipairs(displayed_data) do
                 table.insert(row, col_to_restore.index, col_to_restore.data[i] or '')
             end
             table.insert(col_ids, col_to_restore.index, col_to_restore.col_id)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_header', displayed_header)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', displayed_data)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_col_ids', col_ids)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_removed_columns', removed_columns)
+            grid.set(bufnr, 'displayed_header', displayed_header)
+            grid.set(bufnr, 'displayed_data', displayed_data)
+            grid.set(bufnr, 'displayed_col_ids', col_ids)
+            grid.set(bufnr, 'removed_columns', removed_columns)
             populate_buffer()
-        end, { buffer = bufnr, silent = true, nowait = true })
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: restore column' })
 
         vim.keymap.set('n', 'u', function()
-            local all_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_all_data')
-            local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
+            local all_data = grid.get(bufnr, 'all_data') or {}
+            local displayed_data = grid.get(bufnr, 'displayed_data') or {}
             if #displayed_data == #all_data then
                 vim.notify("No filters to reset.", vim.log.levels.INFO)
                 return
             end
             local ids = {}
             for i = 1, #all_data do ids[i] = i end
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', vim.deepcopy(all_data))
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', ids)
+            grid.set(bufnr, 'displayed_data', vim.deepcopy(all_data))
+            grid.set(bufnr, 'displayed_ids', ids)
             populate_buffer()
             vim.notify("Filters reset.", vim.log.levels.INFO)
-        end, { buffer = bufnr, silent = true, nowait = true })
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: reset filters' })
 
         local function sort_column(ascending)
-            -- local lnum = vim.fn.line('.')
-            -- if lnum == 2 then return end
-
             local col_idx = get_column_from_cursor()
             if not col_idx then return end
 
-            local displayed_data = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_data')
-            local displayed_ids  = vim.api.nvim_buf_get_var(bufnr, 'teradata_displayed_ids')
+            local displayed_data = grid.get(bufnr, 'displayed_data') or {}
+            local displayed_ids  = grid.get(bufnr, 'displayed_ids') or {}
 
             local perm = {}
             for i = 1, #displayed_data do perm[i] = i end
@@ -324,8 +382,8 @@ function M.display_output(file_path, query_id, opts)
                 sorted_data[i] = displayed_data[p]
                 sorted_ids[i]  = displayed_ids[p]
             end
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_data', sorted_data)
-            vim.api.nvim_buf_set_var(bufnr, 'teradata_displayed_ids', sorted_ids)
+            grid.set(bufnr, 'displayed_data', sorted_data)
+            grid.set(bufnr, 'displayed_ids', sorted_ids)
             populate_buffer()
             local dir = ascending and "ascending" or "descending"
             vim.notify("Sorted column " .. col_idx .. " " .. dir, vim.log.levels.INFO)
@@ -333,11 +391,11 @@ function M.display_output(file_path, query_id, opts)
 
         vim.keymap.set('n', '<Up>', function()
             sort_column(true)
-        end, { buffer = bufnr, silent = true, nowait = true })
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: sort column ascending' })
 
         vim.keymap.set('n', '<Down>', function()
             sort_column(false)
-        end, { buffer = bufnr, silent = true, nowait = true })
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: sort column descending' })
     end
     bind_grid_maps()
 
@@ -360,35 +418,47 @@ end
 
 function M.display_help()
     local help_text = {
-        ':nTD   syntax check current + next n-1 statements',
-        ':nTDO  output current + next n-1 statements',
-        'TDE    syntax check visual selection',
-        'TDV    output visual selection',
-        ':nTDM  multistatement output n nodes in 1 BTEQ job',
-        'TDMV   multistatement visual (splits on ; → 1 BTEQ job)',
-        string.format('%-6s re-run latest query (%s in a result buffer, or :TDRerun)',
+        'Global commands:',
+        '  :TDH          Show query history',
+        '  :TDR          Search query history by content (supports all pickers)',
+        '  :TDU          Manage connection profiles / users',
+        '  :TDS          Manage settings',
+        '  :TDB          Manage bookmarks',
+        '  :TDJ          Job manager',
+        '  :TDSync       Refresh metadata cache for autocomplete',
+        '  :TDHelp       Display this help',
+        '',
+        'Buffer commands (in Teradata SQL buffers):',
+        '  :nTD          Syntax-check current + next n-1 statement(s)',
+        '  :nTDO         Run current + next n-1 statement(s)',
+        '  :TDE          Syntax-check visual selection',
+        '  :TDV          Run visual selection',
+        '  :nTDM         Run n statements in 1 multistatement BTEQ job',
+        '  :TDMV         Run visual selection as 1 multistatement BTEQ job',
+        '  :TDBAdd       Add bookmark from selection / range',
+        '  :nTDF         Format current statement(s) (experimental)',
+        '  :TDFF         Format whole buffer (experimental)',
+        '  :TDCodeAction Teradata code actions',
+        '',
+        'Keymaps:',
+        string.format('  %-13s Re-run latest query (%s in result buffer)',
             (config.options.rerun_keymaps or {}).sql or 'g.',
             (config.options.rerun_keymaps or {}).result or '.'),
-        'TDH: Show query history',
-        'TDR: Search query history with FZF',
-        'TDU: Manage users',
-        'TDS: Manage settings',
-        'TDB: Manage bookmarks',
-        'TDBAdd: Add bookmark from visual selection',
-        'TDJ: Jobs Manager',
-        ':nTDF: format current + next n-1 statements',
-        'TDFF: format all statements in buffer',
-        'TDSync: export ddl for autocompletion',
-        'Result buffer: <E> edit mode, <CR> edit cell, <X> set NULL, <S> save, <C> cancel',
-        'TDHelp: Display this help',
+        '  <C-x><C-o>    Omni completion',
+        '  <C-x><C-u>    Interactive completion picker',
+        '',
+        'Result buffer:',
+        '  <E>           Toggle edit mode',
+        '  <CR>          Edit cell under cursor',
+        '  <X>           Set cell to NULL',
+        '  <S>           Save pending edits',
+        '  <C>           Cancel edits',
     }
-    vim.cmd('belowright 13split')
-    vim.cmd.enew()
-    vim.bo.buftype = 'nofile'
-    vim.bo.bufhidden = 'wipe'
-    vim.bo.swapfile = false
-    vim.api.nvim_buf_set_lines(0, 0, -1, false, help_text)
-    vim.bo.modifiable = false
+
+    local bufnr = M.open_scratch('Teradata Help', 22)
+    vim.bo[bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, help_text)
+    vim.bo[bufnr].modifiable = false
 end
 
 --- Opens a query and its corresponding result file.
@@ -424,8 +494,9 @@ function M.show_queries()
         preview_winid = nil
     end
 
+    local list_bufnr = M.open_scratch('Teradata Queries', 10)
+
     local function populate_buffer()
-        local bufnr = vim.api.nvim_get_current_buf()
         local lines = {}
         line_map = {}
         local current_line = 1
@@ -439,25 +510,20 @@ function M.show_queries()
         end
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
         local extmark = '<Enter> Open Query/Result'
-        vim.bo.modifiable = true
+        vim.bo[list_bufnr].modifiable = true
         table.insert(lines, '')
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_lines(list_bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_clear_namespace(list_bufnr, ns_id, 0, -1)
         vim.api.nvim_buf_set_extmark(
-            bufnr,
+            list_bufnr,
             ns_id,
             #lines - 1,
             0,
             { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
         )
-        vim.bo.modifiable = false
+        vim.bo[list_bufnr].modifiable = false
     end
 
-    vim.cmd('belowright 10split')
-    vim.cmd.enew()
-    vim.bo.buftype = 'nofile'
-    vim.bo.bufhidden = 'delete'
-    local list_bufnr = vim.api.nvim_get_current_buf()
-    vim.api.nvim_buf_set_name(0, 'Teradata Queries')
     populate_buffer()
 
     vim.keymap.set('n', '<cr>', function()
@@ -468,40 +534,50 @@ function M.show_queries()
             M.open_query_result_pair(id)
             vim.api.nvim_buf_delete(list_bufnr, { force = true })
         end
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: open query and result' })
 
-    vim.cmd('setlocal updatetime=500')
-    vim.api.nvim_create_autocmd('CursorHold', {
-        buffer = 0,
+    local show_preview = function()
+        if not vim.api.nvim_buf_is_valid(list_bufnr) then return end
+        if vim.api.nvim_get_current_buf() ~= list_bufnr then return end
+        close_preview_win()
+        local lnum = vim.fn.line('.')
+        local id = line_map[lnum]
+        if not id then return end
+        local query_file = util.get_history_path('queries_dir_name') .. '/' .. id .. '.sql'
+        local content = vim.fn.readfile(query_file)
+        if content then
+            local buf = vim.api.nvim_create_buf(false, true)
+            vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
+            local width, height = 80, 10
+            local cursor = vim.api.nvim_win_get_cursor(0)
+            preview_winid = vim.api.nvim_open_win(buf, false, {
+                relative = 'win',
+                width = width,
+                height = height,
+                row = cursor[1] - 1,
+                col = cursor[2] + 10,
+                style = 'minimal',
+                border = 'rounded',
+            })
+        end
+    end
+
+    local deb = debounce.new(300, show_preview)
+
+    vim.api.nvim_create_autocmd('CursorMoved', {
+        group = vim.api.nvim_create_augroup('VimTeradata', { clear = false }),
+        buffer = list_bufnr,
         callback = function()
             close_preview_win()
-            local lnum = vim.fn.line('.')
-            local id = line_map[lnum]
-            if not id then return end
-            local query_file = util.get_history_path('queries_dir_name') .. '/' .. id .. '.sql'
-            local content = vim.fn.readfile(query_file)
-            if content then
-                local buf = vim.api.nvim_create_buf(false, true)
-                vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
-                local width, height = 80, 10
-                local cursor = vim.api.nvim_win_get_cursor(0)
-                preview_winid = vim.api.nvim_open_win(buf, false, {
-                    relative = 'win',
-                    width = width,
-                    height = height,
-                    row = cursor[1] - 1,
-                    col = cursor[2] + 10,
-                    style = 'minimal',
-                    border = 'rounded',
-                })
-            end
+            deb.call()
         end,
     })
-    vim.api.nvim_create_autocmd('BufLeave', {
-        buffer = 0,
-        once = true,
+    vim.api.nvim_create_autocmd({ 'BufLeave', 'BufWipeout', 'BufDelete' }, {
+        group = vim.api.nvim_create_augroup('VimTeradata', { clear = false }),
+        buffer = list_bufnr,
         callback = function()
             close_preview_win()
+            deb.close()
         end,
     })
 end
@@ -510,8 +586,9 @@ end
 -- Users
 -----------------------------------------------------------------------
 function M.show_users()
+    local list_bufnr = M.open_scratch('Teradata Users', 10)
+
     local function populate_buffer()
-        local bufnr = vim.api.nvim_get_current_buf()
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
         local lines = {}
         local extmark
@@ -521,9 +598,9 @@ function M.show_users()
             local tdpid_col_width   = #("tdpid")
             local logmech_col_width = #("logon mechanism")
             for _, u in ipairs(config.options.users) do
-                user_col_width    = math.max(user_col_width, # (u.user) + 1)
-                tdpid_col_width   = math.max(tdpid_col_width, # (u.tdpid))
-                logmech_col_width = math.max(logmech_col_width, # (u.log_mech))
+                user_col_width    = math.max(user_col_width, #(u.user) + 1)
+                tdpid_col_width   = math.max(tdpid_col_width, #(u.tdpid))
+                logmech_col_width = math.max(logmech_col_width, #(u.log_mech))
             end
 
             table.insert(lines, string.format(
@@ -550,11 +627,12 @@ function M.show_users()
             extmark = '<a> Add  <d> Delete  <Enter> Current'
         end
 
-        vim.bo.modifiable = true
+        vim.bo[list_bufnr].modifiable = true
         table.insert(lines, '')
-        vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+        vim.api.nvim_buf_set_lines(list_bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_clear_namespace(list_bufnr, ns_id, 0, -1)
         vim.api.nvim_buf_set_extmark(
-            bufnr,
+            list_bufnr,
             ns_id,
             #lines - 1,
             0,
@@ -564,14 +642,9 @@ function M.show_users()
                 priority = 100,
             }
         )
-        vim.bo.modifiable = false
+        vim.bo[list_bufnr].modifiable = false
     end
 
-    vim.cmd('belowright 10split')
-    vim.cmd.enew()
-    vim.bo.buftype = 'nofile'
-    vim.bo.bufhidden = 'delete'
-    vim.api.nvim_buf_set_name(0, 'Teradata Users')
     populate_buffer()
 
     vim.keymap.set('n', '<cr>', function()
@@ -581,9 +654,11 @@ function M.show_users()
         end
         config.options.current_user_index = index
         util.save_config()
+        local okd, diag = pcall(require, 'vim-teradata.diagnostics')
+        if okd and diag.invalidate_all then diag.invalidate_all() end
         vim.notify('Selected user: ' .. config.options.users[index].user, vim.log.levels.INFO)
         populate_buffer()
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: select active user' })
 
     vim.keymap.set('n', 'd', function()
         local index = vim.fn.line('.') - 2
@@ -599,27 +674,26 @@ function M.show_users()
                     config.options.current_user_index = config.options.current_user_index - 1
                 end
                 util.save_config()
+                local okd, diag = pcall(require, 'vim-teradata.diagnostics')
+                if okd and diag.invalidate_all then diag.invalidate_all() end
                 populate_buffer()
             end
         end)
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: delete user' })
 
     vim.keymap.set('n', 'a', function()
-        if vim.fn.exists('*fzf#run') == 0 then
-            return vim.notify('Error: fzf.vim plugin not found.', vim.log.levels.ERROR)
-        end
         local ok, msg = util.check_executables({ 'tdwallet' })
         if not ok then
             return vim.notify(msg, vim.log.levels.ERROR)
         end
 
-        vim.ui.input({ prompt = 'Enter log_mech (default TD2):', default = 'TD2' }, function(log_mech)
-            if not log_mech then return end
-            vim.ui.input({ prompt = 'Enter tdpid:' }, function(tdpid)
-                if not tdpid then return end
+        vim.ui.input({ prompt = 'Enter log_mech (default TD2): ', default = 'TD2' }, function(log_mech)
+            if not log_mech or log_mech == '' then return end
+            vim.ui.input({ prompt = 'Enter tdpid: ' }, function(tdpid)
+                if not tdpid or tdpid == '' then return end
 
                 local wallet_output = vim.fn.system('tdwallet list')
-                local wallet_users = vim.fn.split(wallet_output, '\n')
+                local wallet_users = vim.split(wallet_output, '\n', { trimempty = true })
                 wallet_users = vim.tbl_filter(function(u)
                     return u ~= '' and not u:match('list is empty')
                 end, wallet_users)
@@ -628,26 +702,25 @@ function M.show_users()
                     return vim.notify('No wallet items available.', vim.log.levels.WARN)
                 end
 
-                vim.fn['fzf#run']({
-                    source = wallet_users,
-                    window = {
-                        width = 0.5,
-                        height = 0.4,
-                    },
-                    sink = function(selected)
-                        local user = selected
-                        table.insert(config.options.users, { log_mech = log_mech, user = user, tdpid = tdpid })
-                        if not config.options.current_user_index then
-                            config.options.current_user_index = #config.options.users
-                        end
-                        util.save_config()
-                        populate_buffer()
-                    end,
-                    options = '--prompt="Select Wallet User> "',
-                })
+                local picker = require('vim-teradata.picker').get()
+                local pick_fn = picker.pick_one or require('vim-teradata.picker.native').pick_one
+                pick_fn(wallet_users, function(user)
+                    if not user then return end
+                    local candidate = { log_mech = log_mech, user = user, tdpid = tdpid }
+                    local vok, verr = config.validate_user(candidate)
+                    if not vok then
+                        return vim.notify('Invalid user: ' .. tostring(verr), vim.log.levels.ERROR)
+                    end
+                    table.insert(config.options.users, candidate)
+                    if not config.options.current_user_index then
+                        config.options.current_user_index = #config.options.users
+                    end
+                    util.save_config()
+                    populate_buffer()
+                end, { prompt = 'Select Wallet User: ' })
             end)
         end)
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: add user' })
 end
 
 -----------------------------------------------------------------------
@@ -665,8 +738,9 @@ function M.show_bookmarks()
         preview_winid = nil
     end
 
+    local list_bufnr = M.open_scratch('Teradata Bookmarks', 10)
+
     local function populate_buffer()
-        local bufnr = vim.api.nvim_get_current_buf()
         local bookmarks = bookmark.get_all()
         local lines = {}
         line_map = {}
@@ -703,21 +777,17 @@ function M.show_bookmarks()
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
         local extmark = '<d> Delete  <Enter> Insert (use TDBAdd to add a bookmark)'
-        vim.bo.modifiable = true
+        vim.bo[list_bufnr].modifiable = true
         table.insert(lines, '')
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_lines(list_bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_clear_namespace(list_bufnr, ns_id, 0, -1)
         vim.api.nvim_buf_set_extmark(
-            bufnr, ns_id, #lines - 1, 0,
+            list_bufnr, ns_id, #lines - 1, 0,
             { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
         )
-        vim.bo.modifiable = false
+        vim.bo[list_bufnr].modifiable = false
     end
 
-    vim.cmd('belowright 10split')
-    vim.cmd.enew()
-    vim.bo.buftype = 'nofile'
-    vim.bo.bufhidden = 'delete'
-    vim.api.nvim_buf_set_name(0, 'Teradata Bookmarks')
     populate_buffer()
 
     vim.keymap.set('n', '<cr>', function()
@@ -726,9 +796,9 @@ function M.show_bookmarks()
         local info = line_map[lnum]
         if info then
             bookmark.insert_into_buffer(info.name, info.type, original_bufnr)
-            vim.api.nvim_buf_delete(0, { force = true })
+            vim.api.nvim_buf_delete(list_bufnr, { force = true })
         end
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: insert bookmark' })
 
     vim.keymap.set('n', 'd', function()
         close_preview_win()
@@ -742,39 +812,49 @@ function M.show_bookmarks()
                 end
             end)
         end
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: delete bookmark' })
 
-    vim.cmd('setlocal updatetime=500')
-    vim.api.nvim_create_autocmd('CursorHold', {
-        buffer = 0,
+    local show_preview = function()
+        if not vim.api.nvim_buf_is_valid(list_bufnr) then return end
+        if vim.api.nvim_get_current_buf() ~= list_bufnr then return end
+        close_preview_win()
+        local lnum = vim.fn.line('.')
+        local info = line_map[lnum]
+        if not info then return end
+        local content = bookmark.get_content(info.name, info.type)
+        if content then
+            local buf = vim.api.nvim_create_buf(false, true)
+            vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
+            local width, height = 80, 10
+            local cursor = vim.api.nvim_win_get_cursor(0)
+            preview_winid = vim.api.nvim_open_win(buf, false, {
+                relative = 'win',
+                width = width,
+                height = height,
+                row = cursor[1] - 1,
+                col = cursor[2] + 10,
+                style = 'minimal',
+                border = 'rounded',
+            })
+        end
+    end
+
+    local deb = debounce.new(300, show_preview)
+
+    vim.api.nvim_create_autocmd('CursorMoved', {
+        group = vim.api.nvim_create_augroup('VimTeradata', { clear = false }),
+        buffer = list_bufnr,
         callback = function()
             close_preview_win()
-            local lnum = vim.fn.line('.')
-            local info = line_map[lnum]
-            if not info then return end
-            local content = bookmark.get_content(info.name, info.type)
-            if content then
-                local buf = vim.api.nvim_create_buf(false, true)
-                vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
-                local width, height = 80, 10
-                local cursor = vim.api.nvim_win_get_cursor(0)
-                preview_winid = vim.api.nvim_open_win(buf, false, {
-                    relative = 'win',
-                    width = width,
-                    height = height,
-                    row = cursor[1] - 1,
-                    col = cursor[2] + 10,
-                    style = 'minimal',
-                    border = 'rounded',
-                })
-            end
+            deb.call()
         end,
     })
-    vim.api.nvim_create_autocmd('BufLeave', {
-        buffer = 0,
-        once = true,
+    vim.api.nvim_create_autocmd({ 'BufLeave', 'BufWipeout', 'BufDelete' }, {
+        group = vim.api.nvim_create_augroup('VimTeradata', { clear = false }),
+        buffer = list_bufnr,
         callback = function()
             close_preview_win()
+            deb.close()
         end,
     })
 end
@@ -818,7 +898,7 @@ local function format_jobs_table(jobs)
 end
 
 function M.refresh_jobs_if_open()
-    local bufnr = vim.fn.bufnr('Teradata Jobs')
+    local bufnr = vim.fn.bufnr('^Teradata Jobs$')
     if bufnr == -1 or not vim.api.nvim_buf_is_loaded(bufnr) then return end
     local win = nil
     for _, w in ipairs(vim.api.nvim_list_wins()) do
@@ -830,24 +910,22 @@ function M.refresh_jobs_if_open()
     local jobs = util.jobs_all()
     local lines, _ = format_jobs_table(jobs)
     vim.bo[bufnr].modifiable = true
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     local ns = vim.api.nvim_create_namespace("HelperBuffer")
     local ext = '<Enter> Open  <x> Cancel  <d> Remove'
+    table.insert(lines, '')
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
     vim.api.nvim_buf_set_extmark(bufnr, ns, #lines - 1, 0, { virt_text = { { ext, "Comment" } }, virt_text_pos = "eol" })
     vim.bo[bufnr].modifiable = false
 end
 
 function M.show_jobs()
-    vim.cmd('belowright 12split')
-    vim.cmd.enew()
-    vim.bo.buftype = 'nofile'
-    vim.bo.bufhidden = 'delete'
-    vim.bo.swapfile = false
-    vim.api.nvim_buf_set_name(0, 'Teradata Jobs')
+    local list_bufnr = M.open_scratch('Teradata Jobs', 12)
 
     local line_to_id = {}
 
     local function populate()
+        if not vim.api.nvim_buf_is_valid(list_bufnr) then return end
         local jobs = util.jobs_all()
         local lines, ids = format_jobs_table(jobs)
         line_to_id = {}
@@ -856,11 +934,12 @@ function M.show_jobs()
         end
         local ns = vim.api.nvim_create_namespace("HelperBuffer")
         local ext = '<Enter> Open  <x> Cancel  <d> Remove'
-        vim.bo.modifiable = true
+        vim.bo[list_bufnr].modifiable = true
         table.insert(lines, '')
-        vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
-        vim.api.nvim_buf_set_extmark(0, ns, #lines - 1, 0, { virt_text = { { ext, "Comment" } }, virt_text_pos = "eol" })
-        vim.bo.modifiable = false
+        vim.api.nvim_buf_set_lines(list_bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_clear_namespace(list_bufnr, ns, 0, -1)
+        vim.api.nvim_buf_set_extmark(list_bufnr, ns, #lines - 1, 0, { virt_text = { { ext, "Comment" } }, virt_text_pos = "eol" })
+        vim.bo[list_bufnr].modifiable = false
     end
 
     populate()
@@ -879,7 +958,7 @@ function M.show_jobs()
                 vim.notify('Result not available for job ' .. job.id, vim.log.levels.WARN)
             end
         end
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: open job result' })
 
     -- x cancel
     vim.keymap.set('n', 'x', function()
@@ -898,7 +977,7 @@ function M.show_jobs()
             vim.notify('Unable to cancel job ' .. id, vim.log.levels.WARN)
         end
         populate()
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: cancel running job' })
 
     -- d remove
     vim.keymap.set('n', 'd', function()
@@ -915,15 +994,11 @@ function M.show_jobs()
         util.jobs_remove(id)
         vim.notify('Removed job ' .. id, vim.log.levels.INFO)
         populate()
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: remove job' })
 
-    vim.cmd('setlocal updatetime=600')
-    vim.api.nvim_create_autocmd('CursorHold', {
-        buffer = 0,
-        callback = function()
-            populate()
-        end,
-    })
+    start_buf_timer(list_bufnr, 1000, function()
+        if has_running_jobs() then populate() end
+    end)
 end
 
 -----------------------------------------------------------------------
@@ -931,9 +1006,9 @@ end
 -----------------------------------------------------------------------
 function M.show_settings()
     local line_map = {}
+    local list_bufnr = M.open_scratch('Teradata Settings', 12)
 
     local function populate_buffer()
-        local bufnr = vim.api.nvim_get_current_buf()
         local lines = {}
         line_map = {}
         local current_line = 1
@@ -982,24 +1057,20 @@ function M.show_settings()
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
         local extmark = '<Enter> Edit  <a> Add Replacement  <d> Delete Replacement'
 
-        vim.bo.modifiable = true
+        vim.bo[list_bufnr].modifiable = true
         table.insert(lines, '')
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_lines(list_bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_clear_namespace(list_bufnr, ns_id, 0, -1)
         vim.api.nvim_buf_set_extmark(
-            bufnr,
+            list_bufnr,
             ns_id,
             #lines - 1,
             0,
             { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
         )
-        vim.bo.modifiable = false
+        vim.bo[list_bufnr].modifiable = false
     end
 
-    vim.cmd('belowright 12split')
-    vim.cmd.enew()
-    vim.bo.buftype = 'nofile'
-    vim.bo.bufhidden = 'delete'
-    vim.api.nvim_buf_set_name(0, 'Teradata Settings')
     populate_buffer()
 
     -- ACTION: Add new replacement
@@ -1015,7 +1086,7 @@ function M.show_settings()
                 vim.notify("Added " .. key, vim.log.levels.INFO)
             end)
         end)
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: add replacement' })
 
     -- ACTION: Delete replacement
     vim.keymap.set('n', 'd', function()
@@ -1032,7 +1103,7 @@ function M.show_settings()
         else
             vim.notify("Cursor is not on a replacement.", vim.log.levels.WARN)
         end
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: delete replacement' })
 
     -- ACTION: Edit existing value
     vim.keymap.set('n', '<cr>', function()
@@ -1072,7 +1143,7 @@ function M.show_settings()
                 end
             end)
         end
-    end, { buffer = true, silent = true })
+    end, { buffer = list_bufnr, silent = true, desc = 'Teradata: edit setting' })
 end
 
 return M

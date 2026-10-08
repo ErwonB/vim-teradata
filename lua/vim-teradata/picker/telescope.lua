@@ -77,15 +77,16 @@ function M.pick_completion(items, context, opts, on_select)
     }):find()
 end
 
-function M.pick_basic(columns, callback)
+function M.pick_basic(columns, callback, opts)
     local pickers = require('telescope.pickers')
     local finders = require('telescope.finders')
     local conf = require('telescope.config').values
     local action_state = require('telescope.actions.state')
     local actions = require('telescope.actions')
 
+    local title = (opts and opts.prompt) or "Select Columns"
     pickers.new({}, {
-        prompt_title = "Select Columns",
+        prompt_title = title,
         finder = finders.new_table({ results = columns }),
         sorter = conf.generic_sorter({}),
         attach_mappings = function(prompt_bufnr, _)
@@ -105,6 +106,33 @@ function M.pick_basic(columns, callback)
                     table.insert(result, sel.value or sel[1])
                 end
                 callback(result)
+            end)
+            return true
+        end,
+    }):find()
+end
+
+function M.pick_one(items, callback, opts)
+    local pickers = require('telescope.pickers')
+    local finders = require('telescope.finders')
+    local conf = require('telescope.config').values
+    local action_state = require('telescope.actions.state')
+    local actions = require('telescope.actions')
+
+    local title = (opts and opts.prompt) or "Select Item"
+    pickers.new({}, {
+        prompt_title = title,
+        finder = finders.new_table({ results = items }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr, _)
+            actions.select_default:replace(function()
+                local selection = action_state.get_selected_entry()
+                actions.close(prompt_bufnr)
+                if selection then
+                    callback(selection.value or selection[1])
+                else
+                    callback(nil)
+                end
             end)
             return true
         end,

@@ -1145,6 +1145,48 @@ format_node = function(node, buf, indent_lvl, context)
     return table.concat(parts, "")
 end
 
+--- Replace '...' / "..." literals and -- / /* */ comments with opaque placeholders so that
+--- whitespace normalisation cannot alter them. Returns protected text and a restore function.
+local function protect_literals(text)
+    local saved = {}
+    local function stash(s)
+        saved[#saved + 1] = s
+        return '\1' .. #saved .. '\2'
+    end
+    local out, i, n = {}, 1, #text
+    while i <= n do
+        local c, two = text:sub(i, i), text:sub(i, i + 1)
+        if c == "'" or c == '"' then
+            local j = i + 1
+            while j <= n do
+                if text:sub(j, j) == c then
+                    if text:sub(j + 1, j + 1) == c then j = j + 2 else break end
+                else
+                    j = j + 1
+                end
+            end
+            local stop = math.min(j, n)
+            out[#out + 1] = stash(text:sub(i, stop))
+            i = stop + 1
+        elseif two == '--' then
+            local j = text:find('\n', i, true) or (n + 1)
+            out[#out + 1] = stash(text:sub(i, j - 1))
+            i = j
+        elseif two == '/*' then
+            local _, e = text:find('*/', i + 2, true)
+            local stop = e or n
+            out[#out + 1] = stash(text:sub(i, stop))
+            i = stop + 1
+        else
+            out[#out + 1] = c
+            i = i + 1
+        end
+    end
+    return table.concat(out), function(s)
+        return (s:gsub('\1(%d+)\2', function(k) return saved[tonumber(k)] end))
+    end
+end
+
 --- Formats a list of statement nodes in-place (bottom-up to preserve ranges).
 local function format_statement_nodes(nodes, buf)
     -- Sort descending by start_row so replacements don't shift earlier nodes
@@ -1157,12 +1199,14 @@ local function format_statement_nodes(nodes, buf)
     for _, node in ipairs(nodes) do
         local formatted = format_node(node, buf, 0)
 
-        formatted = formatted:gsub(" %.", ".")
+        local protected, restore = protect_literals(formatted)
+        protected = protected:gsub(" %.", ".")
             :gsub("%. ", ".")
             :gsub("%( %)", "()")
             :gsub(" %( ", "(")
             :gsub(" ,", ",")
             :gsub("\n ", "\n" .. INDENT_STR)
+        formatted = restore(protected)
 
         local s_row, s_col, e_row, e_col = node:range()
         local lines = vim.split(formatted, "\n")
@@ -1317,6 +1361,7 @@ function M.jump_to_next(target_node_type)
     local node = tsu.next_node_by_type(target_node_type)
     if node then
         local r, c, _, _ = node:range()
+        vim.cmd("normal! m'")
         api.nvim_win_set_cursor(0, { r + 1, c })
     else
         vim.notify("No next " .. target_node_type .. " found.", LOG_LEVELS.INFO)
@@ -1329,10 +1374,13 @@ function M.jump_to_prev(target_node_type)
     local node = tsu.prev_node_by_type(target_node_type)
     if node then
         local r, c, _, _ = node:range()
+        vim.cmd("normal! m'")
         api.nvim_win_set_cursor(0, { r + 1, c })
     else
         vim.notify("No previous " .. target_node_type .. " found.", LOG_LEVELS.INFO)
     end
 end
+
+M._protect_literals = protect_literals
 
 return M

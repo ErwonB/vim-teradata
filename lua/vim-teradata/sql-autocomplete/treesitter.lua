@@ -48,29 +48,29 @@ function M.get_sql_keywords()
     return keywords
 end
 
-local Q = {
-    has_sel_or_dml = vim.treesitter.query.parse("teradata", [[
+local QUERY_SRC = {
+    has_sel_or_dml = [[
     [(delete) (keyword_delete)
      (update) (keyword_update)
      (insert) (keyword_insert)
      (select) (keyword_select)
      (keyword_show) (keyword_merge)
      (from) (keyword_from)] @sel
-  ]]),
-    has_where = vim.treesitter.query.parse("teradata", [[
+  ]],
+    has_where = [[
     [(where) (keyword_where) (order_by)] @where
-  ]]),
-    has_error = vim.treesitter.query.parse("teradata", [[
+  ]],
+    has_error = [[
     (ERROR) @error
-  ]]),
-    subq_with_alias = vim.treesitter.query.parse("teradata", [[
+  ]],
+    subq_with_alias = [[
     (relation
       (subquery) @subquery
       (keyword_as)?
       alias: (identifier)? @subquery_alias
     )
-  ]]),
-    select_expression = vim.treesitter.query.parse("teradata", [[
+  ]],
+    select_expression = [[
   ((select_expression
      (term
        alias: (identifier) @col) @item))
@@ -79,11 +79,21 @@ local Q = {
      (term
        value: (field
          name: (identifier) @col)) @item))
-
-]]),
-    relation = vim.treesitter.query.parse("teradata", [[ (relation) @rel ]]),
-    obj_ref  = vim.treesitter.query.parse("teradata", [[ (object_reference) @obj ]]),
+]],
+    relation = [[ (relation) @rel ]],
+    obj_ref  = [[ (object_reference) @obj ]],
+    statement = [[ (statement) @stmt ]],
 }
+
+local Q = setmetatable({}, {
+    __index = function(t, k)
+        local src = QUERY_SRC[k]
+        if not src then return nil end
+        local q = vim.treesitter.query.parse('teradata', src)
+        rawset(t, k, q)
+        return q
+    end,
+})
 
 
 ---
@@ -292,8 +302,7 @@ local function try_error_recovery_reparse(bufnr, row_1, col_0, context)
         local root = trees[1]:root()
         local fixed_statement_node = nil
 
-        local stmt_query = vim.treesitter.query.parse("teradata", "(statement) @stmt")
-        for _, stmt_node, _ in stmt_query:iter_captures(root, modified_buf_text, 0, -1) do
+        for _, stmt_node, _ in Q.statement:iter_captures(root, modified_buf_text, 0, -1) do
             local s_start_row, _, s_end_row, s_end_col = stmt_node:range()
             if cursor_pos_in_modified >= s_start_row and
                 (cursor_pos_in_modified < s_end_row or

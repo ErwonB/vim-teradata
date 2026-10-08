@@ -7,8 +7,8 @@ function M.get()
     end
     local ok, adapter = pcall(require, 'vim-teradata.picker.' .. name)
     if not ok then
-        vim.notify('[vim-teradata] Unknown picker: ' .. name .. '. Falling back to fzf_vim.', vim.log.levels.WARN)
-        return require('vim-teradata.picker.fzf_vim')
+        vim.notify('[vim-teradata] Unknown picker: ' .. name .. '. Falling back to native vim.ui.', vim.log.levels.WARN)
+        return require('vim-teradata.picker.native')
     end
     return adapter
 end
@@ -17,7 +17,8 @@ function M.detect()
     if pcall(require, 'fzf-lua') then return 'fzf_lua' end
     if pcall(require, 'snacks') then return 'snacks' end
     if pcall(require, 'telescope') then return 'telescope' end
-    return 'fzf_vim'
+    if vim.fn.exists('*fzf#run') == 1 then return 'fzf_vim' end
+    return 'native'
 end
 
 return M

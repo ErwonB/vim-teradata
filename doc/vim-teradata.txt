@@ -81,9 +81,8 @@ Non-goals: teaching SQL, generic Teradata setup, non-BTEQ clients.
 2. REQUIREMENTS                                    *vim-teradata-requirements*
 
 Neovim ~
-    Preferred: Neovim 0.12+ (provides `vim.pack.add`).
-    Minimum:   Neovim 0.10+ (tree-sitter API). Without tree-sitter you do
-               not get diagnostics, autocompletion or syntax highlighting.
+    Minimum:   Neovim 0.12+ (uses `vim.system`, `vim.pack.add`, modern tree-sitter
+               and filetype APIs).
 
 Operating systems ~
     Linux, macOS, and Windows (including WSL) are supported. The only
@@ -264,11 +263,34 @@ picker ~
     Type: `string`            Default: `"auto"`
 
     Picker backend used by |:TDR| and other selection UIs. One of:
-        "auto"      detect automatically
+        "auto"      detect automatically (tries fzf-lua, snacks, telescope, fzf.vim, native)
+        "native"    built-in vim.ui.select (zero external dependencies)
         "fzf_vim"   junegunn/fzf.vim
         "fzf_lua"   ibhagwan/fzf-lua
         "snacks"    folke/snacks.nvim
         "telescope" nvim-telescope/telescope.nvim
+
+                                              *vim-teradata-opt-sql_detection*
+sql_detection ~
+    Type: `string`            Default: `"always"`
+
+    Controls whether `.sql` files are treated as `teradata`:
+        "always"    all `.sql` buffers get filetype `teradata`
+        "never"     do not map `.sql` to `teradata`
+        "modeline"  inspect first/last 5 lines for 'teradata' or 'bteq'
+
+                                                  *vim-teradata-opt-timeout_ms*
+timeout_ms ~
+    Type: `number|nil`        Default: `nil` (disabled)
+
+    BTEQ job timeout in milliseconds. Set to nil or 0 to disable timeout.
+
+                                                  *vim-teradata-opt-history_max*
+history_max ~
+    Type: `number|nil`        Default: `nil` (unlimited)
+
+    Maximum number of query history runs kept on disk before pruning.
+    Set to nil to disable pruning.
 
                                                     *vim-teradata-opt-keymaps*
 keymaps ~
@@ -417,9 +439,11 @@ survives Neovim restarts.
 ==============================================================================
 7. COMMANDS                                            *vim-teradata-commands*
 
-All `:TD*` commands are buffer-local. They are defined by the Teradata
-ftplugin and are available only in buffers whose filetype is `teradata`
-(see |vim-teradata-filetypes|).
+Query execution and editing commands (:TD, :TDO, :TDE, :TDV, :TDM,
+:TDMV, :TDF, :TDFF, :TDCodeAction) are buffer-local to buffers with
+filetype `teradata` (see |vim-teradata-filetypes|). Global utilities
+(:TDH, :TDR, :TDHelp, :TDU, :TDS, :TDB, :TDJ, :TDSync, :TDRerun) are
+available in any buffer.
 
 Several commands accept a count. `[N]` below denotes an optional count
 that defaults to 1. For example `:3TDO` runs the statement under the
@@ -825,7 +849,7 @@ A: No. Authentication goes through `tdwallet`; passwords never touch the
 
 Q: Can I use vim-teradata with vanilla Vim? ~
 A: No. The plugin uses Lua, `vim.system`, `vim.diagnostic`, and the
-   built-in tree-sitter API. Neovim 0.10+ is required.
+   built-in tree-sitter API. Neovim 0.12+ is required.
 
 Q: Can I run multiple queries in parallel? ~
 A: Yes. Every |:TDO| spawns an independent BTEQ job. Track them with

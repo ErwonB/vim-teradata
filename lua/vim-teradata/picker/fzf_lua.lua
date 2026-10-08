@@ -41,13 +41,31 @@ function M.pick_completion(items, context, opts, on_select)
     })
 end
 
-function M.pick_basic(columns, callback)
+function M.pick_basic(columns, callback, opts)
+    local prompt = (opts and opts.prompt) or 'Select Columns (Tab to multi-select)> '
     require('fzf-lua').fzf_exec(columns, {
-        prompt = 'Select Columns (Tab to multi-select)> ',
+        prompt = prompt,
         fzf_opts = { ['-m'] = true },     -- Enable multi-selection
         actions = {
             ['default'] = function(selected)
                 callback(selected)
+            end
+        }
+    })
+end
+
+function M.pick_one(items, callback, opts)
+    local prompt = (opts and opts.prompt) or 'Select Item> '
+    require('fzf-lua').fzf_exec(items, {
+        prompt = prompt,
+        fzf_opts = { ['--no-multi'] = true },
+        actions = {
+            ['default'] = function(selected)
+                if selected and #selected > 0 then
+                    callback(selected[1])
+                else
+                    callback(nil)
+                end
             end
         }
     })

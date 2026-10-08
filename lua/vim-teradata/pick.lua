@@ -1,4 +1,4 @@
--- lua/teradata/fzf.lua
+-- lua/vim-teradata/pick.lua
 local ui = require('vim-teradata.ui')
 local util = require('vim-teradata.util')
 

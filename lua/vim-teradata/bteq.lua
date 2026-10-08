@@ -28,7 +28,7 @@ local function build_script(sql, user_obj, options, output_path)
         '.set session charset \'UTF8\'',
         '.set separator \'' .. config.options.sep .. '\'',
         '.set null \'' .. (config.options.null_token or 'NULL') .. '\'',
-        '.EXPORT FILE = ' .. output_path .. ';',
+        '.EXPORT FILE = \'' .. (output_path:gsub("'", "''")) .. '\';',
         '.set WIDTH 1048575',
     })
     if options.operation == 'output' then
@@ -36,7 +36,7 @@ local function build_script(sql, user_obj, options, output_path)
             '.set retlimit ' .. config.options.retlimit .. ' 2048',
         })
     end
-    vim.list_extend(body, vim.fn.split(sql, '\n'))
+    vim.list_extend(body, vim.split(sql, '\n'))
     vim.list_extend(body, { ';', '.LOGOFF', '.EXIT' })
     return { script = body }
 end
@@ -45,46 +45,48 @@ end
 --- @param script_lines table The script lines to send to BTEQ.
 --- @param on_done function The callback function(res).
 local function start_job(script_lines, on_done)
+    local timeout = config.options.timeout_ms
+    if not timeout or timeout <= 0 then timeout = nil end -- 0/nil = no timeout
     return vim.system({ 'bteq' }, {
         stdin = table.concat(script_lines, '\n'),
         text = true,
+        timeout = timeout,
     }, function(result)
-        local log_content = vim.split(result.stdout or '', '\n', { trimempty = true })
         local res = {
             rc = result.code,
             msg = result.stderr or '',
-            log_content = log_content,
+            log_content = vim.split(result.stdout or '', '\n', { trimempty = true }),
+            timed_out = (result.code == 124),
         }
+        if res.timed_out and res.msg == '' then res.msg = 'BTEQ timed out' end
         on_done(res)
     end)
 end
 
---- Splits a raw SQL string into individual statements on ';'.
---- @param sql string
---- @return table list of trimmed, non-empty SQL strings (without trailing ';')
-local function split_sql_statements(sql)
-    local stmts = {}
-    for part in sql:gmatch('[^;]+') do
-        part = part:match('^%s*(.-)%s*$')
-        if part ~= '' then
-            table.insert(stmts, part)
+--- SQL text for a `{ range = true }` user command.
+---@param args table|nil user-command args (line1/line2/range)
+---@return string|nil
+local function get_range_sql(args)
+    if not (args and args.range == 2) then return nil end
+    local s, e = vim.fn.getpos("'<"), vim.fn.getpos("'>")
+    if s[2] == args.line1 and e[2] == args.line2 then
+        -- invoked from a visual selection: honour charwise/linewise/blockwise
+        local mode = vim.fn.visualmode()
+        if mode ~= '' then
+            return table.concat(vim.fn.getregion(s, e, { type = mode }), '\n')
         end
     end
-    return stmts
-end
-
-local function get_visual_sql()
-    local start_pos = vim.api.nvim_buf_get_mark(0, "<")
-    local end_pos = vim.api.nvim_buf_get_mark(0, ">")
-    return table.concat(
-        vim.api.nvim_buf_get_text(0, start_pos[1] - 1, start_pos[2], end_pos[1] - 1, end_pos[2], {}),
-        '\n'
-    )
+    -- explicit range (:5,10TDV): whole lines
+    return table.concat(vim.api.nvim_buf_get_lines(0, args.line1 - 1, args.line2, false), '\n')
 end
 
 local function get_node_statements(count)
     local buf = vim.api.nvim_get_current_buf()
-    local current_node = vim.treesitter.get_node({ bufnr = buf })
+    local okn, current_node = pcall(vim.treesitter.get_node, { bufnr = buf })
+    if not okn or not current_node then
+        vim.notify('Teradata parser not available for this buffer.', vim.log.levels.WARN)
+        return {}
+    end
     local stmt_node = tsu.ancestor(current_node, "statement")
     if not stmt_node then return {} end
     local nodes = tsu.collect_next_sibling_statement_nodes(stmt_node, count)
@@ -110,11 +112,12 @@ end
 --- @return integer|nil winid
 local function find_result_win(id)
     if not id then return nil end
+    local grid = require('vim-teradata.grid_state')
     local function scan(wins)
         for _, win in ipairs(wins) do
             local buf = vim.api.nvim_win_get_buf(win)
-            local ok, buf_id = pcall(vim.api.nvim_buf_get_var, buf, 'teradata_query_id')
-            if ok and tostring(buf_id) == tostring(id) then
+            local buf_id = grid.get(buf, 'query_id')
+            if buf_id and tostring(buf_id) == tostring(id) then
                 return win
             end
         end
@@ -139,13 +142,10 @@ local function run_single_query(sql, operation, handle_result)
 
     if operation == 'syntax' then
         local parts = {}
-        for part in clean_sql:gmatch("[^;]+") do
-            part = part:match("^%s*(.-)%s*$")
-            if part ~= "" then
-                table.insert(parts, "explain " .. part)
-            end
+        for _, part in ipairs(util.split_statements(clean_sql)) do
+            parts[#parts + 1] = 'explain ' .. part
         end
-        clean_sql = table.concat(parts, " ; ")
+        clean_sql = table.concat(parts, ' ; ')
     end
 
     local output_path
@@ -183,6 +183,13 @@ local function run_single_query(sql, operation, handle_result)
     local bteq_data = build_script(clean_sql, current_user, opts, output_path)
     local handle = start_job(bteq_data.script, function(res)
         vim.schedule(function()
+            local job = util.jobs_get(id)
+            if not job or job.status == 'canceled' then
+                util.remove_files(output_path)   -- partial export
+                ui.refresh_jobs_if_open()
+                return                            -- no result handling, no error popup
+            end
+
             local status = (res.rc == 0) and 'ok' or 'error'
             local rows = nil
             if operation == 'output' then
@@ -223,21 +230,25 @@ local function run_single_query(sql, operation, handle_result)
     end)
 
     util.jobs_update(id, { handle = handle })
+    return id
 end
 
 local function run_multiple(sqls, operation, handle_result)
     if #sqls == 0 then
         return vim.notify('No SQL statements found.', vim.log.levels.WARN)
     end
-    for _, sql in ipairs(sqls) do
-        run_single_query(sql, operation, handle_result)
+    if not util.get_current_user() then
+        return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
     end
-    if #sqls > 1 then
-        vim.notify(#sqls .. ' queries started', vim.log.levels.INFO, { title = 'Teradata' })
-    else
-        -- Provide single notify
-        local job_id = util.jobs_all()[#util.jobs_all()].id -- just referencing the last job we added
-        vim.notify('Query started' .. (job_id and ': ' .. job_id or ''), vim.log.levels.INFO, { title = 'Teradata' })
+    local ids = {}
+    for _, sql in ipairs(sqls) do
+        local id = run_single_query(sql, operation, handle_result)
+        if id then ids[#ids + 1] = id end
+    end
+    if #ids > 1 then
+        vim.notify(#ids .. ' queries started', vim.log.levels.INFO, { title = 'Teradata' })
+    elseif #ids == 1 then
+        vim.notify('Query started: ' .. ids[1], vim.log.levels.INFO, { title = 'Teradata' })
     end
 end
 
@@ -375,12 +386,12 @@ function M.query_multistatement(args)
 end
 
 -- Visual-selection multistatement output
-function M.query_multistatement_visual()
-    local sql = get_visual_sql()
+function M.query_multistatement_visual(args)
+    local sql = get_range_sql(args)
     if not sql or sql:match('^%s*$') then
         return vim.notify('No SQL in selection.', vim.log.levels.WARN)
     end
-    local sqls = split_sql_statements(sql)
+    local sqls = util.split_statements(sql)
     if #sqls == 0 then
         return vim.notify('No SQL statements found.', vim.log.levels.WARN)
     end
@@ -393,8 +404,8 @@ function M.query_multistatement_visual()
 end
 
 -- Visual-selection output 
-function M.query_output_visual()
-    local sql = get_visual_sql()
+function M.query_output_visual(args)
+    local sql = get_range_sql(args)
     if not sql or sql:match('^%s*$') then
         return vim.notify('No SQL in selection.', vim.log.levels.WARN)
     end
@@ -403,8 +414,8 @@ function M.query_output_visual()
 end
 
 -- Visual-selection syntax check
-function M.query_syntax_visual()
-    local sql = get_visual_sql()
+function M.query_syntax_visual(args)
+    local sql = get_range_sql(args)
     if not sql or sql:match('^%s*$') then
         return vim.notify('No SQL in selection.', vim.log.levels.WARN)
     end
@@ -433,7 +444,7 @@ function M.run_updates(statements, on_done)
         'BT;',
     }
     for _, stmt in ipairs(statements) do
-        vim.list_extend(body, vim.fn.split(util.replace_env_vars(stmt), '\n'))
+        vim.list_extend(body, vim.split(util.replace_env_vars(stmt), '\n'))
         table.insert(body, ';')
     end
     vim.list_extend(body, { 'ET;', '.LOGOFF', '.EXIT' })
@@ -447,12 +458,18 @@ function M.run_updates(statements, on_done)
 
     local handle = start_job(body, function(res)
         vim.schedule(function()
+            local job = util.jobs_get(id)
+            if not job or job.status == 'canceled' then
+                ui.refresh_jobs_if_open()
+                return
+            end
             local counts = util.extract_rows_changed(res.log_content)
+            local msg = (res.rc == 0) and 'OK'
+                or (res.timed_out and 'Timed out' or ((res.msg or ''):match('[^\n]*$') or 'Error'))
             util.jobs_update(id, {
                 status = (res.rc == 0) and 'ok' or 'error',
                 rows = counts[1],
-                message = (res.rc == 0) and 'OK'
-                    or ((res.msg or ''):match('[^\n]*$') or 'Error'),
+                message = msg,
                 finished_at = os.time(),
             })
             ui.refresh_jobs_if_open()
@@ -461,5 +478,7 @@ function M.run_updates(statements, on_done)
     end)
     util.jobs_update(id, { handle = handle })
 end
+
+M._get_range_sql = get_range_sql
 
 return M

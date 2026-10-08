@@ -1,18 +1,13 @@
 local config = require('vim-teradata.config')
+local ft = require('vim-teradata.ft')
+local compat = require('vim-teradata.compat')
 
 local M = {}
 
 function M.setup(user_config)
+    compat.check()
     config.setup(user_config)
-
-    local extension_map = {}
-    for _, ext in ipairs(config.options.ft) do
-        extension_map[ext] = "teradata"
-    end
-
-    vim.filetype.add({
-        extension = extension_map,
-    })
+    ft.register()
 end
 
 return M
