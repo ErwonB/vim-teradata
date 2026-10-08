@@ -144,13 +144,18 @@ With `packer.nvim` >lua
 <
 Tree-sitter parser ~
 
-The Teradata grammar replaces the default `sql` parser for accurate
-syntax checking. Install the parser as described in the online docs at
-https://teradata-nvim.com/getting-started/treesitter/ then verify with: >
+The plugin uses its own dedicated `teradata` tree-sitter parser and does
+not replace the default `sql` parser. Install the parser as described in
+the online docs at https://teradata-nvim.com/getting-started/treesitter/
+then verify with: >
+
+    :checkhealth vim-teradata
+<
+or: >
 
     :checkhealth treesitter
 <
-The output should show that the `sql` parser is detected.
+The output should show that the `teradata` parser is detected.
 
 Metadata sync ~
 
@@ -818,6 +823,10 @@ To add another extension: >lua
 
 No diagnostics or syntax highlighting ~
     The tree-sitter parser is missing. Run: >
+
+        :checkhealth vim-teradata
+<
+    or: >
 
         :checkhealth treesitter
 <
