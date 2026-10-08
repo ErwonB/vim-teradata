@@ -98,17 +98,19 @@ local function action_expand_star(bufnr)
     local scopes = diag.get_query_scopes(stmt_node)
 
     -- Find the scope that contains our star node
-    local target_scope = nil
-    local star_sr, _, star_er, _ = star_node:range()
+    local target_scope, best_span = nil, math.huge
+    local star_sb = select(3, star_node:start())
+    local star_eb = select(3, star_node:end_())
+
     for _, scope_nodes in ipairs(scopes) do
         for _, node in ipairs(scope_nodes) do
-            local s_sr, _, s_er, _ = node:range()
-            if star_sr >= s_sr and star_er <= s_er then
+            local sb = select(3, node:start())
+            local eb = select(3, node:end_())
+            if star_sb >= sb and star_eb <= eb and (eb - sb) < best_span then
+                best_span = eb - sb
                 target_scope = scope_nodes
-                break
             end
         end
-        if target_scope then break end
     end
 
     if not target_scope then
