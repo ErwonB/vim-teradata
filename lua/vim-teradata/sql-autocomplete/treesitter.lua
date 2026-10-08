@@ -150,8 +150,8 @@ local function find_all_object_reference(scope_node, source)
 
         if schema_name and tbl_name then
             table.insert(tables, {
-                db_name = string.upper(schema_name),
-                tb_name = string.upper(tbl_name),
+                db_name = string.upper(utils.replace_env_vars(schema_name)),
+                tb_name = string.upper(utils.replace_env_vars(tbl_name)),
                 alias   = string.upper(alias_str),
             })
         end
@@ -274,8 +274,8 @@ local function find_all_tables_in_scope(scope_node, source)
 
             if schema_name and tbl_name then
                 table.insert(tables, {
-                    db_name = string.upper(schema_name),
-                    tb_name = string.upper(tbl_name),
+                    db_name = string.upper(utils.replace_env_vars(schema_name)),
+                    tb_name = string.upper(utils.replace_env_vars(tbl_name)),
                     alias   = string.upper(alias_str),
                 })
             end
