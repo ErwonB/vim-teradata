@@ -340,8 +340,18 @@ function M.export_db_data()
     local ok, msg = M.check_executables({ 'tbuild' })
     if not ok then return vim.notify(msg, vim.log.levels.ERROR) end
 
+    local tbuild_bin = 'tbuild'
+    if vim.fn.has('win32') == 1 then
+        -- On Windows, tbuild.exe relaunches itself from argv[0], so a bare name
+        -- ends up as "tbuild.EXEexe". Pass the full path with a lowercase .exe.
+        local resolved = vim.fn.exepath('tbuild')
+        if resolved ~= '' then
+            tbuild_bin = resolved:gsub('%.EXE$', '.exe')
+        end
+    end
+
     local tbuild_command = {
-        'tbuild', '-f', tpt_script, '-u',
+    tbuild_bin, '-f', tpt_script, '-u',
         string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'",
             current_user.user, current_user.log_mech, current_user.tdpid, data_tmp),
     }
