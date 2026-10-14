@@ -77,6 +77,23 @@ function M.check()
     else
         vim.health.ok("Diagnostics enabled")
     end
+
+    -- 8. Metadata catalog of the active user
+    local util = require("vim-teradata.util")
+    local cur = util.get_current_user()
+    if not cur then
+        vim.health.info("No active user; no metadata catalog selected (use :TDU)")
+    else
+        local key = util.catalog_key(cur)
+        local meta = util.catalog_meta(cur)
+        if not key then
+            vim.health.warn("Active user has no tdpid; cannot locate its metadata catalog")
+        elseif meta then
+            vim.health.ok(string.format("Metadata catalog '%s' synced %s", key, os.date("%Y-%m-%d %H:%M", meta.synced_at)))
+        else
+            vim.health.warn(string.format("No metadata catalog for '%s'; run :TDSync", key))
+        end
+    end
 end
 
 return M

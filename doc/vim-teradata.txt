@@ -231,8 +231,11 @@ users ~
           log_mech = 'TD2',   -- logon mechanism (TD2, LDAP, KRB5, ...)
           user     = 'USER',  -- wallet-backed username
           tdpid    = 'HOST',  -- Teradata host or IP
+          catalog  = 'NAME',  -- (optional) metadata catalog, defaults to tdpid
         }
 <
+    catalog (optional)  Name of the metadata catalog. Defaults to `tdpid`.
+
     Passwords are NEVER stored by vim-teradata. They are retrieved from
     `tdwallet` at logon time using `$tdwallet(<user>)`.
 
@@ -554,7 +557,11 @@ cursor plus the next two.
                                                                    *:TDSync*
 :TDSync         Build or refresh the local metadata index used by
                 autocomplete. Connects to the active user with TPT and
-                dumps catalog data into |vim-teradata-opt-data_dir|.
+                writes one catalog per Teradata machine (`tdpid`) under
+                |vim-teradata-opt-data_dir|. Users on the same machine
+                share a catalog; switching user with |:TDU| switches the
+                catalog used by completion and diagnostics. Run |:TDSync|
+                once per machine.
 
                                                                       *:TDU*
 :TDU            Open the user manager (see |vim-teradata-connections|).
@@ -681,7 +688,10 @@ Completion is exposed as a source to `blink.cmp` and `nvim-cmp`. If
 neither is installed, trigger completion manually with `i_CTRL-X CTRL-U`
 (see |vim-teradata-buffer-mappings|).
 
-The metadata cache lives under |vim-teradata-opt-data_dir|. Re-run |:TDSync|
+The metadata cache lives under |vim-teradata-opt-data_dir|.
+Layout: `<data_dir>/data/<tdpid>/` (one directory per machine). To
+separate two users of the same machine, give them different `catalog`
+names in |vim-teradata-opt-users|. Re-run |:TDSync|
 whenever a DDL change should be visible to the editor.
 
 ------------------------------------------------------------------------------
@@ -837,10 +847,11 @@ No diagnostics or syntax highlighting ~
     the only database privilege the plugin needs.
 
 Completion returns nothing ~
-    1. Confirm a successful |:TDSync| has run.
-    2. Confirm the cache directory contains JSON files: >
+    1. Confirm a successful |:TDSync| has run for the ACTIVE user's
+       machine (`:checkhealth vim-teradata` shows the catalog).
+    2. Confirm the catalog directory contains the generated files: >
 
-        :echo stdpath('data') . '/teradata/sql-autocomplete'
+        :echo stdpath('data') . '/teradata/sql-autocomplete/data'
 <
     3. With `blink.cmp` / `nvim-cmp`, verify `td_sql_completion` is in
        the active source list.

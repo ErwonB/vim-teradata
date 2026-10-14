@@ -58,10 +58,12 @@ local function normalize_col(str)
 end
 
 local function has_db(db_name)
+    if not util.has_catalog() then return true end
     return util.is_a_db(db_name)
 end
 
 local function has_table(db, tb)
+    if not util.has_catalog() then return true end
     local db_norm = normalize(db)
     local tb_norm = normalize(tb)
     return util.is_a_table(db_norm, tb_norm)
@@ -69,6 +71,7 @@ end
 
 
 local function has_column(db, tb, col)
+    if not util.has_catalog() then return true end
     local db_norm = normalize(db)
     local tb_norm = normalize(tb)
     local col_norm = normalize_col(col)

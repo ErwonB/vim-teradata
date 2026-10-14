@@ -1,9 +1,83 @@
 local config = require('vim-teradata.config')
 local M = {}
 
+-- cache.db[key]      -> { DB_NAME = true, ... }                      (data.lua of that catalog)
+-- cache.tb[key][DB]  -> { is_table = {...}, TABLE = { cols... } }    (<DB>.lua of that catalog)
 local Schema = {
-    cache = {}
+    cache = { db = {}, tb = {} }
 }
+
+-- catalog keys with a sync in flight (prevents two concurrent syncs of the same machine)
+local syncing = {}
+-- catalog keys already hinted about "no metadata yet" (one hint per key per session)
+local warned_missing = {}
+
+local function sanitize_key(s)
+    return (tostring(s):gsub('[^%w_%-]', '_'):lower())
+end
+
+--- Stable, filesystem-safe id of the metadata catalog a user maps to.
+--- Defaults to the tdpid; `user.catalog` overrides it. Sanitized keys never contain '.',
+--- so they can never collide with the "<key>.new" staging directory.
+--- @param user table|nil defaults to the active user
+--- @return string|nil
+function M.catalog_key(user)
+    user = user or M.get_current_user()
+    if not user then return nil end
+    local raw = user.catalog
+    if type(raw) ~= 'string' or raw == '' then raw = user.tdpid end
+    if type(raw) ~= 'string' or raw == '' then return nil end
+    return sanitize_key(raw)
+end
+
+--- Root directory holding one sub-directory per catalog.
+--- @return string
+function M.catalog_root()
+    return config.options.data_dir .. '/' .. config.options.data_completion_dir
+end
+
+--- Key and directory of the active user's catalog (nil, nil when no usable user).
+--- Cheap on purpose: called on every completion/diagnostic lookup.
+--- @return string|nil key, string|nil dir
+local function active_catalog()
+    local key = M.catalog_key()
+    if not key then return nil, nil end
+    return key, M.catalog_root() .. '/' .. key
+end
+
+--- True when a synced catalog exists for `user` (defaults to the active user).
+--- @return boolean
+function M.has_catalog(user)
+    local key = M.catalog_key(user)
+    return key ~= nil and vim.fn.filereadable(M.catalog_root() .. '/' .. key .. '/data.lua') == 1
+end
+
+--- Contents of meta.lua ({ synced_at = <epoch>, tdpid = <string>, user = <string> }) or nil.
+--- @return table|nil
+function M.catalog_meta(user)
+    local key = M.catalog_key(user)
+    if not key then return nil end
+    local ok, meta = pcall(dofile, M.catalog_root() .. '/' .. key .. '/meta.lua')
+    return (ok and type(meta) == 'table') and meta or nil
+end
+
+--- One-time (per key, per session) hint when the active user's machine was never synced.
+function M.warn_if_no_catalog()
+    local key = active_catalog()
+    if not key or warned_missing[key] or M.has_catalog() then return end
+    warned_missing[key] = true
+    local u = M.get_current_user()
+    vim.notify(('[vim-teradata] No metadata for %s yet. Run :TDSync.'):format(u and u.tdpid or key),
+        vim.log.levels.INFO)
+end
+
+--- Pre-catalog versions wrote data.lua/<DB>.lua directly in the root. They are never read
+--- anymore; remove them once a sync has succeeded.
+local function purge_legacy_flat_catalog()
+    for _, f in ipairs(vim.fn.glob(M.catalog_root() .. '/*.lua', false, true)) do
+        vim.fn.delete(f)
+    end
+end
 
 --- Safely removes one or more files.
 --- @param ... string One or more file paths to delete.
@@ -78,24 +152,24 @@ local function process_in_chunks(items, step, handler, done)
 end
 
 --- Splits a temporary CSV file into per-database files and generates a summary file.
---- @param on_done function|nil
+--- Output is written to a staging directory ("<catalog_dir>.new") that replaces `catalog_dir`
+--- only once everything was written successfully.
+--- @param input_filename string  CSV produced by TPT for this catalog
+--- @param catalog_dir string     final destination: <root>/<key>
+--- @param user table             connection used for the sync (recorded in meta.lua)
+--- @param on_done fun(ok: boolean)|nil
 --- @return nil
-local function split_data_db_file_to_lua(on_done)
-    local input_filename = config.options.data_dir .. "/data_tmp.csv"
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
+local function split_data_db_file_to_lua(input_filename, catalog_dir, user, on_done)
+    local data_files_dir = catalog_dir .. ".new" -- staging
     local summary_filename = data_files_dir .. "/data.lua"
 
-    -- Ensure output directory exists
-    local function ensure_dir(path)
-        if vim.fn.isdirectory(path) == 0 then
-            vim.fn.mkdir(path, "p")
-        end
-    end
-    ensure_dir(data_files_dir)
+    vim.fn.delete(data_files_dir, "rf") -- leftover of a crashed sync
+    vim.fn.mkdir(data_files_dir, "p")
 
     local input_file = io.open(input_filename, "r")
     if not input_file then
-        if on_done then on_done() end
+        vim.fn.delete(data_files_dir, "rf")
+        if on_done then on_done(false) end
         return vim.notify("Error: Could not open the input file: " .. input_filename, vim.log.levels.ERROR)
     end
 
@@ -173,49 +247,76 @@ local function split_data_db_file_to_lua(on_done)
             end
         end
 
-        -- Write summary file
-        local summary_file = io.open(summary_filename, "w")
-        if summary_file then
-            summary_file:write("-- Auto-generated. Do not edit.\n")
-            summary_file:write("return {\n")
-            for _, db_name in ipairs(sorted_keys(unique_dbs)) do
-                summary_file:write(string.format('  ["%s"] = true,\n', escape_lua_string(db_name)))
-            end
-            summary_file:write("}\n")
-            summary_file:close()
-        else
-            vim.notify("Error: Could not write summary file: " .. summary_filename, vim.log.levels.ERROR)
+        local function fail(msg)
+            vim.fn.delete(data_files_dir, "rf") -- keep the previous catalog untouched
+            vim.notify(msg, vim.log.levels.ERROR)
+            if on_done then on_done(false) end
         end
 
-        if on_done then on_done() end
+        -- An empty export (bad filter_db, no rights on dbc.columnsv...) must not wipe a good catalog.
+        if next(unique_dbs) == nil then
+            return fail("TDSync: export contained no rows; keeping the previous metadata.")
+        end
+
+        -- Write summary file
+        local summary_file = io.open(summary_filename, "w")
+        if not summary_file then
+            return fail("Error: Could not write summary file: " .. summary_filename)
+        end
+        summary_file:write("-- Auto-generated. Do not edit.\n")
+        summary_file:write("return {\n")
+        for _, db_name in ipairs(sorted_keys(unique_dbs)) do
+            summary_file:write(string.format('  ["%s"] = true,\n', escape_lua_string(db_name)))
+        end
+        summary_file:write("}\n")
+        summary_file:close()
+
+        -- Write meta file (used by :checkhealth and anything showing "last synced")
+        local meta_file = io.open(data_files_dir .. "/meta.lua", "w")
+        if meta_file then
+            meta_file:write("-- Auto-generated. Do not edit.\n")
+            meta_file:write(string.format("return { synced_at = %d, tdpid = %q, user = %q }\n",
+                os.time(), user.tdpid or "", user.user or ""))
+            meta_file:close()
+        end
+
+        -- Swap staging -> final. Deleting first drops databases that no longer exist on the server.
+        vim.fn.delete(catalog_dir, "rf")
+        if not vim.uv.fs_rename(data_files_dir, catalog_dir) then
+            return fail("Error: Could not move the new catalog into place: " .. catalog_dir)
+        end
+
+        if on_done then on_done(true) end
     end)
 end
 
-local function load_databases(summary_file)
-    Schema.cache.db = M.cached_read(summary_file, dofile)
+local function load_databases(key, summary_file)
+    Schema.cache.db[key] = M.cached_read(summary_file, dofile)
 end
 
 --- Return true if db_name is in the db file, false otherwise
 --- @return boolean db_name is present.
 function M.is_a_db(db_name)
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
-    local summary_file = data_files_dir .. "/data.lua"
+    local key, dir = active_catalog()
+    if not key then return false end
+    local summary_file = dir .. "/data.lua"
     if vim.fn.filereadable(summary_file) == 0 then return false end
-    if not Schema.cache.db then
-        load_databases(summary_file)
-    end
-    return Schema.cache.db[db_name:upper()]
+    -- always go through cached_read: it only reloads when mtime/size changed, so a re-sync is picked up
+    load_databases(key, summary_file)
+    return (Schema.cache.db[key] or {})[db_name:upper()]
 end
 
 --- Retrieves a list of available databases from a summary CSV file.
 --- @return table | nil A list of database names.
 function M.get_databases()
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
-    local summary_file = data_files_dir .. "/data.lua"
-    if vim.fn.filereadable(summary_file) == 0 then return nil end
-    if not Schema.cache.db then
-        load_databases(summary_file)
+    local key, dir = active_catalog()
+    if not key then return nil end
+    local summary_file = dir .. "/data.lua"
+    if vim.fn.filereadable(summary_file) == 0 then
+        M.warn_if_no_catalog()
+        return nil
     end
+    load_databases(key, summary_file)
 
     local filter_db = config.options.filter_db
     local databases = {}
@@ -225,7 +326,7 @@ function M.get_databases()
         needle = filter_db:upper()
     end
 
-    for db_name, _ in pairs(Schema.cache.db or {}) do
+    for db_name, _ in pairs(Schema.cache.db[key] or {}) do
         if want_all then
             table.insert(databases, db_name)
         else
@@ -238,41 +339,42 @@ function M.get_databases()
     return databases
 end
 
-local function load_tables(db_file, db)
-    if not Schema.cache.tb then
-        Schema.cache.tb = {}
-    end
-    Schema.cache.tb[db] = M.cached_read(db_file, dofile)
+local function load_tables(key, db_file, db)
+    Schema.cache.tb[key] = Schema.cache.tb[key] or {}
+    Schema.cache.tb[key][db] = M.cached_read(db_file, dofile)
 end
 
 --- Return true if db_name is a the db files, false otherwise
 --- @return boolean database + tablename is present.
 function M.is_a_table(database, tablename)
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
+    local key, dir = active_catalog()
+    if not key then return false end
     local db = database:gsub("%s+", ""):upper()
     local tb = tablename:gsub("%s+", ""):upper()
-    local db_file = data_files_dir .. "/" .. db .. ".lua"
+    local db_file = dir .. "/" .. db .. ".lua"
 
     if vim.fn.filereadable(db_file) == 0 then return false end
 
-    load_tables(db_file, db)
-    return Schema.cache.tb[db] and Schema.cache.tb[db].is_table and Schema.cache.tb[db].is_table[tb]
+    load_tables(key, db_file, db)
+    local t = Schema.cache.tb[key][db]
+    return t and t.is_table and t.is_table[tb]
 end
 
 --- Retrieves a list of unique tables from a database-specific CSV file.
 --- @param database string The name of the database.
 --- @return table | nil A list of table names.
 function M.get_tables(database)
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
+    local key, dir = active_catalog()
+    if not key then return nil end
     local db = database:gsub("%s+", ""):upper()
-    local db_file = data_files_dir .. "/" .. db .. ".lua"
+    local db_file = dir .. "/" .. db .. ".lua"
 
     if vim.fn.filereadable(db_file) == 0 then return nil end
 
-    load_tables(db_file, db)
+    load_tables(key, db_file, db)
 
     local tables = {}
-    for tb, _ in pairs((Schema.cache.tb[db] and Schema.cache.tb[db].is_table) or {}) do
+    for tb, _ in pairs((Schema.cache.tb[key][db] and Schema.cache.tb[key][db].is_table) or {}) do
         table.insert(tables, tb)
     end
     return tables
@@ -280,16 +382,17 @@ end
 
 --- @return boolean col exists
 function M.is_a_column(database, tablename, columnname)
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
+    local key, dir = active_catalog()
+    if not key then return false end
     local db = database:gsub("%s+", ""):upper()
     local tb = tablename:gsub("%s+", ""):upper()
     local col = columnname:gsub("%s+", ""):upper()
-    local db_file = data_files_dir .. "/" .. db .. ".lua"
+    local db_file = dir .. "/" .. db .. ".lua"
 
     if vim.fn.filereadable(db_file) == 0 then return false end
 
-    load_tables(db_file, db)
-    for _, c in ipairs((Schema.cache.tb[db] and Schema.cache.tb[db][tb]) or {}) do
+    load_tables(key, db_file, db)
+    for _, c in ipairs((Schema.cache.tb[key][db] and Schema.cache.tb[key][db][tb]) or {}) do
         if c:upper() == col then
             return true
         end
@@ -298,18 +401,19 @@ function M.is_a_column(database, tablename, columnname)
 end
 
 function M.get_columns(table_db_tb)
-    local data_files_dir = config.options.data_dir .. "/" .. config.options.data_completion_dir
+    local key, dir = active_catalog()
+    if not key then return {} end
     local seen = {}
     local acc = {}
     for _, item in ipairs(table_db_tb or {}) do
         if item and item.db_name and item.tb_name then
-            local db_file = data_files_dir .. "/" .. item.db_name .. ".lua"
+            local db_file = dir .. "/" .. item.db_name .. ".lua"
 
             if vim.fn.filereadable(db_file) == 0 then goto continue end
 
-            load_tables(db_file, item.db_name)
+            load_tables(key, db_file, item.db_name)
 
-            for _, col in ipairs((Schema.cache.tb[item.db_name] and Schema.cache.tb[item.db_name][item.tb_name]) or {}) do
+            for _, col in ipairs((Schema.cache.tb[key][item.db_name] and Schema.cache.tb[key][item.db_name][item.tb_name]) or {}) do
                 if col ~= "" and not seen[col] then
                     seen[col] = true
                     table.insert(acc, col)
@@ -340,6 +444,18 @@ function M.export_db_data()
     local ok, msg = M.check_executables({ 'tbuild' })
     if not ok then return vim.notify(msg, vim.log.levels.ERROR) end
 
+    local key = M.catalog_key(current_user)
+    if not key then
+        return vim.notify('Selected user has no tdpid; cannot determine its metadata catalog.', vim.log.levels.ERROR)
+    end
+    if syncing[key] then
+        return vim.notify('TDSync already running for ' .. current_user.tdpid, vim.log.levels.WARN)
+    end
+    local catalog_dir = M.catalog_root() .. '/' .. key
+    -- per-catalog scratch dir: the TPT job writes data_tmp.csv into `data_path` (see assumption A1)
+    local tmp_dir = data_tmp .. '/_sync/' .. key
+    vim.fn.mkdir(tmp_dir, 'p')
+
     local tbuild_bin = 'tbuild'
     if vim.fn.has('win32') == 1 then
         -- On Windows, tbuild.exe relaunches itself from argv[0], so a bare name
@@ -353,31 +469,49 @@ function M.export_db_data()
     local tbuild_command = {
     tbuild_bin, '-f', tpt_script, '-u',
         string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'",
-            current_user.user, current_user.log_mech, current_user.tdpid, data_tmp),
+            current_user.user, current_user.log_mech, current_user.tdpid, tmp_dir),
     }
 
-    local data_tmp_file = data_tmp .. "/data_tmp.csv"
+    local data_tmp_file = tmp_dir .. "/data_tmp.csv"
     M.remove_files(data_tmp_file)
 
-    vim.notify("TDSync: Syncing databases... (this may take a while)", vim.log.levels.INFO)
-
-    vim.system(tbuild_command, { text = true }, function(result)
+    local function on_exit(result)
         vim.schedule(function()
             if result.code ~= 0 then
+                syncing[key] = nil
+                M.remove_files(data_tmp_file)
                 vim.notify("TDSync failed: " .. (result.stderr or result.stdout or "unknown error"), vim.log.levels.ERROR)
                 return
             end
 
-            split_data_db_file_to_lua(function()
+            split_data_db_file_to_lua(data_tmp_file, catalog_dir, current_user, function(ok_split)
+                syncing[key] = nil
                 M.remove_files(data_tmp_file)
-                vim.notify("TDSync: Completed successfully", vim.log.levels.INFO)
-                local okd, diag = pcall(require, 'vim-teradata.diagnostics')
-                if okd and diag.invalidate_all then
-                    diag.invalidate_all()
+                if not ok_split then return end -- the splitter already reported the error
+
+                purge_legacy_flat_catalog()
+                warned_missing[key] = nil
+                vim.notify(("TDSync: %s completed successfully"):format(current_user.tdpid), vim.log.levels.INFO)
+
+                -- the user may have switched machine while this sync was running:
+                -- only refresh diagnostics if the catalog just rebuilt is the active one
+                if M.catalog_key() == key then
+                    local okd, diag = pcall(require, 'vim-teradata.diagnostics')
+                    if okd and diag.invalidate_all then
+                        diag.invalidate_all()
+                    end
                 end
             end)
         end)
-    end)
+    end
+
+    syncing[key] = true
+    vim.notify(("TDSync: Syncing %s... (this may take a while)"):format(current_user.tdpid), vim.log.levels.INFO)
+    local spawned, err = pcall(vim.system, tbuild_command, { text = true }, on_exit)
+    if not spawned then
+        syncing[key] = nil
+        vim.notify("TDSync failed to start: " .. tostring(err), vim.log.levels.ERROR)
+    end
 end
 
 --- Gets the full path for a history directory.
@@ -451,7 +585,19 @@ function M.load_config()
             return vim.fn.json_decode(table.concat(content, '\n'))
         end)
         if ok and type(data) == 'table' then
+            local existing = {}
+            for _, u in ipairs(config.options.users or {}) do
+                if u.user and u.tdpid and u.log_mech then
+                    existing[u.user .. '\0' .. u.tdpid .. '\0' .. u.log_mech] = u
+                end
+            end
             config.options.users = data.users or {}
+            for _, u in ipairs(config.options.users) do
+                local match = existing[u.user .. '\0' .. u.tdpid .. '\0' .. u.log_mech]
+                if match and match.catalog and not u.catalog then
+                    u.catalog = match.catalog
+                end
+            end
             config.options.current_user_index = data.current_user_index
         end
     end

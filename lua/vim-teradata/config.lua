@@ -2,6 +2,9 @@
 ---@field log_mech string  logon mechanism (TD2, LDAP, KRB5, ...)
 ---@field user string      wallet-backed username
 ---@field tdpid string     Teradata host or IP
+---@field catalog string|nil  optional metadata-catalog name; defaults to `tdpid`. Users sharing a
+---                           catalog share one :TDSync export (set it only when two users of the same
+---                           machine see different objects in dbc.columnsv)
 
 ---@class VimTeradata.Config
 ---@field picker 'auto'|'fzf_vim'|'fzf_lua'|'snacks'|'telescope'|'native'

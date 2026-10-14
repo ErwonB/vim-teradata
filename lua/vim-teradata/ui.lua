@@ -657,6 +657,8 @@ function M.show_users()
         local okd, diag = pcall(require, 'vim-teradata.diagnostics')
         if okd and diag.invalidate_all then diag.invalidate_all() end
         vim.notify('Selected user: ' .. config.options.users[index].user, vim.log.levels.INFO)
+        -- the catalog follows the user's tdpid; tell them if that machine was never synced
+        util.warn_if_no_catalog()
         populate_buffer()
     end, { buffer = list_bufnr, silent = true, desc = 'Teradata: select active user' })
 
