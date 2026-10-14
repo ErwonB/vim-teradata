@@ -151,6 +151,38 @@ local function process_in_chunks(items, step, handler, done)
     tick()
 end
 
+--- Replace `final` with the contents of `staging`.
+--- Directory renames are fragile on Windows (AV/indexer handles, existing target), so fall
+--- back to moving files one by one if the fast path fails.
+--- @return boolean ok, string|nil err
+local function swap_dir(staging, final)
+    -- best effort: a locked file here is not fatal, the fallback below overwrites in place
+    if vim.fn.isdirectory(final) == 1 then
+        vim.fn.delete(final, "rf")
+    end
+
+    -- fast path (works when `final` is gone)
+    local ok, err = vim.uv.fs_rename(staging, final)
+    if ok then return true end
+
+    -- fallback: file by file (rename, or copy if the rename is refused)
+    vim.fn.mkdir(final, "p")
+    for name, kind in vim.fs.dir(staging) do
+        if kind == "file" then
+            local src, dst = staging .. "/" .. name, final .. "/" .. name
+            local okf, ferr = vim.uv.fs_rename(src, dst)
+            if not okf then
+                okf, ferr = vim.uv.fs_copyfile(src, dst)
+            end
+            if not okf then
+                return false, ferr or err
+            end
+        end
+    end
+    vim.fn.delete(staging, "rf")
+    return true
+end
+
 --- Splits a temporary CSV file into per-database files and generates a summary file.
 --- Output is written to a staging directory ("<catalog_dir>.new") that replaces `catalog_dir`
 --- only once everything was written successfully.
@@ -280,10 +312,11 @@ local function split_data_db_file_to_lua(input_filename, catalog_dir, user, on_d
             meta_file:close()
         end
 
-        -- Swap staging -> final. Deleting first drops databases that no longer exist on the server.
-        vim.fn.delete(catalog_dir, "rf")
-        if not vim.uv.fs_rename(data_files_dir, catalog_dir) then
-            return fail("Error: Could not move the new catalog into place: " .. catalog_dir)
+        -- Swap staging -> final (drops databases that no longer exist on the server)
+        local swapped, swap_err = swap_dir(data_files_dir, catalog_dir)
+        if not swapped then
+            return fail(("Error: Could not move the new catalog into place: %s (%s)")
+                :format(catalog_dir, tostring(swap_err)))
         end
 
         if on_done then on_done(true) end
@@ -467,7 +500,7 @@ function M.export_db_data()
     end
 
     local tbuild_command = {
-    tbuild_bin, '-f', tpt_script, '-u',
+        tbuild_bin, '-f', tpt_script, '-u',
         string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'",
             current_user.user, current_user.log_mech, current_user.tdpid, tmp_dir),
     }
@@ -480,7 +513,8 @@ function M.export_db_data()
             if result.code ~= 0 then
                 syncing[key] = nil
                 M.remove_files(data_tmp_file)
-                vim.notify("TDSync failed: " .. (result.stderr or result.stdout or "unknown error"), vim.log.levels.ERROR)
+                vim.notify("TDSync failed: " .. (result.stderr or result.stdout or "unknown error"), vim.log.levels
+                    .ERROR)
                 return
             end
 
