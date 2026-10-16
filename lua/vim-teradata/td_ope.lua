@@ -15,13 +15,20 @@ local NODE = {
     SELECT = "select",
     UPDATE = "update",
     INSERT = "insert",
+    DELETE = "delete",
     FROM = "from",
     WHERE = "where",
     WHEN = "when_clause",
     GROUP_BY = "group_by",
     ORDER_BY = "order_by",
     HAVING = "having",
+    QUALIFY = "qualify",
+    SAMPLE = "sample_clause",
+    EXPAND_ON = "expand_on_clause",
+    WINDOW = "window_clause",
+    PIVOT = "pivot",
     JOIN = "join",
+    CROSS_JOIN = "cross_join",
     CASE = "case",
     COLUMN_DEFS = "column_definitions",
     COL_DEF = "column_definition",
@@ -49,6 +56,24 @@ local NODE = {
     CREATE_MACRO = "create_macro",
     CREATE_VIEW = "create_view",
     CREATE_QUERY = "create_query",
+    USING_MODIFIER = "using_request_modifier",
+    LOGGING_ERRORS = "logging_errors_clause",
+    ISOLATED_LOADING = "isolated_loading_clause",
+    CREATE_PROCEDURE = "create_procedure",
+    COMPOUND_STMT = "compound_statement",
+    PROC_IF = "procedure_if_statement",
+    PROC_ELSEIF = "procedure_elseif_statement",
+    PROC_ELSE = "procedure_else_statement",
+    PROC_FOR = "procedure_for_statement",
+    DECLARE_STMT = "declare_statement",
+    CREATE_FUNCTION = "create_function",
+    FUNCTION_BODY = "function_body",
+    CREATE_JOIN_INDEX = "create_join_index",
+    CREATE_HASH_INDEX = "create_hash_index",
+    CREATE_DATABASE = "create_database",
+    MODIFY_DATABASE = "modify_database",
+    ALTER_TABLE = "alter_table",
+    INSERT_EXPLAIN = "insert_explain",
 }
 
 local MAJOR_CLAUSES = {
@@ -59,16 +84,36 @@ local MAJOR_CLAUSES = {
     [NODE.HAVING] = true,
     [NODE.SELECT] = true,
     [NODE.UPDATE] = true,
+    [NODE.INSERT] = true,
+    [NODE.DELETE] = true,
+    [NODE.SET_OPERATION] = true,
+    [NODE.QUALIFY] = true,
+    [NODE.SAMPLE] = true,
+    [NODE.EXPAND_ON] = true,
+    [NODE.WINDOW] = true,
+    [NODE.PIVOT] = true,
+    [NODE.CROSS_JOIN] = true,
     [NODE.TEMP_MODIFIER] = true,
     [NODE.LOCK] = true,
+    [NODE.USING_MODIFIER] = true,
+    [NODE.LOGGING_ERRORS] = true,
+    [NODE.ISOLATED_LOADING] = true,
 }
 
 local CREATE_TABLE_SECTIONS = {
     [NODE.COLUMN_DEFS] = true,
+    [NODE.CREATE_QUERY] = true,
     ["primary_index_clause"] = true,
+    ["index_clause"] = true,
     ["index_definition"] = true,
     ["partition_by"] = true,
     ["partition_by_clause"] = true,
+    ["with_data_clause"] = true,
+    ["storage_location"] = true,
+    ["row_format"] = true,
+    ["table_sort"] = true,
+    ["table_partition"] = true,
+    ["storage_parameters"] = true,
 }
 
 -- Forward declaration
@@ -178,7 +223,7 @@ local function format_update(node, buf, indent_lvl, current_indent)
         local c_type = child:type()
         local txt = format_node(child, buf, indent_lvl)
 
-        if c_type == "keyword_update" then
+        if c_type == "keyword_update" or c_type == "keyword_upd" then
             table.insert(parts, txt)
         elseif c_type == "keyword_set" then
             inside_set = true
@@ -197,6 +242,14 @@ local function format_update(node, buf, indent_lvl, current_indent)
             else
                 table.insert(parts, ",")
             end
+        elseif c_type == NODE.JOIN or c_type == NODE.CROSS_JOIN then
+            table.insert(parts, "\n" .. current_indent .. txt)
+        elseif c_type == "keyword_else" then
+            table.insert(parts, "\n" .. current_indent .. txt)
+        elseif c_type == NODE.INSERT then
+            table.insert(parts, "\n" .. current_indent .. INDENT_STR .. txt)
+        elseif c_type == NODE.ISOLATED_LOADING then
+            table.insert(parts, "\n" .. current_indent .. txt)
         elseif c_type == NODE.RELATION then
             local prev = child:prev_sibling()
             if prev and prev:type() == "keyword_from" then
@@ -251,12 +304,14 @@ local function format_merge_when(node, buf, indent_lvl, current_indent)
                 table.insert(parts, " " .. format_node(child, buf, indent_lvl))
             end
         else
-            -- After THEN: handle UPDATE/INSERT blocks
+            -- After THEN: handle UPDATE/INSERT/DELETE blocks
             if c_type == "keyword_update" then
                 table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
             elseif c_type == "keyword_set" then
                 inside_set = true
                 table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            elseif c_type == "keyword_delete" or c_type == "keyword_del" then
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
             elseif c_type == "," then
                 if inside_set then
                     table.insert(parts, "\n" .. indent_then .. ",")
@@ -272,24 +327,19 @@ local function format_merge_when(node, buf, indent_lvl, current_indent)
                 local col_parts = {}
                 local is_first_col = true
                 for col_child in child:iter_children() do
-                    if col_child:type() == NODE.COLUMN then
-                        local identifier_node = col_child:named_child(0)
-                        if identifier_node then
-                            local identifier_txt = format_node(identifier_node, buf, indent_lvl)
-                            if is_first_col then
-                                table.insert(col_parts, indent_deeper .. identifier_txt)
-                                is_first_col = false
-                            else
-                                table.insert(col_parts, "\n" .. indent_deeper .. ", " .. identifier_txt)
-                            end
+                    if col_child:named() then
+                        local item_txt
+                        if col_child:type() == NODE.COLUMN then
+                            local id_node = col_child:named_child(0)
+                            item_txt = id_node and format_node(id_node, buf, indent_lvl) or format_node(col_child, buf, indent_lvl)
+                        else
+                            item_txt = format_node(col_child, buf, indent_lvl)
                         end
-                    elseif col_child:type() == NODE.FIELD then
-                        local identifier_txt = format_node(col_child, buf, indent_lvl)
                         if is_first_col then
-                            table.insert(col_parts, indent_deeper .. identifier_txt)
+                            table.insert(col_parts, indent_deeper .. item_txt)
                             is_first_col = false
                         else
-                            table.insert(col_parts, "\n" .. indent_deeper .. ", " .. identifier_txt)
+                            table.insert(col_parts, "\n" .. indent_deeper .. ", " .. item_txt)
                         end
                     end
                 end
@@ -335,8 +385,8 @@ local function format_merge(node, buf, indent_lvl, current_indent)
         elseif c_type == "keyword_on" then
             -- ON clause header on new line
             table.insert(parts, "\n" .. indent_1 .. txt)
-        elseif c_type == NODE.PAR_EXPR then
-            -- predicate in parentheses appended after ON with a space
+        elseif c_type == NODE.PAR_EXPR or c_type == NODE.BINARY_EXPR or c_type == NODE.RELATION or c_type == NODE.TERM then
+            -- predicate appended after ON with a space
             table.insert(parts, " " .. txt)
         elseif c_type == NODE.WHEN then
             -- Each WHEN clause starts on a new line at indent_1
@@ -435,7 +485,7 @@ local function format_column_definitions(node, buf, indent_lvl, current_indent)
                     end
 
                     local gc_txt = format_node(grandchild, buf, indent_lvl)
-                    if gc_type == NODE.IDENTIFIER and name_txt == "" then
+                    if (gc_type == NODE.IDENTIFIER or gc_type == NODE.LITERAL) and name_txt == "" then
                         name_txt = gc_txt
                     else
                         table.insert(col_parts, gc_txt)
@@ -477,7 +527,7 @@ local function format_column_definitions(node, buf, indent_lvl, current_indent)
                     table.insert(parts, "\n" .. constraint_text)
                 end
             end
-        elseif c_type:match("comment") then
+        elseif c_type:match("comment") or c_type == NODE.MARGINALIA then
             table.insert(parts, " " .. format_node(child, buf, indent_lvl))
         end
     end
@@ -487,51 +537,58 @@ end
 local function format_insert(node, buf, indent_lvl, current_indent)
     local parts = {}
     local column_list_text = ""
+    local is_first_header = true
 
     for child in node:iter_children() do
         local c_type = child:type()
 
-        if c_type == "keyword_insert" or c_type == "keyword_into" or c_type == NODE.OBJECT_REF then
+        if c_type == "keyword_insert" or c_type == "keyword_ins" or c_type == "keyword_into"
+            or c_type == "keyword_replace" or c_type == "keyword_overwrite" or c_type == "keyword_ignore" then
             local txt = format_node(child, buf, indent_lvl)
-            if #parts == 0 then
+            if is_first_header then
                 table.insert(parts, txt)
+                is_first_header = false
             else
                 table.insert(parts, " " .. txt)
             end
+        elseif c_type == NODE.OBJECT_REF or c_type == NODE.RELATION then
+            table.insert(parts, " " .. format_node(child, buf, indent_lvl))
         elseif c_type == NODE.LIST then
             local col_parts = {}
             local col_indent = string.rep(INDENT_STR, indent_lvl + 1)
-            local is_first_col = true
-            local is_first_value = true
+            local is_first_item = true
 
             for col_child in child:iter_children() do
-                if col_child:type() == NODE.COLUMN then
-                    local identifier_node = col_child:named_child(0)
-                    if identifier_node then
-                        local identifier_txt = format_node(identifier_node, buf, indent_lvl)
-                        if is_first_col then
-                            table.insert(col_parts, col_indent .. identifier_txt)
-                            is_first_col = false
-                        else
-                            table.insert(col_parts, "\n" .. col_indent .. ", " .. identifier_txt)
-                        end
-                    end
-                elseif col_child:type() == NODE.LITERAL then
-                    local literal_txt = ts.get_node_text(col_child, buf)
-                    if is_first_value then
-                        table.insert(col_parts, col_indent .. literal_txt)
-                        is_first_value = false
+                if col_child:named() then
+                    local item_txt
+                    if col_child:type() == NODE.COLUMN then
+                        local identifier_node = col_child:named_child(0)
+                        item_txt = identifier_node and format_node(identifier_node, buf, indent_lvl) or format_node(col_child, buf, indent_lvl)
                     else
-                        table.insert(col_parts, "\n" .. col_indent .. ", " .. literal_txt)
+                        item_txt = format_node(col_child, buf, indent_lvl)
+                    end
+                    if is_first_item then
+                        table.insert(col_parts, col_indent .. item_txt)
+                        is_first_item = false
+                    else
+                        table.insert(col_parts, "\n" .. col_indent .. ", " .. item_txt)
                     end
                 end
             end
-            column_list_text = "\n(\n" .. table.concat(col_parts, "") .. "\n" .. current_indent .. ")"
+            column_list_text = "\n" .. current_indent .. "(\n" .. table.concat(col_parts, "") .. "\n" .. current_indent .. ")"
             table.insert(parts, column_list_text)
+        elseif c_type == "keyword_values" then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        elseif c_type == "," then
+            table.insert(parts, ",")
+        elseif MAJOR_CLAUSES[c_type] or c_type == NODE.SELECT or c_type == NODE.SET_OPERATION or c_type == NODE.CTE or c_type == "keyword_with" then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
         else
-            local rest_txt = format_node(child, buf, indent_lvl)
-            if rest_txt ~= "" and rest_txt ~= "," then
-                table.insert(parts, "\n" .. current_indent .. rest_txt)
+            if child:named() then
+                local rest_txt = format_node(child, buf, indent_lvl)
+                if rest_txt ~= "" then
+                    table.insert(parts, "\n" .. current_indent .. rest_txt)
+                end
             end
         end
     end
@@ -539,13 +596,12 @@ local function format_insert(node, buf, indent_lvl, current_indent)
     return table.concat(parts, "")
 end
 
---- Formats a set operation: UNION [ALL], INTERSECT [ALL], EXCEPT [ALL]
+--- Formats a set operation: UNION [ALL], INTERSECT [ALL], EXCEPT [ALL], MINUS [ALL]
 local function format_set_operation(node, buf, indent_lvl, current_indent)
     local parts       = {}
-    local pending_ops = {} -- keyword_union / keyword_intersect / keyword_except / keyword_all
+    local pending_ops = {}
     local in_operator = false
 
-    -- Collect children: flush any pending op-keywords as a separator line before the next SELECT block
     local function flush_ops()
         if #pending_ops > 0 then
             table.insert(parts, "\n" .. current_indent .. table.concat(pending_ops, " "))
@@ -559,11 +615,11 @@ local function format_set_operation(node, buf, indent_lvl, current_indent)
 
         if c_type == "keyword_union"
             or c_type == "keyword_intersect"
-            or c_type == "keyword_except" then
+            or c_type == "keyword_except"
+            or c_type == "keyword_minus" then
             in_operator = true
             table.insert(pending_ops, get_formatted_text(child, buf))
-        elseif c_type == "keyword_all" and in_operator then
-            -- ALL/DISTINCT that qualifies the set operator
+        elseif (c_type == "keyword_all" or c_type == "keyword_distinct") and in_operator then
             table.insert(pending_ops, get_formatted_text(child, buf))
         elseif MAJOR_CLAUSES[c_type] or c_type == NODE.SELECT then
             if c_type == NODE.SELECT then
@@ -575,12 +631,10 @@ local function format_set_operation(node, buf, indent_lvl, current_indent)
                     table.insert(parts, "\n" .. current_indent .. txt)
                 end
             else
-                -- from / where / group_by / … attached to the current query block
                 local txt = format_node(child, buf, indent_lvl)
                 table.insert(parts, "\n" .. current_indent .. txt)
             end
         else
-            -- Anything else (e.g. nested set_operation, parentheses)
             flush_ops()
             local txt = format_node(child, buf, indent_lvl)
             if #parts > 0 then
@@ -647,14 +701,11 @@ local function format_cte(node, buf, indent_lvl, current_indent)
             end
         elseif c_type == "," then
             -- top-level comma between CTEs: already handled by is_first_cte logic, skip
-            -- (do nothing)
         elseif MAJOR_CLAUSES[c_type] or c_type == NODE.SELECT then
-            -- Final SELECT/UPDATE/INSERT after all CTEs
             table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
         elseif c_type == NODE.SELECT_EXPR then
             table.insert(parts, "\n" .. format_node(child, buf, indent_lvl))
         else
-            -- comments, semicolons, etc. — skip anonymous punctuation silently
             if child:named() then
                 local txt = format_node(child, buf, indent_lvl)
                 if txt ~= "" then
@@ -677,26 +728,18 @@ local function format_create_macro(node, buf, indent_lvl, current_indent)
     local param_indent = string.rep(INDENT_STR, indent_lvl + 1)
     local body_indent  = string.rep(INDENT_STR, indent_lvl + 1)
 
-    -- First pass: collect everything
     for child in node:iter_children() do
         local c_type = child:type()
 
-        if c_type == "keyword_create" then
+        if c_type == "keyword_create" or c_type == "keyword_replace" then
             table.insert(parts, get_formatted_text(child, buf))
         elseif c_type == "keyword_macro" then
             table.insert(parts, " " .. get_formatted_text(child, buf))
         elseif c_type == NODE.OBJECT_REF then
             table.insert(parts, " " .. format_node(child, buf, indent_lvl))
         elseif c_type == NODE.COL_DEF then
-            -- Collect parameter definitions; the surrounding '(' ')' and ',' are
-            -- anonymous children the tree provides — we reconstruct them ourselves.
-            local def_parts = {}
-            for gc in child:iter_children() do
-                table.insert(def_parts, format_node(gc, buf, indent_lvl))
-            end
-            table.insert(param_parts, table.concat(def_parts, " "))
+            table.insert(param_parts, format_node(child, buf, indent_lvl))
         elseif c_type == "keyword_as" then
-            -- Flush parameter list wrapped in ( … ) immediately before 'as'
             if #param_parts > 0 then
                 table.insert(parts, " (\n")
                 for i, p in ipairs(param_parts) do
@@ -711,12 +754,11 @@ local function format_create_macro(node, buf, indent_lvl, current_indent)
             seen_as = true
             table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
         elseif c_type == NODE.STATEMENT and seen_as then
-            -- Collect body statements — will be wrapped in a single ( … ) block below
             local body = format_node(child, buf, indent_lvl + 1)
-            body = body:gsub("%s*;%s*$", "") -- strip any trailing semicolon
+            body = body:gsub("%s*;%s*$", "")
             table.insert(body_stmts, body)
         elseif c_type == "(" or c_type == ")" or c_type == "," or c_type == ";" then
-            -- Anonymous punctuation reproduced by our own logic — skip
+            -- Skip punctuation reproduced manually
         else
             if child:named() then
                 local txt = format_node(child, buf, indent_lvl)
@@ -727,7 +769,6 @@ local function format_create_macro(node, buf, indent_lvl, current_indent)
         end
     end
 
-    -- Emit the body block: all statements separated by ";\n<indent>" inside one ( … )
     if #body_stmts > 0 then
         local joined = table.concat(body_stmts, "\n" .. body_indent .. ";\n" .. body_indent)
         table.insert(parts, " (\n" .. body_indent .. joined .. "\n" .. current_indent .. ")")
@@ -745,24 +786,27 @@ local function format_create_view(node, buf, indent_lvl, current_indent)
     for child in node:iter_children() do
         local c_type = child:type()
 
-        -- Header keywords: replace / view
-        if c_type == "keyword_replace" or c_type == "keyword_view" then
+        if c_type == "keyword_create" or c_type == "keyword_replace"
+            or c_type == "keyword_recursive" or c_type == "keyword_temp"
+            or c_type == "keyword_temporary" or c_type == "keyword_view" then
             if #parts == 0 then
                 table.insert(parts, get_formatted_text(child, buf))
             else
                 table.insert(parts, " " .. get_formatted_text(child, buf))
             end
-
-            -- View name
         elseif c_type == NODE.OBJECT_REF then
             table.insert(parts, " " .. format_node(child, buf, indent_lvl))
-
-            -- AS keyword: goes on the same line as the name
+        elseif c_type == "(" then
+            table.insert(parts, " (")
+        elseif c_type == "," then
+            table.insert(parts, ", ")
+        elseif c_type == ")" then
+            table.insert(parts, ")")
+        elseif c_type == NODE.IDENTIFIER then
+            table.insert(parts, get_formatted_text(child, buf))
         elseif c_type == "keyword_as" then
             seen_as = true
             table.insert(parts, " " .. get_formatted_text(child, buf))
-
-            -- create_query: the body — expand its children directly at current indent
         elseif c_type == NODE.CREATE_QUERY and seen_as then
             local is_first = true
             for qchild in child:iter_children() do
@@ -770,15 +814,10 @@ local function format_create_view(node, buf, indent_lvl, current_indent)
                 local txt     = format_node(qchild, buf, indent_lvl)
 
                 if MAJOR_CLAUSES[qc_type] or qc_type == NODE.SELECT then
-                    if is_first then
-                        table.insert(parts, "\n" .. current_indent .. txt)
-                    else
-                        table.insert(parts, "\n" .. current_indent .. txt)
-                    end
+                    table.insert(parts, "\n" .. current_indent .. txt)
                 elseif qc_type == NODE.SELECT_EXPR then
                     table.insert(parts, "\n" .. txt)
                 else
-                    -- lock_clause and any other named node
                     if not is_first and parts[#parts] and not parts[#parts]:match("\n%s*$") then
                         table.insert(parts, " ")
                     end
@@ -786,16 +825,451 @@ local function format_create_view(node, buf, indent_lvl, current_indent)
                 end
                 is_first = false
             end
-
-            -- Skip anonymous punctuation (semicolons, etc.)
+        elseif c_type == "keyword_with" or c_type == "keyword_check" or c_type == "keyword_option" or c_type == "keyword_local" then
+            if c_type == "keyword_with" then
+                table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+            else
+                table.insert(parts, " " .. get_formatted_text(child, buf))
+            end
         elseif not child:named() then
             -- do nothing
         else
-            -- Comments or unexpected named nodes
             local txt = format_node(child, buf, indent_lvl)
             if txt ~= "" then
                 table.insert(parts, " " .. txt)
             end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats a SAMPLE clause (simple or WHEN ... THEN ... ELSE ... END)
+local function format_sample(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local kw_indent = "\n" .. current_indent .. INDENT_STR
+    local has_when = false
+    for child in node:iter_children() do
+        if child:type() == "keyword_when" then
+            has_when = true
+            break
+        end
+    end
+
+    if not has_when then
+        for child in node:iter_children() do
+            local c_type = child:type()
+            local txt = format_node(child, buf, indent_lvl)
+            if c_type == "," then
+                table.insert(parts, ", ")
+            elseif #parts > 0 and parts[#parts]:sub(-1) ~= " " then
+                table.insert(parts, " " .. txt)
+            else
+                table.insert(parts, txt)
+            end
+        end
+        return table.concat(parts, "")
+    end
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+        local txt = format_node(child, buf, indent_lvl + 1)
+        if c_type == "keyword_sample" then
+            table.insert(parts, txt)
+        elseif c_type == "keyword_when" or c_type == "keyword_else" or c_type == "keyword_end" then
+            table.insert(parts, kw_indent .. txt)
+        else
+            if #parts > 0 and parts[#parts]:sub(-1) ~= "\n" and parts[#parts]:sub(-1) ~= " " and c_type ~= "," then
+                table.insert(parts, " ")
+            end
+            table.insert(parts, txt)
+        end
+    end
+    return table.concat(parts, "")
+end
+
+
+--- Formats a compound statement (BEGIN ... END)
+local function format_compound_statement(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local inner_indent = current_indent .. INDENT_STR
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_begin" then
+            if #parts == 0 then
+                table.insert(parts, get_formatted_text(child, buf))
+            else
+                table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+            end
+        elseif c_type == "keyword_end" then
+            table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+        elseif c_type == ";" then
+            table.insert(parts, ";")
+        elseif c_type == ":" then
+            table.insert(parts, ":")
+        elseif child:named() then
+            local txt = format_node(child, buf, indent_lvl + 1)
+            table.insert(parts, "\n" .. inner_indent .. txt)
+        else
+            table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats a procedural IF statement
+local function format_proc_if(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local inner_indent = current_indent .. INDENT_STR
+    local seen_then = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_if" and not seen_then then
+            table.insert(parts, get_formatted_text(child, buf))
+        elseif c_type == "keyword_then" then
+            seen_then = true
+            table.insert(parts, " " .. get_formatted_text(child, buf))
+        elseif c_type == NODE.PROC_ELSEIF then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        elseif c_type == NODE.PROC_ELSE then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        elseif c_type == "keyword_end" then
+            table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+        elseif c_type == "keyword_if" and seen_then then
+            table.insert(parts, " " .. get_formatted_text(child, buf))
+        elseif c_type == ";" then
+            table.insert(parts, ";")
+        elseif child:named() then
+            if not seen_then then
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            else
+                table.insert(parts, "\n" .. inner_indent .. format_node(child, buf, indent_lvl + 1))
+            end
+        end
+    end
+    return table.concat(parts, "")
+end
+
+
+--- Formats a procedural FOR loop
+local function format_proc_for(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local inner_indent = current_indent .. INDENT_STR
+    local seen_do = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_for" and not seen_do then
+            if #parts == 0 then
+                table.insert(parts, get_formatted_text(child, buf))
+            else
+                table.insert(parts, " " .. get_formatted_text(child, buf))
+            end
+        elseif c_type == "keyword_do" then
+            seen_do = true
+            table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+        elseif c_type == "keyword_end" then
+            table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+        elseif c_type == "keyword_for" and seen_do then
+            table.insert(parts, " " .. get_formatted_text(child, buf))
+        elseif c_type == ";" then
+            table.insert(parts, ";")
+        elseif child:named() then
+            if not seen_do then
+                if c_type == NODE.SELECT or MAJOR_CLAUSES[c_type] then
+                    table.insert(parts, "\n" .. inner_indent .. format_node(child, buf, indent_lvl + 1))
+                else
+                    table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+                end
+            else
+                table.insert(parts, "\n" .. inner_indent .. format_node(child, buf, indent_lvl + 1))
+            end
+        end
+    end
+    return table.concat(parts, "")
+end
+
+
+--- Formats CREATE [REPLACE] PROCEDURE
+local function format_create_procedure(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local header_parts = {}
+    local body_node = nil
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_create" or c_type == "keyword_replace" or c_type == "keyword_procedure" then
+            table.insert(header_parts, get_formatted_text(child, buf))
+        elseif c_type == NODE.OBJECT_REF then
+            table.insert(header_parts, format_node(child, buf, indent_lvl))
+        elseif c_type == "procedure_arguments" then
+            table.insert(parts, table.concat(header_parts, " "))
+            header_parts = {}
+
+            local arg_parts = {}
+            local arg_indent = current_indent .. INDENT_STR
+            local is_first_arg = true
+            for achild in child:iter_children() do
+                if achild:named() then
+                    local atxt = format_node(achild, buf, indent_lvl + 1)
+                    if is_first_arg then
+                        table.insert(arg_parts, arg_indent .. atxt)
+                        is_first_arg = false
+                    else
+                        table.insert(arg_parts, "\n" .. arg_indent .. ", " .. atxt)
+                    end
+                end
+            end
+            if #arg_parts > 0 then
+                table.insert(parts, " (\n" .. table.concat(arg_parts, "") .. "\n" .. current_indent .. ")")
+            else
+                table.insert(parts, " ()")
+            end
+        elseif c_type == "procedure_body" or c_type == NODE.COMPOUND_STMT then
+            body_node = child
+        elseif c_type:match("^procedure_") then
+            if #header_parts > 0 then
+                table.insert(parts, table.concat(header_parts, " "))
+                header_parts = {}
+            end
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        elseif c_type == NODE.COMMENT or c_type == NODE.MARGINALIA then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        end
+    end
+
+    if #header_parts > 0 then
+        table.insert(parts, table.concat(header_parts, " "))
+    end
+
+    if body_node then
+        table.insert(parts, "\n" .. current_indent .. format_node(body_node, buf, indent_lvl))
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats CREATE [REPLACE] FUNCTION
+local function format_create_function(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local header_parts = {}
+    local seen_header = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if c_type == "keyword_create" or c_type == "keyword_replace" or c_type == "keyword_function" then
+            table.insert(header_parts, get_formatted_text(child, buf))
+        elseif c_type == NODE.OBJECT_REF and not seen_header then
+            table.insert(header_parts, format_node(child, buf, indent_lvl))
+        elseif c_type == "function_arguments" then
+            table.insert(header_parts, format_node(child, buf, indent_lvl))
+            table.insert(parts, table.concat(header_parts, " "))
+            seen_header = true
+        elseif c_type == "keyword_returns" then
+            if not seen_header and #header_parts > 0 then
+                table.insert(parts, table.concat(header_parts, " "))
+                seen_header = true
+            end
+            table.insert(parts, "\n" .. current_indent .. get_formatted_text(child, buf))
+        elseif c_type:match("^function_") and c_type ~= "function_body" then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        elseif c_type == "function_body" or c_type == NODE.FUNCTION_BODY then
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+        else
+            if child:named() then
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            else
+                table.insert(parts, format_node(child, buf, indent_lvl))
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats CREATE DATABASE and MODIFY DATABASE
+local function format_database_ddl(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local header_parts = {}
+    local seen_as = false
+    local attr_indent = current_indent .. INDENT_STR
+    local current_attr = {}
+    local is_first_attr = true
+
+    local function flush_attr()
+        if #current_attr > 0 then
+            local attr_txt = table.concat(current_attr, " ")
+            if is_first_attr then
+                table.insert(parts, "\n" .. attr_indent .. "  " .. attr_txt)
+                is_first_attr = false
+            else
+                table.insert(parts, "\n" .. attr_indent .. ", " .. attr_txt)
+            end
+            current_attr = {}
+        end
+    end
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if not seen_as then
+            if c_type == "keyword_as" then
+                seen_as = true
+                table.insert(header_parts, get_formatted_text(child, buf))
+                table.insert(parts, table.concat(header_parts, " "))
+            else
+                table.insert(header_parts, format_node(child, buf, indent_lvl))
+            end
+        else
+            if c_type == "," then
+                flush_attr()
+            elseif c_type == "=" then
+                table.insert(current_attr, "=")
+            elseif child:named() then
+                table.insert(current_attr, format_node(child, buf, indent_lvl))
+            end
+        end
+    end
+    flush_attr()
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats ALTER TABLE
+local function format_alter_table(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local header_parts = {}
+    local seen_name = false
+    local spec_indent = current_indent .. INDENT_STR
+    local is_first_spec = true
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if not seen_name then
+            table.insert(header_parts, format_node(child, buf, indent_lvl))
+            if c_type == NODE.OBJECT_REF then
+                seen_name = true
+                table.insert(parts, table.concat(header_parts, " "))
+            end
+        else
+            if c_type == NODE.COMMENT or c_type == NODE.MARGINALIA then
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            elseif c_type == "," then
+                -- Comma handled below
+            elseif child:named() then
+                local txt = format_node(child, buf, indent_lvl + 1)
+                if is_first_spec then
+                    table.insert(parts, "\n" .. spec_indent .. "  " .. txt)
+                    is_first_spec = false
+                else
+                    table.insert(parts, "\n" .. spec_indent .. ", " .. txt)
+                end
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats CREATE JOIN INDEX
+local function format_create_join_index(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local seen_as = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+        local txt = format_node(child, buf, indent_lvl)
+
+        if not seen_as then
+            if c_type == "keyword_as" then
+                seen_as = true
+                table.insert(parts, " " .. txt)
+            elseif #parts == 0 then
+                table.insert(parts, txt)
+            else
+                table.insert(parts, " " .. txt)
+            end
+        else
+            if CREATE_TABLE_SECTIONS[c_type] or c_type == NODE.SELECT or MAJOR_CLAUSES[c_type] then
+                table.insert(parts, "\n" .. current_indent .. txt)
+            elseif c_type == NODE.SELECT_EXPR then
+                table.insert(parts, "\n" .. txt)
+            else
+                if parts[#parts] and not parts[#parts]:match("\n%s*$") then
+                    table.insert(parts, " ")
+                end
+                table.insert(parts, txt)
+            end
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats CREATE HASH INDEX
+local function format_create_hash_index(node, buf, indent_lvl, current_indent)
+    local parts = {}
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+        local txt = format_node(child, buf, indent_lvl)
+
+        if c_type == "keyword_on" or c_type == "keyword_by" or c_type == "hash_index_order_by_clause" then
+            table.insert(parts, "\n" .. current_indent .. txt)
+        elseif c_type == "hash_index_option" then
+            table.insert(parts, "\n" .. current_indent .. txt)
+        elseif #parts == 0 then
+            table.insert(parts, txt)
+        else
+            if parts[#parts] and not parts[#parts]:match("\n%s*$") and c_type ~= "," and c_type ~= "(" and c_type ~= ")" then
+                table.insert(parts, " ")
+            end
+            table.insert(parts, txt)
+        end
+    end
+
+    return table.concat(parts, "")
+end
+
+
+--- Formats INSERT EXPLAIN
+local function format_insert_explain(node, buf, indent_lvl, current_indent)
+    local parts = {}
+    local header_done = false
+
+    for child in node:iter_children() do
+        local c_type = child:type()
+
+        if not header_done then
+            if c_type == NODE.SELECT or c_type == NODE.INSERT or c_type == NODE.UPDATE or c_type == NODE.DELETE or c_type == NODE.STATEMENT then
+                header_done = true
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
+            else
+                local txt = format_node(child, buf, indent_lvl)
+                if #parts == 0 then
+                    table.insert(parts, txt)
+                else
+                    table.insert(parts, " " .. txt)
+                end
+            end
+        else
+            table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
         end
     end
 
@@ -808,14 +1282,14 @@ format_node = function(node, buf, indent_lvl, context)
     local type = node:type()
     local current_indent = string.rep(INDENT_STR, indent_lvl)
 
-    -- Base case: Leaf nodes
-    if node:child_count() == 0 or type == NODE.LITERAL then
+    -- Base case: Leaf nodes or tokens without separate AST children
+    if node:child_count() == 0 or type == NODE.LITERAL or type == NODE.IDENTIFIER then
         return get_formatted_text(node, buf)
     end
 
     -- Handlers for specific node types
 
-    -- set_operation: UNION [ALL] / INTERSECT [ALL] / EXCEPT [ALL]
+    -- set_operation: UNION [ALL] / INTERSECT [ALL] / EXCEPT [ALL] / MINUS [ALL]
     if type == NODE.SET_OPERATION then
         return format_set_operation(node, buf, indent_lvl, current_indent)
     end
@@ -825,15 +1299,102 @@ format_node = function(node, buf, indent_lvl, context)
         return format_create_macro(node, buf, indent_lvl, current_indent)
     end
 
+    -- create_procedure
+    if type == NODE.CREATE_PROCEDURE then
+        return format_create_procedure(node, buf, indent_lvl, current_indent)
+    end
+
+    -- compound_statement
+    if type == NODE.COMPOUND_STMT then
+        return format_compound_statement(node, buf, indent_lvl, current_indent)
+    end
+
+    -- procedure_if_statement
+    if type == NODE.PROC_IF then
+        return format_proc_if(node, buf, indent_lvl, current_indent)
+    end
+
+    -- procedure_for_statement
+    if type == NODE.PROC_FOR then
+        return format_proc_for(node, buf, indent_lvl, current_indent)
+    end
+
+    -- create_function
+    if type == NODE.CREATE_FUNCTION then
+        return format_create_function(node, buf, indent_lvl, current_indent)
+    end
+
+    -- create_database / modify_database
+    if type == NODE.CREATE_DATABASE or type == NODE.MODIFY_DATABASE then
+        return format_database_ddl(node, buf, indent_lvl, current_indent)
+    end
+
+    -- alter_table
+    if type == NODE.ALTER_TABLE then
+        return format_alter_table(node, buf, indent_lvl, current_indent)
+    end
+
+    -- create_join_index
+    if type == NODE.CREATE_JOIN_INDEX then
+        return format_create_join_index(node, buf, indent_lvl, current_indent)
+    end
+
+    -- create_hash_index
+    if type == NODE.CREATE_HASH_INDEX then
+        return format_create_hash_index(node, buf, indent_lvl, current_indent)
+    end
+
+    -- insert_explain
+    if type == NODE.INSERT_EXPLAIN then
+        return format_insert_explain(node, buf, indent_lvl, current_indent)
+    end
+
+    -- sample_clause
+    if type == NODE.SAMPLE then
+        return format_sample(node, buf, indent_lvl, current_indent)
+    end
+
+    if type == NODE.QUALIFY then
+        local parts = {}
+        for child in node:iter_children() do
+            if child:type() == "keyword_qualify" then
+                table.insert(parts, get_formatted_text(child, buf))
+            else
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            end
+        end
+        return table.concat(parts, "")
+    end
+
+    if type == NODE.EXPAND_ON then
+        local parts = {}
+        for child in node:iter_children() do
+            local txt = format_node(child, buf, indent_lvl)
+            if #parts > 0 and parts[#parts]:sub(-1) ~= " " and child:type() ~= "," then
+                table.insert(parts, " ")
+            end
+            table.insert(parts, txt)
+        end
+        return table.concat(parts, "")
+    end
+
     if type == NODE.STATEMENT or type == NODE.SELECT then
         if type == NODE.STATEMENT and is_merge_statement(node) then
             return format_merge(node, buf, indent_lvl, current_indent)
         end
 
-        -- CTE: statement whose first named child is keyword_with
+        -- CTE: statement with keyword_with before main query
         if type == NODE.STATEMENT then
-            local first = node:named_child(0)
-            if first and first:type() == "keyword_with" then
+            local has_with = false
+            for child in node:iter_children() do
+                if child:type() == "keyword_with" then
+                    has_with = true
+                    break
+                elseif child:type() == NODE.SELECT or child:type() == NODE.INSERT or child:type() == NODE.UPDATE or child:type() == NODE.DELETE then
+                    break
+                end
+            end
+            if has_with then
                 return format_cte(node, buf, indent_lvl, current_indent)
             end
         end
@@ -911,23 +1472,18 @@ format_node = function(node, buf, indent_lvl, context)
             local r_txt = format_node(right[1], buf, indent_lvl, context)
             return l_txt .. "\n" .. current_indent .. op_txt .. " " .. r_txt
         end
-
-        local parts = {}
-        for child in node:iter_children() do
-            table.insert(parts, format_node(child, buf, indent_lvl, context))
-        end
-        return table.concat(parts, " ")
+        -- Non-AND/OR expressions fall through to Generic Fallback to preserve gaps (e.g. ESCAPE '\')
     end
 
-    if type == NODE.JOIN then
+    if type == NODE.JOIN or type == NODE.CROSS_JOIN then
         local parts = {}
         for child in node:iter_children() do
             local c_type = child:type()
-            if c_type == NODE.RELATION then
-                table.insert(parts, "\n" .. format_node(child, buf, indent_lvl))
+            if c_type == NODE.RELATION or c_type == NODE.SUBQUERY or c_type == NODE.OBJECT_REF then
+                table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
             elseif c_type == "keyword_on" then
                 table.insert(parts, "\n" .. current_indent .. format_node(child, buf, indent_lvl))
-            elseif c_type == NODE.BINARY_EXPR and c_type ~= "keyword_full" and c_type ~= "keyword_join" then
+            elseif c_type == NODE.BINARY_EXPR and c_type ~= "keyword_full" and c_type ~= "keyword_join" and c_type ~= "keyword_cross" then
                 table.insert(parts, " " .. format_node(child, buf, indent_lvl))
             else
                 if #parts > 0 then table.insert(parts, " ") end
@@ -1016,6 +1572,8 @@ format_node = function(node, buf, indent_lvl, context)
             local txt = format_node(child, buf, indent_lvl)
             if CREATE_TABLE_SECTIONS[c_type] then
                 table.insert(parts, "\n" .. current_indent .. txt)
+            elseif c_type == "keyword_no" or c_type == "keyword_on" then
+                table.insert(parts, "\n" .. current_indent .. txt)
             else
                 if not is_first and parts[#parts] and not parts[#parts]:match("\n%s*$") then
                     table.insert(parts, " ")
@@ -1087,12 +1645,23 @@ format_node = function(node, buf, indent_lvl, context)
         local parts = {}
         for child in node:iter_children() do
             local c_type = child:type()
-            local txt = format_node(child, buf, indent_lvl)
 
             if c_type == "keyword_partition" then
-                table.insert(parts, txt)
+                table.insert(parts, format_node(child, buf, indent_lvl))
             elseif c_type == "keyword_by" then
-                table.insert(parts, " " .. txt)
+                table.insert(parts, " " .. format_node(child, buf, indent_lvl))
+            elseif c_type == NODE.PAR_EXPR then
+                local p_indent = current_indent .. INDENT_STR
+                for pchild in child:iter_children() do
+                    local pt = pchild:type()
+                    if pt == "(" then
+                        table.insert(parts, "\n" .. p_indent .. "(")
+                    elseif pt == ")" then
+                        table.insert(parts, "\n" .. p_indent .. ")")
+                    else
+                        table.insert(parts, "\n" .. p_indent .. format_node(pchild, buf, indent_lvl + 1))
+                    end
+                end
             else
                 table.insert(parts, "\n" .. current_indent .. INDENT_STR .. format_node(child, buf, indent_lvl + 1))
             end
@@ -1103,6 +1672,7 @@ format_node = function(node, buf, indent_lvl, context)
     -- Generic Fallback
     local parts = {}
     local prev_er, prev_ec
+    local prev_was_comment = false
     do
         local sr, sc, _, _ = node:range(); prev_er, prev_ec = sr, sc
     end
@@ -1117,7 +1687,10 @@ format_node = function(node, buf, indent_lvl, context)
             local joined = table.concat(gap, " "):match("^%s*(.-)%s*$")
             if joined ~= "" then
                 local prev = parts[#parts]
-                if #parts > 0 and prev ~= "(" and prev:sub(-1) ~= "\n" then
+                if prev_was_comment then
+                    table.insert(parts, "\n" .. current_indent)
+                    prev_was_comment = false
+                elseif #parts > 0 and prev ~= "(" and prev:sub(-1) ~= "\n" then
                     table.insert(parts, " ")
                 end
                 table.insert(parts, joined)
@@ -1127,7 +1700,10 @@ format_node = function(node, buf, indent_lvl, context)
         local txt = format_node(child, buf, indent_lvl, context)
         local prev = parts[#parts]
 
-        if c_type == "." or (prev and prev:sub(-1) == ".") then
+        if prev_was_comment then
+            table.insert(parts, "\n" .. current_indent .. txt)
+            prev_was_comment = false
+        elseif c_type == "." or (prev and prev:sub(-1) == ".") then
             table.insert(parts, txt)
         elseif c_type == "(" then
             table.insert(parts, " " .. txt)
@@ -1140,8 +1716,29 @@ format_node = function(node, buf, indent_lvl, context)
             table.insert(parts, txt)
         end
 
+        if c_type == NODE.COMMENT then
+            prev_was_comment = true
+        end
+
         prev_er, prev_ec = c_er, c_ec
     end
+
+    -- Capture any trailing gap after the last child (e.g. trailing numbers, format strings, literals)
+    local _, _, parent_er, parent_ec = node:range()
+    if prev_er ~= nil and (parent_er > prev_er or (parent_er == prev_er and parent_ec > prev_ec)) then
+        local gap = api.nvim_buf_get_text(buf, prev_er, prev_ec, parent_er, parent_ec, {})
+        local joined = table.concat(gap, " "):match("^%s*(.-)%s*$")
+        if joined ~= "" then
+            local prev = parts[#parts]
+            if prev_was_comment then
+                table.insert(parts, "\n" .. current_indent)
+            elseif #parts > 0 and prev ~= "(" and prev:sub(-1) ~= "\n" then
+                table.insert(parts, " ")
+            end
+            table.insert(parts, joined)
+        end
+    end
+
     return table.concat(parts, "")
 end
 
