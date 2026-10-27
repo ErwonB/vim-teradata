@@ -258,6 +258,9 @@ retlimit ~
     Maximum number of rows returned per |:TDO|/|:TDV| query. Controls
     memory and latency.
 
+    The limit is NOT applied to `EXPLAIN` statements: the full explain
+    plan is always returned, whatever the value of retlimit.
+
                                                          *vim-teradata-opt-ft*
 ft ~
     Type: `string[]`          Default: `{ "sql", "teradata" }`
@@ -472,7 +475,8 @@ cursor plus the next two.
                                                                       *:TDO*
 :[N]TDO         Run the current statement plus the next N-1 statements
                 via BTEQ and display the results in a split. Honours
-                |vim-teradata-opt-retlimit|.
+                |vim-teradata-opt-retlimit|, except for `EXPLAIN`
+                statements, which are never truncated.
 
                                                                       *:TDV*
 :[range]TDV     Run statements of the visual selection (split on `;`)

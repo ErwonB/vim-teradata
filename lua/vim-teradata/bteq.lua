@@ -31,7 +31,8 @@ local function build_script(sql, user_obj, options, output_path)
         '.EXPORT FILE = \'' .. (output_path:gsub("'", "''")) .. '\';',
         '.set WIDTH 1048575',
     })
-    if options.operation == 'output' then
+    -- retlimit is skipped for EXPLAIN so that the whole plan is exported
+    if options.operation == 'output' and not options.skip_retlimit then
         vim.list_extend(body, {
             '.set retlimit ' .. config.options.retlimit .. ' 2048',
         })
@@ -125,6 +126,41 @@ local function find_result_win(id)
     return scan(vim.api.nvim_tabpage_list_wins(0)) or scan(vim.api.nvim_list_wins())
 end
 
+--- Strips leading whitespace, `-- line` comments and `/* block */` comments.
+--- @param s string
+--- @return string
+local function strip_leading_noise(s)
+    while true do
+        local before = s
+        s = s:gsub('^%s+', '')
+        s = s:gsub('^%-%-[^\n]*', '')
+        s = s:gsub('^/%*.-%*/', '')
+        if s == before then return s end
+    end
+end
+
+--- True when a single statement is an EXPLAIN request (case-insensitive).
+--- @param stmt string
+--- @return boolean
+local function is_explain(stmt)
+    local head = strip_leading_noise(stmt):sub(1, 16):lower()
+    return head:match('^explain%f[%W]') ~= nil
+end
+
+--- True when at least one statement of `sql` is an EXPLAIN request.
+--- EXPLAIN output is plan text: truncating it by `retlimit` would hide the
+--- end of the plan, so retlimit is not applied to such jobs.
+--- @param sql string
+--- @return boolean
+local function has_explain(sql)
+    local parts = util.split_statements(sql)
+    if not parts or #parts == 0 then parts = { sql } end
+    for _, part in ipairs(parts) do
+        if is_explain(part) then return true end
+    end
+    return false
+end
+
 local function run_single_query(sql, operation, handle_result)
     if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
@@ -148,6 +184,9 @@ local function run_single_query(sql, operation, handle_result)
         clean_sql = table.concat(parts, ' ; ')
     end
 
+    -- Do not truncate EXPLAIN plans with retlimit (only relevant for 'output')
+    opts.skip_retlimit = (operation == 'output') and has_explain(clean_sql) or false
+
     local output_path
     local context = {}
     local id = util.get_unique_query_id()
@@ -157,7 +196,11 @@ local function run_single_query(sql, operation, handle_result)
         query_path = util.get_history_path('queries_dir_name') .. '/' .. id .. '.sql'
         output_path = util.get_history_path('resultsets_dir_name') .. '/' .. id .. '.csv'
         vim.fn.writefile(vim.split(sql, '\n'), query_path)
-        context = { query_id = id, result_path = output_path }
+        context = {
+            query_id = id,
+            result_path = output_path,
+            retlimit_applied = not opts.skip_retlimit,
+        }
         -- Keep the raw SQL, not clean_sql: a re-run must go through the same
         -- replacement / terminator handling as the original submission.
         last_run = { sql = sql, id = id }
@@ -276,7 +319,8 @@ function M.query_output(args)
             if vim.fn.getfsize(result_path) > 0 then
                 ui.display_output(result_path, context.query_id)
                 local actual_lines = util.extract_rows_found(res.log_content)
-                if actual_lines and actual_lines > config.options.retlimit then
+                if context.retlimit_applied
+                    and actual_lines and actual_lines > config.options.retlimit then
                     vim.notify(
                         string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
                         vim.log.levels.WARN
@@ -324,7 +368,8 @@ local function output_callback_with(res, context, display_opts)
         if vim.fn.getfsize(result_path) > 0 then
             ui.display_output(result_path, context.query_id, display_opts)
             local actual_lines = util.extract_rows_found(res.log_content)
-            if actual_lines and actual_lines > config.options.retlimit then
+            if context.retlimit_applied
+                and actual_lines and actual_lines > config.options.retlimit then
                 vim.notify(
                     string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
                     vim.log.levels.WARN
