@@ -27,6 +27,7 @@ CONTENTS                                               *vim-teradata-contents*
         7.4 Jobs .............................. |vim-teradata-cmd-jobs|
         7.5 Editing & formatting .............. |vim-teradata-cmd-edit|
         7.6 Metadata & UI ..................... |vim-teradata-cmd-meta|
+        7.7 Sessions .......................... |vim-teradata-cmd-session|
     8. Mappings ............................... |vim-teradata-mappings|
         8.1 Buffer mappings ................... |vim-teradata-buffer-mappings|
         8.2 OPE operations .................... |vim-teradata-ope|
@@ -41,6 +42,7 @@ CONTENTS                                               *vim-teradata-contents*
         9.7 Code actions ...................... |vim-teradata-guide-actions|
         9.8 Editing results ................... |vim-teradata-guide-editing|
         9.9 Editing & formatting .............. |vim-teradata-guide-format|
+        9.10 Persistent sessions .............. |vim-teradata-guide-sessions|
     10. Filetypes ............................. |vim-teradata-filetypes|
     11. Troubleshooting ....................... |vim-teradata-troubleshooting|
     12. FAQ ................................... |vim-teradata-faq|
@@ -258,9 +260,6 @@ retlimit ~
     Maximum number of rows returned per |:TDO|/|:TDV| query. Controls
     memory and latency.
 
-    The limit is NOT applied to `EXPLAIN` statements: the full explain
-    plan is always returned, whatever the value of retlimit.
-
                                                          *vim-teradata-opt-ft*
 ft ~
     Type: `string[]`          Default: `{ "sql", "teradata" }`
@@ -295,6 +294,11 @@ timeout_ms ~
     Type: `number|nil`        Default: `nil` (disabled)
 
     BTEQ job timeout in milliseconds. Set to nil or 0 to disable timeout.
+
+    In a persistent session (|:TDSession|) the timeout applies to each
+    command, counted from the moment it is sent to BTEQ (time spent in
+    the queue does not count). A command that times out closes the
+    session.
 
                                                   *vim-teradata-opt-history_max*
 history_max ~
@@ -451,10 +455,10 @@ survives Neovim restarts.
 7. COMMANDS                                            *vim-teradata-commands*
 
 Query execution and editing commands (:TD, :TDO, :TDE, :TDV, :TDM,
-:TDMV, :TDF, :TDFF, :TDCodeAction) are buffer-local to buffers with
-filetype `teradata` (see |vim-teradata-filetypes|). Global utilities
-(:TDH, :TDR, :TDHelp, :TDU, :TDS, :TDB, :TDJ, :TDSync, :TDRerun) are
-available in any buffer.
+:TDMV, :TDF, :TDFF, :TDCodeAction, :TDSession) are buffer-local to
+buffers with filetype `teradata` (see |vim-teradata-filetypes|). Global
+utilities (:TDH, :TDR, :TDHelp, :TDU, :TDS, :TDB, :TDJ, :TDSync,
+:TDRerun, :TDSessions) are available in any buffer.
 
 Several commands accept a count. `[N]` below denotes an optional count
 that defaults to 1. For example `:3TDO` runs the statement under the
@@ -475,8 +479,7 @@ cursor plus the next two.
                                                                       *:TDO*
 :[N]TDO         Run the current statement plus the next N-1 statements
                 via BTEQ and display the results in a split. Honours
-                |vim-teradata-opt-retlimit|, except for `EXPLAIN`
-                statements, which are never truncated.
+                |vim-teradata-opt-retlimit|.
 
                                                                       *:TDV*
 :[range]TDV     Run statements of the visual selection (split on `;`)
@@ -485,7 +488,8 @@ cursor plus the next two.
                                                                       *:TDM*
 :[N]TDM         Multistatement run: send the current statement plus the
                 next N-1 statements as a SINGLE BTEQ job. Useful for
-                transactions and dependent statements.
+                transactions and dependent statements. To keep session
+                state across separate commands, see |:TDSession|.
 
                                                                      *:TDMV*
 :[range]TDMV    Multistatement run for the visual selection. Splits on
@@ -505,6 +509,11 @@ cursor plus the next two.
                 been closed, or you are looking at an OLDER result, the
                 new grid opens in its own split, so nothing you are still
                 reading is thrown away.
+
+                A query that ran in a persistent session (|:TDSession|) is
+                re-run in that same session, so it still sees its volatile
+                tables. If that session has been closed, the query runs in
+                a one-shot job and a warning is shown.
 
 ------------------------------------------------------------------------------
 7.2 History & search                                *vim-teradata-cmd-history*
@@ -577,6 +586,40 @@ cursor plus the next two.
                                                                    *:TDHelp*
 :TDHelp         Open a quick reference of vim-teradata commands in a
                 split. Equivalent to a "cheat sheet".
+
+------------------------------------------------------------------------------
+7.7 Sessions                                       *vim-teradata-cmd-session*
+
+                                                                 *:TDSession*
+:TDSession [open]
+                Open a persistent BTEQ session and attach it to the
+                current buffer. The session logs on with the active user
+                (|:TDU|) and stays logged on until it is closed. While it
+                is attached, |:TD|, |:TDE|, |:TDO|, |:TDV|, |:TDM|, |:TDMV|
+                and |:TDRerun| run inside it, so volatile tables, session
+                query bands, `DATABASE x;` and open transactions carry over
+                from one command to the next.
+                See |vim-teradata-guide-sessions|.
+
+                                                                *:TDSession!*
+:TDSession!
+:TDSession close
+                Log off and close the session of the current buffer.
+                Teradata drops the volatile tables of that session.
+
+:TDSession restart
+                Close the session and open a new one. Use it after
+                switching user with |:TDU| or changing |vim-teradata-opt-sep|
+                or |vim-teradata-opt-null_token|: a session keeps the user
+                and settings it was opened with.
+
+:TDSession status
+                Show the user, host and state of the current buffer's
+                session: `logging on`, `idle` or `busy`, and the number of
+                queued commands.
+
+                                                                *:TDSessions*
+:TDSessions     List every open session with the buffer it belongs to.
 
 ==============================================================================
 8. MAPPINGS                                            *vim-teradata-mappings*
@@ -668,7 +711,9 @@ Use |vim-teradata-opt-retlimit| to cap row counts. Very large result sets
 for heavy exports.
 
 For dependent statements that must share a transaction or session
-state, use the multistatement variants |:TDM| / |:TDMV|.
+state, use the multistatement variants |:TDM| / |:TDMV|, or open a
+persistent session with |:TDSession| to keep that state between
+commands (see |vim-teradata-guide-sessions|).
 
 ------------------------------------------------------------------------------
 9.2 Diagnostics                               *vim-teradata-guide-diagnostics*
@@ -734,6 +779,12 @@ reference to the source query. Press <CR> to jump to the job's log.
 Because BTEQ jobs run asynchronously (`vim.system`) you can keep
 editing while queries execute and check progress in |:TDJ| anytime.
 
+Jobs that run in a persistent session (|:TDSession|) show `(S)` next to
+the user. A session runs one command at a time: a command waiting for
+its turn shows `Queued`, then `Running`. Canceling (`x`) a queued
+command removes it from the queue; canceling the running command is
+described in |vim-teradata-guide-sessions|.
+
 ------------------------------------------------------------------------------
 9.7 Code actions                                  *vim-teradata-guide-actions*
 
@@ -789,6 +840,17 @@ Not editable ~
     `SELECT *`, DISTINCT, GROUP BY / HAVING, set operations, CTEs,
     derived tables, multistatement results (|:TDM|), EXPLAIN and SHOW.
 
+Results produced in a persistent session ~
+    Saving edits (<S>) on a result that came from a persistent session
+    runs the UPDATE statements in that same session, so a volatile table
+    can be edited too. If the session has been closed, the statements run
+    in a one-shot job (which fails for volatile tables).
+
+Failures ~
+    The UPDATE statements run in one transaction and stop at the first
+    failing statement; the transaction is rolled back and nothing is
+    changed.
+
 ------------------------------------------------------------------------------
 9.9 Editing & formatting                           *vim-teradata-guide-format*
 
@@ -801,6 +863,89 @@ editing workflow:
     gdw    delete the WHERE clause
     ]s     jump to the next statement
     :TDF   reformat current statement
+
+------------------------------------------------------------------------------
+9.10 Persistent sessions                       *vim-teradata-guide-sessions*
+
+By default every command starts its own BTEQ process: it logs on, runs
+the statement(s), exports the result and logs off. Nothing survives
+between two commands. This is what you want most of the time, because
+jobs are independent and run in parallel. It rules out anything that
+lives in a Teradata session: volatile tables, `SET QUERY_BAND ... FOR
+SESSION`, `DATABASE`, `SET SESSION ...`, or a transaction spread over
+several commands.
+
+|:TDSession| attaches a long-lived BTEQ process to the current buffer.
+
+Example ~
+>sql
+    CREATE VOLATILE TABLE vt_orders AS (
+        SELECT * FROM ${DB_NAME}.Orders
+        WHERE OrderDate >= DATE '2026-01-01'
+    ) WITH DATA ON COMMIT PRESERVE ROWS;
+
+    SELECT CustomerId, COUNT(*) FROM vt_orders GROUP BY 1;
+<
+    :TDSession     open the session (once)
+    :TDO           on the CREATE: runs inside the session
+    :TDO           on the SELECT: vt_orders is still there
+
+Scope ~
+    One session per SQL buffer. Two buffers can each have their own
+    session, even with different users. Buffers without a session keep
+    the default behaviour.
+
+    A session keeps the user it was opened with: switching user with
+    |:TDU| does not affect it (use `:TDSession restart`).
+
+    Result buffers remember the session that produced them: re-running
+    (|:TDRerun|, `.`) and saving edits (|vim-teradata-guide-editing|)
+    from a result buffer go through that same session.
+
+Ordering ~
+    A Teradata session runs one request at a time, so commands sent to a
+    session are queued and run in order. |:TDJ| marks them with `(S)`.
+    Buffers without a session still run their jobs in parallel.
+
+Lifetime ~
+    The session ends with `:TDSession!`, when its buffer is wiped out,
+    when Neovim exits, or when the connection is lost. Ending the session
+    drops its volatile tables. A lost session is reported with a warning;
+    commands then run as one-shot jobs until a new session is opened.
+
+Cancel and timeout ~
+    Canceling (|:TDJ| `x`) a queued command just removes it. Canceling
+    the running command interrupts it on Linux and macOS and the session
+    survives. On Windows the whole session is closed.
+
+    A command that exceeds |vim-teradata-opt-timeout_ms| closes the
+    session, because a stuck request cannot be resynchronised.
+
+Statusline ~
+    `require('vim-teradata.session').statusline()` returns
+    `TD:<user>@<tdpid>` when the current buffer has a session (with a
+    trailing `*` while a command runs), and an empty string otherwise: >lua
+
+    vim.o.statusline = "%f %{v:lua.require'vim-teradata.session'.statusline()}"
+<
+How it works ~
+    BTEQ is driven through plain pipes (`vim.system` with an open stdin):
+    no terminal emulator and no extra program, the same on Linux, macOS
+    and Windows. After each request the plugin sends `.REMARK` markers
+    and reads BTEQ's output until the marker comes back. Error messages
+    are collected from both standard output and standard error, and are
+    shown exactly like for one-shot jobs; everything else BTEQ prints is
+    discarded. The session must run in Teradata (BTET) transaction mode,
+    like the rest of the plugin.
+
+Caveats ~
+    - A statement whose end BTEQ cannot find (missing `;`, unclosed
+      `/*`) swallows the markers and the command never completes. Close
+      the session, or set |vim-teradata-opt-timeout_ms|.
+    - An open transaction (`BT;` without `ET;`) holds its locks until
+      you end it or close the session.
+    - `.EXPORT`, `.SET` and other BTEQ commands typed in your SQL affect
+      the whole session and can interfere with the plugin's own export.
 
 ==============================================================================
 10. FILETYPES                                         *vim-teradata-filetypes*
@@ -864,6 +1009,27 @@ Completion returns nothing ~
     A picker is missing. Install one of the supported pickers (see
     |vim-teradata-opt-picker|) and either `ripgrep` and `bat`.
 
+A command in a persistent session never finishes ~
+    BTEQ is still waiting for the end of the statement (missing `;`,
+    unclosed `/*` comment or string). Close the session with
+    `:TDSession!` and fix the statement. Setting
+    |vim-teradata-opt-timeout_ms| makes such commands fail on their own.
+
+`Object 'vt_xxx' does not exist` after a re-run or an edit ~
+    The volatile table lived in a session that has been closed (buffer
+    wiped, `:TDSession!`, timeout or lost connection). Open a new session
+    with |:TDSession| and create the table again.
+
+`BTEQ session could not log on` ~
+    Same causes as a one-shot logon failure: missing `tdwallet` entry,
+    wrong `tdpid` or logon mechanism. The message shows BTEQ's own error.
+
+"BTEQ reported an error but printed no message" ~
+    The request failed (BTEQ's ERRORCODE was not 0) but BTEQ wrote no
+    `*** Failure` / `*** Error` line on either output stream. Run the
+    statement once without a session (close it with `:TDSession!`) to
+    see BTEQ's full output, and report the case with your TTU version.
+
 ==============================================================================
 12. FAQ                                                     *vim-teradata-faq*
 
@@ -877,11 +1043,21 @@ A: No. The plugin uses Lua, `vim.system`, `vim.diagnostic`, and the
 
 Q: Can I run multiple queries in parallel? ~
 A: Yes. Every |:TDO| spawns an independent BTEQ job. Track them with
-   |:TDJ|.
+   |:TDJ|. The exception is a buffer with a persistent session
+   (|:TDSession|): its commands run one after the other.
 
 Q: How do I run a `BEGIN TRANSACTION ... COMMIT;` block? ~
 A: Use |:TDM| or |:TDMV| so every statement is sent in the same BTEQ
-   session.
+   session, or open a persistent session with |:TDSession| and run the
+   statements one by one.
+
+Q: How do I use volatile tables? ~
+A: Open a persistent session with |:TDSession|, then create and query
+   the tables with the usual commands. See |vim-teradata-guide-sessions|.
+
+Q: Does a persistent session need anything besides BTEQ? ~
+A: No. It uses the same `bteq` binary through pipes; no terminal
+   emulator or extra tool is needed, on Linux, macOS or Windows.
 
 Q: Why is the formatter marked experimental? ~
 A: |:TDF| / |:TDFF| work for common DML/DDL but may reorder comments or

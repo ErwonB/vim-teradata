@@ -1,9 +1,20 @@
 local config = require('vim-teradata.config')
-local util = require('vim-teradata.util')
-local tsu  = require('vim-teradata.ts-util')
-local ui = require('vim-teradata.ui')
+local util   = require('vim-teradata.util')
+local tsu    = require('vim-teradata.ts-util')
+local ui     = require('vim-teradata.ui')
+local session = require('vim-teradata.session')
 
-local M = {}
+local M      = {}
+
+--- query id -> bufnr of the session that produced the result
+--- (used by re-runs and by grid edits started from a result buffer)
+--- @type table<string, integer>
+local result_session = {}
+
+local function sq(s)
+    return "'" .. (s:gsub("'", "''")) .. "'"
+end
+
 --- Builds the common BTEQ logon header.
 --- @param user string The username.
 --- @param tdpid string The Teradata server ID.
@@ -11,35 +22,61 @@ local M = {}
 --- @return table The list of BTEQ header commands.
 local function build_header(user, tdpid, log_mech)
     return {
+        -- SESSION CHARSET applies to the NEXT logon: it must precede .logon,
+        -- otherwise the session runs with the client's default charset.
+        ".set session charset 'UTF8'",
         '.logmech ' .. log_mech,
         '.logon ' .. tdpid .. '/' .. user .. ',$tdwallet(' .. user .. ');',
     }
 end
---- Builds a BTEQ script for a given operation.
---- @param sql string The SQL query.
---- @param user_obj table The user object containing user, tdpid, log_mech.
---- @param options table Additional options like operation type, pattern, etc.
---- @param output_path string The path for the export file.
---- @return table A table containing the BTEQ script (as a list of strings).
-local function build_script(sql, user_obj, options, output_path)
-    local body = build_header(user_obj.user, user_obj.tdpid, user_obj.log_mech)
-    vim.list_extend(body, {
+
+--- Session-wide settings. Sent once per one-shot job, or once when a
+--- persistent session is opened.
+--- @return string[]
+local function settings_lines()
+    return {
         '.set titledashes off',
-        '.set session charset \'UTF8\'',
-        '.set separator \'' .. config.options.sep .. '\'',
-        '.set null \'' .. (config.options.null_token or 'NULL') .. '\'',
-        '.EXPORT FILE = \'' .. (output_path:gsub("'", "''")) .. '\';',
+        '.set separator ' .. sq(config.options.sep),
+        '.set null ' .. sq(config.options.null_token or 'NULL'),
         '.set WIDTH 1048575',
-    })
-    -- retlimit is skipped for EXPLAIN so that the whole plan is exported
+    }
+end
+
+--- Per-request lines.
+--- @param sql string
+--- @param options table { operation = string, skip_retlimit = boolean }
+--- @param output_path string export file
+--- @return string[] body  lines up to and including the SQL terminator
+--- @return string[] post  lines to run after the request (closes the export)
+local function request_lines(sql, options, output_path)
+    local body = {}
     if options.operation == 'output' and not options.skip_retlimit then
-        vim.list_extend(body, {
-            '.set retlimit ' .. config.options.retlimit .. ' 2048',
-        })
+        body[#body + 1] = '.set retlimit ' .. config.options.retlimit .. ' 2048'
+    else
+        -- EXPLAIN / syntax: no row limit. RETLIMIT is sticky inside a
+        -- persistent session, so it is always set explicitly (0 = no limit).
+        body[#body + 1] = '.set retlimit 0 2048'
     end
+    body[#body + 1] = '.EXPORT FILE = ' .. sq(output_path) .. ';'
     vim.list_extend(body, vim.split(sql, '\n'))
-    vim.list_extend(body, { ';', '.LOGOFF', '.EXIT' })
-    return { script = body }
+    -- A lone ';' after an already terminated statement is an empty request
+    -- that would reset ERRORCODE, hiding the failure from the session's check.
+    if not sql:match(';%s*$') then
+        body[#body + 1] = ';'
+    end
+    return body, { '.EXPORT RESET' }
+end
+
+--- Builds a complete one-shot BTEQ script (logon .. logoff).
+--- @return table { script = string[] }
+local function build_script(sql, user_obj, options, output_path)
+    local script = build_header(user_obj.user, user_obj.tdpid, user_obj.log_mech)
+    vim.list_extend(script, settings_lines())
+    local body, post = request_lines(sql, options, output_path)
+    vim.list_extend(script, body)
+    vim.list_extend(script, post)
+    vim.list_extend(script, { '.LOGOFF', '.EXIT' })
+    return { script = script }
 end
 
 --- Starts an asynchronous BTEQ job.
@@ -161,11 +198,22 @@ local function has_explain(sql)
     return false
 end
 
-local function run_single_query(sql, operation, handle_result)
-    if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
-        return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
+--- @param exec_opts table|nil { session_buf = integer }  buffer whose session
+---        runs the query; defaults to the current buffer. Pass -1 to force a
+---        one-shot job.
+local function run_single_query(sql, operation, handle_result, exec_opts)
+    local session_buf = (exec_opts and exec_opts.session_buf) or vim.api.nvim_get_current_buf()
+    local sess = session.get(session_buf)
+
+    local current_user
+    if sess then
+        current_user = sess.user -- a session keeps the user it was opened with
+    else
+        if not config.options.current_user_index or not config.options.users[config.options.current_user_index] then
+            return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
+        end
+        current_user = config.options.users[config.options.current_user_index]
     end
-    local current_user = config.options.users[config.options.current_user_index]
     local opts = {
         operation = operation,
         pattern = '',
@@ -203,7 +251,8 @@ local function run_single_query(sql, operation, handle_result)
         }
         -- Keep the raw SQL, not clean_sql: a re-run must go through the same
         -- replacement / terminator handling as the original submission.
-        last_run = { sql = sql, id = id }
+        last_run = { sql = sql, id = id, session_buf = sess and session_buf or nil }
+        if sess then result_session[id] = session_buf end
     else
         output_path = vim.fn.tempname()
     end
@@ -214,8 +263,9 @@ local function run_single_query(sql, operation, handle_result)
         operation   = operation,
         status      = 'running',
         user        = current_user.user,
+        session     = sess and session_buf or nil,
         rows        = nil,
-        message     = 'Started',
+        message     = sess and 'Queued' or 'Started',
         result_path = (operation == 'output') and output_path or nil,
         query_path  = query_path,
         started_at  = os.time(),
@@ -223,14 +273,13 @@ local function run_single_query(sql, operation, handle_result)
         handle      = nil,
     })
 
-    local bteq_data = build_script(clean_sql, current_user, opts, output_path)
-    local handle = start_job(bteq_data.script, function(res)
+    local function on_done(res)
         vim.schedule(function()
             local job = util.jobs_get(id)
             if not job or job.status == 'canceled' then
-                util.remove_files(output_path)   -- partial export
+                util.remove_files(output_path) -- partial export
                 ui.refresh_jobs_if_open()
-                return                            -- no result handling, no error popup
+                return                         -- no result handling, no error popup
             end
 
             local status = (res.rc == 0) and 'ok' or 'error'
@@ -270,7 +319,18 @@ local function run_single_query(sql, operation, handle_result)
 
             ui.refresh_jobs_if_open()
         end)
-    end)
+    end
+
+    local handle
+    if sess then
+        local body, post = request_lines(clean_sql, opts, output_path)
+        handle = sess:submit(body, post, on_done, function()
+            util.jobs_update(id, { message = 'Running' })
+        end)
+    else
+        local bteq_data = build_script(clean_sql, current_user, opts, output_path)
+        handle = start_job(bteq_data.script, on_done)
+    end
 
     util.jobs_update(id, { handle = handle })
     return id
@@ -280,7 +340,7 @@ local function run_multiple(sqls, operation, handle_result)
     if #sqls == 0 then
         return vim.notify('No SQL statements found.', vim.log.levels.WARN)
     end
-    if not util.get_current_user() then
+    if not util.get_current_user() and not session.get(vim.api.nvim_get_current_buf()) then
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN)
     end
     local ids = {}
@@ -307,7 +367,6 @@ function M.query_syntax(args)
         end
     end)
 end
-
 
 -- Node-based output (supports count: :3TDO)
 function M.query_output(args)
@@ -404,16 +463,26 @@ function M.rerun_latest(opts)
     -- it is about to start, so by callback time last_run.id is the NEW result.
     local prev_id = last_run.id
 
+    -- -1 forces a one-shot job (the current buffer may be a result buffer, or
+    -- a SQL buffer whose session did not run the original query).
+    local exec_opts = { session_buf = -1 }
+    if last_run.session_buf then
+        if session.get(last_run.session_buf) then
+            exec_opts.session_buf = last_run.session_buf
+        else
+            vim.notify('The BTEQ session of this query is closed; re-running it in a new BTEQ job.',
+                vim.log.levels.WARN, { title = 'Teradata' })
+        end
+    end
+
     run_single_query(last_run.sql, 'output', function(res, context)
         local target = reuse_win
         if not target or not vim.api.nvim_win_is_valid(target) then
             target = find_result_win(prev_id)
         end
         output_callback_with(res, context, { reuse_win = target })
-    end)
+    end, exec_opts)
 end
-
-
 
 -- Node-based multistatement output (supports count: :3TDM)
 function M.query_multistatement(args)
@@ -448,7 +517,7 @@ function M.query_multistatement_visual(args)
     run_single_query(joined, 'output', output_callback)
 end
 
--- Visual-selection output 
+-- Visual-selection output
 function M.query_output_visual(args)
     local sql = get_range_sql(args)
     if not sql or sql:match('^%s*$') then
@@ -468,40 +537,105 @@ function M.query_syntax_visual(args)
     run_single_query(sql, 'syntax', output_callback)
 end
 
---- Runs a list of UPDATE statements in a single BTEQ job, inside one transaction.
+--- :TDSession [open|close|restart|status]   /   :TDSession!  (= close)
+--- @param args table user-command args
+function M.session_command(args)
+    local buf = vim.api.nvim_get_current_buf()
+    local action = args.bang and 'close' or ((args.fargs or {})[1] or 'open')
+    local title = { title = 'Teradata' }
+
+    if action == 'close' then
+        if session.close(buf) then
+            vim.notify('BTEQ session closed.', vim.log.levels.INFO, title)
+        else
+            vim.notify('No BTEQ session attached to this buffer.', vim.log.levels.INFO, title)
+        end
+        return
+    end
+
+    if action == 'status' then
+        local d = session.describe(buf)
+        vim.notify(d and ('BTEQ session: ' .. d) or 'No BTEQ session attached to this buffer.',
+            vim.log.levels.INFO, title)
+        return
+    end
+
+    if action ~= 'open' and action ~= 'restart' then
+        return vim.notify('Usage: :TDSession [open|close|restart|status]', vim.log.levels.WARN, title)
+    end
+
+    if action == 'restart' then session.close(buf) end
+    local existing = session.describe(buf)
+    if existing then
+        return vim.notify('BTEQ session already open: ' .. existing, vim.log.levels.INFO, title)
+    end
+
+    local user = util.get_current_user()
+    if not user then
+        return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN, title)
+    end
+
+    vim.notify('Opening BTEQ session for ' .. user.user .. '@' .. user.tdpid .. '…',
+        vim.log.levels.INFO, title)
+    session.open(buf, user, {
+        logon = build_header(user.user, user.tdpid, user.log_mech),
+        settings = settings_lines(),
+        on_ready = function()
+            vim.notify('BTEQ session ready (' .. user.user .. '@' .. user.tdpid .. ').',
+                vim.log.levels.INFO, title)
+        end,
+    })
+end
+
+--- bufnr of the session that produced result `query_id`, if any.
+function M.session_buf_for(query_id)
+    return query_id and result_session[tostring(query_id)] or nil
+end
+
+--- Runs a list of UPDATE statements inside one transaction, stopping at the
+--- first failure. Runs in the session that produced the edited result when it
+--- is still open, otherwise in a one-shot BTEQ job.
 --- @param statements string[] statements WITHOUT trailing ';'
 --- @param on_done fun(res: table, counts: table)  counts[i] = rows changed by statement i
-function M.run_updates(statements, on_done)
+--- @param opts table|nil { query_id = string }  id of the edited result
+function M.run_updates(statements, on_done, opts)
     if #statements == 0 then return end
 
-    local current_user = util.get_current_user()
+    local sbuf = M.session_buf_for(opts and opts.query_id)
+    local sess = sbuf and session.get(sbuf) or nil
+    if sbuf and not sess then
+        vim.notify('The BTEQ session of this result is closed; updates run in a new BTEQ job.',
+            vim.log.levels.INFO, { title = 'Teradata' })
+    end
+
+    local current_user = sess and sess.user or util.get_current_user()
     if not current_user then
         return vim.notify('No Teradata user configured.', vim.log.levels.ERROR)
     end
 
-    local body = {
-        '.logmech ' .. current_user.log_mech,
-        '.logon ' .. current_user.tdpid .. '/' .. current_user.user ..
-            ',$tdwallet(' .. current_user.user .. ');',
-        '.set titledashes off',
-        '.set session charset \'UTF8\'',
-        '.set errorlevel severity 8 exitcode 8',
-        'BT;',
-    }
-    for _, stmt in ipairs(statements) do
-        vim.list_extend(body, vim.split(util.replace_env_vars(stmt), '\n'))
-        table.insert(body, ';')
-    end
-    vim.list_extend(body, { 'ET;', '.LOGOFF', '.EXIT' })
-
     local id = util.get_unique_query_id()
+    local abort_label = 'VTD_ABORT_' .. id:gsub('%W', '_')
+
+    local stmts = { 'BT;' }
+    for _, stmt in ipairs(statements) do
+        vim.list_extend(stmts, vim.split(util.replace_env_vars(stmt), '\n'))
+        table.insert(stmts, ';')
+        -- stop at the first failure: after it the transaction is already
+        -- rolled back and later statements would auto-commit one by one
+        table.insert(stmts, sess
+            and ('.IF ERRORCODE <> 0 THEN .GOTO ' .. abort_label)
+            or '.IF ERRORCODE <> 0 THEN .QUIT 8')
+    end
+    table.insert(stmts, 'ET;')
+
     util.jobs_add({
         id = id, operation = 'update', status = 'running',
-        user = current_user.user, message = 'Started',
+        user = current_user.user, session = sess and sbuf or nil,
+        message = sess and 'Queued' or 'Started',
         started_at = os.time(),
     })
 
-    local handle = start_job(body, function(res)
+    local function on_job_done(res)
         vim.schedule(function()
             local job = util.jobs_get(id)
             if not job or job.status == 'canceled' then
@@ -520,10 +654,30 @@ function M.run_updates(statements, on_done)
             ui.refresh_jobs_if_open()
             on_done(res, counts)
         end)
-    end)
+    end
+
+    local handle
+    if sess then
+        table.insert(stmts, '.LABEL ' .. abort_label)
+        handle = sess:submit(stmts, {}, on_job_done, function()
+            util.jobs_update(id, { message = 'Running' })
+        end)
+    else
+        local body = build_header(current_user.user, current_user.tdpid, current_user.log_mech)
+        vim.list_extend(body, {
+            '.set titledashes off',
+            '.set errorlevel severity 8 exitcode 8',
+        })
+        vim.list_extend(body, stmts)
+        vim.list_extend(body, { '.LOGOFF', '.EXIT' })
+        handle = start_job(body, on_job_done)
+    end
     util.jobs_update(id, { handle = handle })
 end
 
 M._get_range_sql = get_range_sql
+-- exposed for tests
+M._build_script = build_script
+M._request_lines = request_lines
 
 return M

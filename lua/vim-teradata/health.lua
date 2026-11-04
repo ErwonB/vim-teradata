@@ -94,6 +94,14 @@ function M.check()
             vim.health.warn(string.format("No metadata catalog for '%s'; run :TDSync", key))
         end
     end
+
+    -- 9. Persistent BTEQ sessions
+    local sessions = package.loaded["vim-teradata.session"]
+    if sessions and sessions.count() > 0 then
+        vim.health.ok(string.format("%d persistent BTEQ session(s) open (:TDSessions)", sessions.count()))
+    else
+        vim.health.info("No persistent BTEQ session open (see :TDSession)")
+    end
 end
 
 return M

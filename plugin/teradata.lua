@@ -13,6 +13,7 @@ local GLOBAL_CMDS = {
     { 'TDJ',    'vim-teradata.ui',   'show_jobs',             'Teradata: job manager' },
     { 'TDSync', 'vim-teradata.util', 'export_db_data',        'Teradata: refresh metadata cache' },
     { 'TDRerun','vim-teradata.bteq', 'rerun_latest',          'Teradata: re-run latest query' },
+    { 'TDSessions', 'vim-teradata.session', 'show',           'Teradata: list open BTEQ sessions' },
 }
 
 for _, c in ipairs(GLOBAL_CMDS) do

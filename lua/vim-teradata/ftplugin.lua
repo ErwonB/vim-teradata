@@ -16,6 +16,10 @@ local BUF_CMDS = {
     { 'TDF',         'vim-teradata.td_ope',       'format_current_statement',    { count = true }, 'Format statement(s) (experimental)' },
     { 'TDFF',        'vim-teradata.td_ope',       'format_all_statements',       { nargs = 0 },    'Format whole buffer (experimental)' },
     { 'TDCodeAction','vim-teradata.code_actions', 'run',                         { nargs = 0 },    'Teradata code actions' },
+    { 'TDSession',   'vim-teradata.bteq',         'session_command',
+        { nargs = '?', bang = true,
+          complete = function() return { 'open', 'close', 'restart', 'status' } end },
+        'Persistent BTEQ session for this buffer' },
 }
 
 local function describe(func_name, node_type)

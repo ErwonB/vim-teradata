@@ -826,6 +826,7 @@ end
 
 local function execute(bufnr, statements)
     local bteq = require('vim-teradata.bteq')
+    local query_id = require('vim-teradata.grid_state').get(bufnr, 'query_id')
     bteq.run_updates(statements, function(res, counts)
         if res.rc ~= 0 then
             require('vim-teradata.ui').display_error(res.msg)

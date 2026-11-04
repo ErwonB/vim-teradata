@@ -413,6 +413,9 @@ end
 --- Displays an error message from a BTEQ execution.
 --- @param msg string The error message.
 function M.display_error(msg)
+    if type(msg) ~= 'string' or msg:match('^%s*$') then
+        msg = 'BTEQ reported an error but no message was captured. Check :TDJ for the job status.'
+    end
     vim.notify(msg, vim.log.levels.ERROR, { title = 'Teradata Error' })
 end
 
@@ -425,6 +428,7 @@ function M.display_help()
         '  :TDS          Manage settings',
         '  :TDB          Manage bookmarks',
         '  :TDJ          Job manager',
+        '  :TDSessions   List open persistent BTEQ sessions',
         '  :TDSync       Refresh metadata cache for autocomplete',
         '  :TDHelp       Display this help',
         '',
@@ -435,6 +439,8 @@ function M.display_help()
         '  :TDV          Run visual selection',
         '  :nTDM         Run n statements in 1 multistatement BTEQ job',
         '  :TDMV         Run visual selection as 1 multistatement BTEQ job',
+        '  :TDSession    Open a persistent BTEQ session for this buffer',
+        '  :TDSession!   Close it (also: restart, status)',
         '  :TDBAdd       Add bookmark from selection / range',
         '  :nTDF         Format current statement(s) (experimental)',
         '  :TDFF         Format whole buffer (experimental)',
@@ -455,7 +461,7 @@ function M.display_help()
         '  <C>           Cancel edits',
     }
 
-    local bufnr = M.open_scratch('Teradata Help', 22)
+    local bufnr = M.open_scratch('Teradata Help', 25)
     vim.bo[bufnr].modifiable = true
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, help_text)
     vim.bo[bufnr].modifiable = false
@@ -865,12 +871,16 @@ end
 -- Jobs Manager
 -----------------------------------------------------------------------
 local function format_jobs_table(jobs)
+    -- '(S)': the job ran (or is queued) in a persistent BTEQ session
+    local function user_cell(j)
+        return tostring(j.user or '') .. (j.session and ' (S)' or '')
+    end
     local w = { id = 18, op = 8, st = 9, usr = 8, rows = 6, msg = 20 }
     for _, j in ipairs(jobs) do
         w.id   = math.max(w.id, #tostring(j.id))
         w.op   = math.max(w.op, #tostring(j.operation))
         w.st   = math.max(w.st, #tostring(j.status))
-        w.usr  = math.max(w.usr, #tostring(j.user or ''))
+        w.usr  = math.max(w.usr, #user_cell(j))
         w.rows = math.max(w.rows, #tostring(j.rows or '-'))
         w.msg  = math.max(w.msg, math.min(80, #tostring(j.message or '')))
     end
@@ -890,7 +900,7 @@ local function format_jobs_table(jobs)
             tostring(j.id),
             tostring(j.operation),
             tostring(j.status),
-            tostring(j.user or ''),
+            user_cell(j),
             tostring(j.rows or '-'),
             msg
         ))
