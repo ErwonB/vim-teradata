@@ -11,7 +11,6 @@ local GLOBAL_CMDS = {
     { 'TDS',    'vim-teradata.ui',   'show_settings',         'Teradata: settings' },
     { 'TDB',    'vim-teradata.ui',   'show_bookmarks',        'Teradata: bookmarks' },
     { 'TDJ',    'vim-teradata.ui',   'show_jobs',             'Teradata: job manager' },
-    { 'TDSync', 'vim-teradata.util', 'export_db_data',        'Teradata: refresh metadata cache' },
     { 'TDRerun','vim-teradata.bteq', 'rerun_latest',          'Teradata: re-run latest query' },
     { 'TDSessions', 'vim-teradata.session', 'show',           'Teradata: list open BTEQ sessions' },
 }
@@ -22,3 +21,16 @@ for _, c in ipairs(GLOBAL_CMDS) do
         require(c[2])[c[3]](args)
     end, { nargs = 0, desc = c[4] })
 end
+
+vim.api.nvim_create_user_command('TDSync', function(args)
+    require('vim-teradata.config').ensure()
+    require('vim-teradata.util').sync_command(args)
+end, {
+    nargs = '*',
+    range = true,
+    bang = true,
+    desc = 'Teradata: refresh metadata cache (full or per object)',
+    complete = function(arglead, cmdline)
+        return require('vim-teradata.util').sync_complete(arglead, cmdline)
+    end,
+})

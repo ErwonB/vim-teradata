@@ -19,7 +19,7 @@ DESCRIPTION 'Export data from Teradata to a file'
         on t.DATABASENAME = c.DATABASENAME
         and t.TABLENAME = c.TABLENAME
         where 1=1
-        and t.TABLEKIND in (''T'', ''V'', ''M'')
+        and t.TABLEKIND in (''T'', ''V'', ''M'', ''O'', ''Q'')
         order by c.DATABASENAME, c.TABLENAME, c.COLUMNID
         ;',
         VARCHAR PrivateLogName = 'selector_log',

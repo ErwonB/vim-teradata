@@ -19,6 +19,7 @@
 ---@field global_bookmarks_dir_name string
 ---@field user_bookmarks_dir_name string
 ---@field tpt_script string|nil
+---@field tpt_objects_script string|nil
 ---@field filter_db string|nil
 ---@field retlimit integer
 ---@field replacements table<string,string>
@@ -61,6 +62,7 @@ M.defaults = {
 
     -- tpt_script
     tpt_script = nil, -- resolved lazily, see M.get_tpt_script()
+    tpt_objects_script = nil, -- resolved lazily, see M.get_tpt_objects_script()
     -- pattern to filter result from database autocompletion
     filter_db = nil,
 
@@ -167,6 +169,14 @@ function M.get_tpt_script()
     local o = M.options
     if o.tpt_script and o.tpt_script ~= '' then return o.tpt_script end
     return vim.api.nvim_get_runtime_file('lua/vim-teradata/sql-autocomplete/tpt/export_db.tpt', false)[1]
+end
+
+--- Absolute path of the TPT objects export script (lazy; plugin must be on 'runtimepath').
+---@return string|nil
+function M.get_tpt_objects_script()
+    local o = M.options
+    if o.tpt_objects_script and o.tpt_objects_script ~= '' then return o.tpt_objects_script end
+    return vim.api.nvim_get_runtime_file('lua/vim-teradata/sql-autocomplete/tpt/export_objects.tpt', false)[1]
 end
 
 --- Merges user-provided configuration with the defaults.

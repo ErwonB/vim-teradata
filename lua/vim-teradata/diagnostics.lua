@@ -14,6 +14,7 @@ local SEVERITY = {
     ERROR = vim.diagnostic.severity.ERROR,
     WARN = vim.diagnostic.severity.WARN,
     INFO = vim.diagnostic.severity.INFO,
+    HINT = vim.diagnostic.severity.HINT,
 }
 
 local NODE = {
@@ -90,11 +91,18 @@ local QUERY_SRC = {
     subquery_select = [[ (subquery (select (select_expression) @sub_select_expr)) ]],
     relation = [[ (relation) @relation ]],
     statement = [[ (statement) @stmt ]],
+    create_table = [[ (create_table) @ct ]],
     cte_def = [[
         (cte
-            (identifier) @cte_name
+            . (identifier) @cte_name
             (statement) @cte_body
         ) @cte
+    ]],
+    cte_column_list = [[
+        (cte
+            . (identifier)
+            (identifier) @cte_col
+            (keyword_as))
     ]],
 
     select_output_alias = [[
@@ -420,14 +428,196 @@ local function check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
 end
 
 -- =============================================================================
--- Logic: CTE Analysis
+-- Logic: CTE & Local Table Analysis
 -- =============================================================================
+
+local buffer_local_tables = {}
+
+local function cte_explicit_columns(cte_node, bufnr)
+    local cols, first_seen = {}, false
+    for child in cte_node:iter_children() do
+        local t = child:type()
+        if t == 'keyword_as' then break end
+        if t == NODE.IDENTIFIER then
+            if first_seen then
+                table.insert(cols, { name = get_text(child, bufnr), node = child })
+            else
+                first_seen = true
+            end
+        end
+    end
+    return cols
+end
+
+local function find_first_select(node)
+    if not node then return nil end
+    for child in node:iter_children() do
+        local t = child:type()
+        if t == NODE.SELECT then
+            return child
+        elseif t ~= NODE.SUBQUERY then
+            local found = find_first_select(child)
+            if found then return found end
+        end
+    end
+    return nil
+end
+
+--- Resolves output columns of a statement, subquery, or create_query node.
+--- @param statement_or_query_node TSNode
+--- @param bufnr number
+--- @param cte_defs table|nil
+--- @param local_tables table|nil
+--- @return table|nil cols (nil when columns could not be resolved)
+local function resolve_select_columns(statement_or_query_node, bufnr, cte_defs, local_tables)
+    local select_node = find_first_select(statement_or_query_node)
+    if not select_node then return nil end
+
+    local select_expr = nil
+    for child in select_node:iter_children() do
+        if child:type() == NODE.SELECT_EXPR then
+            select_expr = child
+            break
+        end
+    end
+    if not select_expr then return nil end
+
+    local cols = {}
+    if get_text(select_expr, bufnr) == "*" then
+        local inner_scopes = get_query_scopes(statement_or_query_node)
+        if #inner_scopes > 0 then
+            local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs or {}, local_tables)
+            for _, rel in ipairs(inner_active) do
+                if rel.columns_unknown then
+                    return nil
+                elseif rel.db and rel.table then
+                    local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or {}
+                    if #schema_cols == 0 and util.has_catalog() then
+                        return nil
+                    end
+                    for _, c in ipairs(schema_cols) do table.insert(cols, { name = c }) end
+                elseif rel.columns and #rel.columns > 0 then
+                    for _, c in ipairs(rel.columns) do table.insert(cols, { name = c.name }) end
+                else
+                    return nil
+                end
+            end
+        end
+        if #cols == 0 then return nil end
+    else
+        _, cols = get_columns_from_select_expr(select_expr, bufnr)
+        if #cols == 0 then return nil end
+    end
+
+    return cols
+end
+
+--- Collects single-part CREATE TABLE definitions from a root node (or buffer).
+--- @param root_or_bufnr TSNode|number
+--- @param bufnr number|nil
+--- @return table<string, {name:string, columns:table|nil, volatile:boolean}>
+local function collect_buffer_created_tables(root_or_bufnr, bufnr)
+    local root = root_or_bufnr
+    if type(root_or_bufnr) == "number" then
+        bufnr = root_or_bufnr
+        local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "teradata")
+        if not ok or not parser then return {} end
+        local parse_ok, trees = pcall(function() return parser:parse() end)
+        if not parse_ok or not trees or #trees == 0 then return {} end
+        root = trees[1]:root()
+    end
+    if not root or not bufnr then return {} end
+
+    local out = {}
+    if not QUERIES.create_table then return out end
+
+    for _, ct_node in QUERIES.create_table:iter_captures(root, bufnr, 0, -1) do
+        local obj_ref = nil
+        local volatile = false
+        local has_global, has_temp = false, false
+        local col_defs_node = nil
+        local query_node = nil
+
+        for child in ct_node:iter_children() do
+            local t = child:type()
+            if t == NODE.OBJ_REF and not obj_ref then
+                obj_ref = child
+            elseif t == "keyword_volatile" then
+                volatile = true
+            elseif t == "keyword_global" then
+                has_global = true
+            elseif t == "keyword_temporary" then
+                has_temp = true
+            elseif t == "column_definitions" then
+                col_defs_node = child
+            elseif t == "create_query" or t == "statement" or t == "subquery" then
+                query_node = child
+            end
+        end
+
+        if has_global and has_temp then volatile = true end
+
+        if obj_ref then
+            local parts = {}
+            for part in obj_ref:iter_children() do
+                if part:type() == NODE.IDENTIFIER then
+                    table.insert(parts, get_text(part, bufnr))
+                end
+            end
+
+            if #parts == 1 and parts[1] then
+                local tbl_name = parts[1]
+                local cols = nil
+
+                if col_defs_node then
+                    local explicit_cols = {}
+                    for child in col_defs_node:iter_children() do
+                        if child:type() == "column_definition" then
+                            local name_node = child:field("name")[1]
+                            if not name_node then
+                                for sub in child:iter_children() do
+                                    if sub:type() == NODE.IDENTIFIER then
+                                        name_node = sub
+                                        break
+                                    end
+                                end
+                            end
+                            local cname = name_node and get_text(name_node, bufnr)
+                            if cname then
+                                table.insert(explicit_cols, { name = cname, node = name_node })
+                            end
+                        end
+                    end
+                    if #explicit_cols > 0 then
+                        cols = explicit_cols
+                    end
+                end
+
+                if not cols and query_node then
+                    cols = resolve_select_columns(query_node, bufnr, {}, out)
+                elseif not cols then
+                    -- Handle case where SELECT is direct child of create_table
+                    cols = resolve_select_columns(ct_node, bufnr, {}, out)
+                end
+
+                out[normalize(tbl_name)] = {
+                    name = tbl_name,
+                    columns = cols,
+                    volatile = volatile,
+                }
+            end
+        end
+    end
+
+    return out
+end
 
 --- Extracts CTE definitions (name and output columns) from a statement node.
 --- @param stmt_node TSNode The root statement node (which may contain a WITH clause).
 --- @param bufnr number The buffer number.
+--- @param local_tables table|nil Optional buffer-created tables map.
 --- @return table A map of normalized CTE name to its definition.
-local function get_cte_definitions(stmt_node, bufnr)
+local function get_cte_definitions(stmt_node, bufnr, local_tables)
     local cte_defs = {}
 
     -- Pre-pass: register every CTE name so recursive self-references resolve.
@@ -445,59 +635,37 @@ local function get_cte_definitions(stmt_node, bufnr)
 
     -- Main pass: fill in columns, overwriting the seed entries.
     for _, cte_def_match, _ in QUERIES.cte_def:iter_matches(stmt_node, bufnr, 0, -1) do
+        local cte_node
         local cte_name_node
         local cte_body_node
         for capid, n in pairs(cte_def_match) do
-            if QUERIES.cte_def.captures[capid] == "cte_name" then cte_name_node = n[1] end
-            if QUERIES.cte_def.captures[capid] == "cte_body" then cte_body_node = n[1] end
+            local cap = QUERIES.cte_def.captures[capid]
+            if cap == "cte" then cte_node = n[1] end
+            if cap == "cte_name" then cte_name_node = n[1] end
+            if cap == "cte_body" then cte_body_node = n[1] end
         end
 
         local cte_name = get_text(cte_name_node, bufnr)
-        if not (cte_name and cte_body_node) then goto next_cte end  -- was: continue
+        if not (cte_name and cte_body_node) then goto next_cte end
 
-        local select_node = nil
-        for child in cte_body_node:iter_children() do
-            if child:type() == NODE.SELECT then
-                select_node = child
-                break
-            end
-        end
+        local cols = cte_node and cte_explicit_columns(cte_node, bufnr) or {}
+        local columns_unknown = false
 
-        -- ← was: `return cte_defs` here, which aborted the whole function early
-        if not select_node then goto next_cte end
-
-        local select_expr = nil
-        for child in select_node:iter_children() do
-            if child:type() == NODE.SELECT_EXPR then
-                select_expr = child
-                break
-            end
-        end
-
-        local cols = {}
-        if select_expr then
-            if get_text(select_expr, bufnr) == "*" then
-                local inner_scopes = get_query_scopes(cte_body_node)
-                if #inner_scopes > 0 then
-                    local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs)
-                    for _, rel in ipairs(inner_active) do
-                        if rel.db and rel.table then
-                            local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or {}
-                            for _, c in ipairs(schema_cols) do table.insert(cols, { name = c }) end
-                        elseif rel.columns then
-                            for _, c in ipairs(rel.columns) do table.insert(cols, { name = c.name }) end
-                        end
-                    end
-                end
+        if #cols == 0 then
+            local resolved = resolve_select_columns(cte_body_node, bufnr, cte_defs, local_tables)
+            if resolved and #resolved > 0 then
+                cols = resolved
             else
-                _, cols = get_columns_from_select_expr(select_expr, bufnr)
+                cols = {}
+                columns_unknown = true
             end
         end
 
         cte_defs[normalize(cte_name)] = {
-            name     = cte_name,
-            columns  = cols,
-            node     = cte_name_node,
+            name            = cte_name,
+            columns         = cols,
+            columns_unknown = columns_unknown,
+            node            = cte_name_node,
         }
 
         ::next_cte::
@@ -510,7 +678,26 @@ end
 -- Logic: Schema Analysis (Scoped with boundary check)
 -- =============================================================================
 
-analyze_relations = function(scope_nodes, bufnr, diagnostics, cte_defs)
+--- @return boolean|nil  true = column exists, false = definitely missing,
+---                      nil = cannot tell (unknown relation) -> NO diagnostic
+local function relation_has_column(rel, col_name)
+    if rel.columns_unknown then return nil end
+    if rel.columns then
+        local want = normalize_col(col_name)
+        for _, c in ipairs(rel.columns) do
+            if normalize_col(c.name) == want then return true end
+        end
+        return false
+    end
+    if rel.db and rel.table then
+        return has_column(rel.db, rel.table, col_name)
+    end
+    return nil
+end
+
+analyze_relations = function(scope_nodes, bufnr, diagnostics, cte_defs, local_tables)
+    cte_defs = cte_defs or {}
+    local_tables = local_tables or buffer_local_tables[bufnr] or {}
     local relation_map = {}
     local active_tables_list = {}
     local temp_rels = {}
@@ -563,6 +750,7 @@ analyze_relations = function(scope_nodes, bufnr, diagnostics, cte_defs)
                 if alias_node then
                     local alias = get_text(alias_node, bufnr)
                     local cols = {}
+                    local columns_unknown = false
 
                     local subquery_node = nil
                     for child in rel_node:iter_children() do
@@ -573,46 +761,19 @@ analyze_relations = function(scope_nodes, bufnr, diagnostics, cte_defs)
                     end
 
                     if subquery_node then
-                        local select_node = tsu.descendant(subquery_node, NODE.SELECT)
-                        local select_expr = select_node and
-                            tsu.descendant(select_node, NODE.SELECT_EXPR)
-
-                        if select_expr then
-                            local expr_text = get_text(select_expr, bufnr)
-                            -- CASE: SELECT *
-                            if expr_text == "*" then
-                                -- We look at the relations inside the subquery to expand the *
-                                local inner_scopes = get_query_scopes(subquery_node)
-                                if #inner_scopes > 0 then
-                                    -- Run a "silent" analysis on the inner scope to find its source tables
-                                    -- We pass an empty table for diagnostics to avoid duplicate reporting
-                                    local _, inner_active = analyze_relations(inner_scopes[1], bufnr, {}, cte_defs)
-                                    for _, rel in ipairs(inner_active) do
-                                        if rel.db and rel.table then
-                                            -- Base Table: fetch real columns from schema
-                                            local schema_cols = util.get_columns({ { db_name = rel.db, tb_name = rel.table } }) or
-                                                {}
-                                            for _, cname in ipairs(schema_cols) do
-                                                table.insert(cols, { name = cname })
-                                            end
-                                        elseif rel.columns then
-                                            -- Nested derived table or CTE: use its already resolved columns
-                                            for _, c in ipairs(rel.columns) do
-                                                table.insert(cols, { name = c.name })
-                                            end
-                                        end
-                                    end
-                                end
-                            else
-                                -- CASE: Explicit column list
-                                _, cols = get_columns_from_select_expr(select_expr, bufnr)
-                            end
+                        local resolved = resolve_select_columns(subquery_node, bufnr, cte_defs, local_tables)
+                        if resolved and #resolved > 0 then
+                            cols = resolved
+                        else
+                            cols = {}
+                            columns_unknown = true
                         end
                     end
 
                     local def = {
                         derived = true,
                         columns = cols,
+                        columns_unknown = columns_unknown,
                         table = normalize(alias),
                         is_cte = false
                     }
@@ -649,29 +810,60 @@ analyze_relations = function(scope_nodes, bufnr, diagnostics, cte_defs)
                     is_valid = false
                 end
             end
-        else -- Unqualified table/alias
-            local cte_def = cte_defs[normalize(def.table)]
+        elseif def.table then -- Unqualified table/alias
+            local tbl_norm = normalize(def.table)
+            local cte_def = cte_defs[tbl_norm]
+            local local_entry = local_tables[tbl_norm]
+            local sess_entry = util.get_session_table and util.get_session_table(tbl_norm) or nil
 
             if cte_def then
-                -- It's a CTE. Mark as derived/CTE and add columns.
+                -- 1. CTE
                 def.derived = true
-                def.is_cte = true -- Custom flag to distinguish CTE from generic derived
+                def.is_cte = true
                 def.columns = cte_def.columns
-                is_valid = true   -- It's a valid reference.
+                def.columns_unknown = cte_def.columns_unknown
+                if def.columns_unknown then has_unqualified = true end
+                is_valid = true
+            elseif local_entry or sess_entry then
+                -- 2. local_tables[NAME] or 3. util.get_session_table(NAME)
+                local entry = local_entry or sess_entry
+                def.local_table = true
+                if entry.columns then
+                    local norm_cols = {}
+                    for _, c in ipairs(entry.columns) do
+                        table.insert(norm_cols, type(c) == "table" and c or { name = c })
+                    end
+                    def.columns = norm_cols
+                    def.columns_unknown = false
+                else
+                    def.columns = nil
+                    def.columns_unknown = true
+                    has_unqualified = true
+                end
+                is_valid = true
             else
-                -- Not a CTE, so it must be an unqualified base table.
-                has_unqualified = true
-                local found = false
+                -- 4. Found in one of used_dbs
+                local matching_dbs = {}
                 for db in pairs(used_dbs) do
                     if has_table(db, def.table) then
-                        found = true
-                        break
+                        table.insert(matching_dbs, db)
                     end
                 end
-                if next(used_dbs) ~= nil and not found then
-                    add_diagnostic(diagnostics, node, bufnr, SEVERITY.ERROR,
-                        'Unknown table: "' .. def.table .. '" (not found in used databases)')
-                    is_valid = false
+                if #matching_dbs > 0 then
+                    has_unqualified = true
+                    if #matching_dbs == 1 then
+                        def.db = matching_dbs[1]
+                    else
+                        def.columns_unknown = true
+                    end
+                    is_valid = true
+                else
+                    -- 5. Otherwise: unknown unqualified relation
+                    def.columns_unknown = true
+                    has_unqualified = true
+                    add_diagnostic(diagnostics, node, bufnr, SEVERITY.HINT,
+                        string.format('Table "%s" is not in the metadata catalog (volatile table or default database?)', def.table))
+                    is_valid = true
                 end
             end
         end
@@ -773,20 +965,9 @@ local function check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_
                             -- 4. Validate existence in Target Table ONLY
                             if target_rel then
                                 local col_name = get_text(col_node, bufnr)
-                                local has_col = false
+                                local res = relation_has_column(target_rel, col_name)
 
-                                if target_rel.is_cte then
-                                    for _, c in ipairs(target_rel.columns) do
-                                        if normalize_col(c.name) == normalize_col(col_name) then
-                                            has_col = true
-                                            break
-                                        end
-                                    end
-                                elseif target_rel.db then
-                                    has_col = has_column(target_rel.db, target_rel.table, col_name)
-                                end
-
-                                if not has_col then
+                                if res == false then
                                     add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
                                         string.format('Column "%s" not found in update target "%s"', col_name, t_name))
                                 end
@@ -810,19 +991,10 @@ local function check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_
                 local found_in = {}
 
                 for _, rel in ipairs(active_tables) do
-                    local has_col = false
-                    if rel.is_cte or (rel.derived and rel.columns) then
-                        for _, col in ipairs(rel.columns) do
-                            if normalize_col(col.name) == normalize_col(col_name) then
-                                has_col = true
-                                break
-                            end
-                        end
-                    elseif rel.db then
-                        has_col = has_column(rel.db, rel.table, col_name)
+                    local res = relation_has_column(rel, col_name)
+                    if res == true then
+                        table.insert(found_in, rel.table or "subquery")
                     end
-
-                    if has_col then table.insert(found_in, rel.table or "subquery") end
                 end
 
                 if #found_in > 1 then
@@ -856,28 +1028,19 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
             if qualifier_node and col_node then
                 local qualifier = get_text(qualifier_node, bufnr)
                 local col_name = get_text(col_node, bufnr)
-                local col_norm = normalize_col(col_name)
                 local rel_def = relation_map[normalize(qualifier)]
 
                 if rel_def then
-                    local found = false
-                    -- Check against columns if it's a CTE OR a derived table with columns
-                    if rel_def.is_cte or (rel_def.derived and rel_def.columns) then
-                        for _, col in ipairs(rel_def.columns) do
-                            if normalize_col(col.name) == col_norm then
-                                found = true
-                                break
-                            end
-                        end
-                    elseif rel_def.db then
-                        found = has_column(rel_def.db, rel_def.table, col_name)
-                    end
-
-                    if not found then
+                    local res = relation_has_column(rel_def, col_name)
+                    if res == false then
+                        local label = rel_def.is_cte and "CTE"
+                            or rel_def.derived and "derived table"
+                            or rel_def.local_table and "volatile table"
+                            or "table"
                         add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
                             string.format('Column "%s" not found in %s "%s"',
                                 col_name,
-                                rel_def.derived and "derived table" or "table",
+                                label,
                                 rel_def.table or rel_def.name))
                     end
                 end
@@ -911,31 +1074,29 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
                 if output_aliases[col_norm] then goto continue end
 
                 local found_anywhere = false
+                local inconclusive = false
                 local searched_in = {}
 
                 for _, rel in ipairs(active_tables) do
-                    local has_col = false
-
-                    if rel.is_cte or (rel.derived and rel.columns) then
-                        for _, col in ipairs(rel.columns) do
-                            if normalize_col(col.name) == col_norm then
-                                has_col = true
-                                break
-                            end
+                    local res = relation_has_column(rel, col_name)
+                    if res == nil then
+                        inconclusive = true
+                    else
+                        if rel.is_cte or rel.derived then
+                            local label = rel.is_cte and "CTE" or "derived"
+                            table.insert(searched_in, string.format("%s (%s)", rel.table, label))
+                        elseif rel.local_table then
+                            table.insert(searched_in, string.format("%s (volatile)", rel.table))
+                        elseif rel.db and rel.table then
+                            table.insert(searched_in, rel.db .. "." .. rel.table)
+                        else
+                            table.insert(searched_in, rel.table or "table")
                         end
-                        local label = rel.is_cte and "CTE" or "derived"
-                        table.insert(searched_in, string.format("%s (%s)", rel.table, label))
-                    elseif not rel.derived and rel.db then
-                        local t_name = rel.table
-                        local d_name = rel.db
-                        table.insert(searched_in, d_name .. "." .. t_name)
-                        has_col = has_column(d_name, t_name, col_name)
+                        if res == true then found_anywhere = true end
                     end
-
-                    if has_col then found_anywhere = true end
                 end
 
-                if not found_anywhere and #searched_in > 0 then
+                if not found_anywhere and not inconclusive and #searched_in > 0 then
                     if not has_unqualified then
                         local tables_str = table.concat(searched_in, ", ")
                         add_diagnostic(diagnostics, col_node, bufnr, SEVERITY.ERROR,
@@ -948,13 +1109,36 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
     end
 end
 
-local function check_undefined_alias(scope_nodes, bufnr, diagnostics)
+local function check_undefined_alias(scope_nodes, bufnr, diagnostics, relation_map)
     local defined_aliases = {}
+    if relation_map then
+        for k in pairs(relation_map) do
+            defined_aliases[k] = true
+        end
+    end
     for _, node in ipairs(scope_nodes) do
         for _, cap in QUERIES.alias_def:iter_captures(node, bufnr, 0, -1) do
             if not is_nested_in_subquery(cap, node) then
                 local text = get_text(cap, bufnr)
                 if text then defined_aliases[normalize(text)] = true end
+            end
+        end
+        for _, rel_node in QUERIES.relation:iter_captures(node, bufnr, 0, -1) do
+            if not is_nested_in_subquery(rel_node, node) then
+                for child in rel_node:iter_children() do
+                    if child:type() == NODE.OBJ_REF then
+                        local parts = {}
+                        for p in child:iter_children() do
+                            if p:type() == NODE.IDENTIFIER then
+                                table.insert(parts, get_text(p, bufnr))
+                            end
+                        end
+                        if #parts > 0 and parts[#parts] then
+                            defined_aliases[normalize(parts[#parts])] = true
+                        end
+                        break
+                    end
+                end
             end
         end
     end
@@ -1199,7 +1383,7 @@ get_query_scopes = function(root_node)
 
     local function traverse(node)
         local type = node:type()
-        local is_container = (type == 'statement' or type == 'subquery')
+        local is_container = (type == 'statement' or type == 'subquery' or type == 'create_query')
 
         if is_container then
             local has_set_op = false
@@ -1252,8 +1436,12 @@ get_query_scopes = function(root_node)
     return scopes
 end
 
-local function process_statement(stmt_node, bufnr, diagnostics)
-    local cte_defs = get_cte_definitions(stmt_node, bufnr)
+local function process_statement(stmt_node, bufnr, diagnostics, local_tables)
+    local parent = stmt_node:parent()
+    if parent and parent:type() == "cte" then return end
+
+    local_tables = local_tables or buffer_local_tables[bufnr] or {}
+    local cte_defs = get_cte_definitions(stmt_node, bufnr, local_tables)
 
     check_union_column_compatibility(stmt_node, bufnr, diagnostics)
     check_subquery_unnamed_fields(stmt_node, bufnr, diagnostics)
@@ -1265,12 +1453,12 @@ local function process_statement(stmt_node, bufnr, diagnostics)
     local scopes = get_query_scopes(stmt_node)
 
     for _, scope_nodes in ipairs(scopes) do
-        local relation_map, active_tables, has_unqualified = analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs)
+        local relation_map, active_tables, has_unqualified = analyze_relations(scope_nodes, bufnr, diagnostics, cte_defs, local_tables)
         local output_aliases = get_output_aliases(scope_nodes, bufnr)
         check_field_validity(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified,
             output_aliases)
         check_ambiguous_columns(scope_nodes, bufnr, relation_map, active_tables, diagnostics, has_unqualified)
-        check_undefined_alias(scope_nodes, bufnr, diagnostics)
+        check_undefined_alias(scope_nodes, bufnr, diagnostics, relation_map)
         check_duplicate_join_conditions(scope_nodes, bufnr, diagnostics)
         check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
     end
@@ -1296,6 +1484,7 @@ end
 function M.forget(bufnr)
     if bufnr then
         last_tick[bufnr] = nil
+        buffer_local_tables[bufnr] = nil
     end
 end
 
@@ -1322,6 +1511,16 @@ function M.update_diagnostics(bufnr)
 
     local result = {}
     local run_ok, err = pcall(function()
+        local local_tables = {}
+        for _, tree in ipairs(trees) do
+            local root = tree:root()
+            local collected = collect_buffer_created_tables(root, bufnr)
+            for k, v in pairs(collected) do
+                local_tables[k] = v
+            end
+        end
+        buffer_local_tables[bufnr] = local_tables
+
         for _, tree in ipairs(trees) do
             local root = tree:root()
             if QUERIES.syntax_error then
@@ -1332,7 +1531,7 @@ function M.update_diagnostics(bufnr)
 
             if QUERIES.statement then
                 for _, stmt_node in QUERIES.statement:iter_captures(root, bufnr, 0, -1) do
-                    process_statement(stmt_node, bufnr, result)
+                    process_statement(stmt_node, bufnr, result, local_tables)
                 end
             end
         end
@@ -1356,6 +1555,8 @@ M.get_query_scopes = get_query_scopes
 M.analyze_relations = analyze_relations
 M.get_cte_definitions = get_cte_definitions
 M.get_columns_from_select_expr = get_columns_from_select_expr
+M.collect_buffer_created_tables = collect_buffer_created_tables
+M.resolve_select_columns = resolve_select_columns
 M.is_nested_in_subquery = is_nested_in_subquery
 M.get_text = get_text
 

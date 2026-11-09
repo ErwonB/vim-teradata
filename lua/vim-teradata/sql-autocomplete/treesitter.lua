@@ -154,6 +154,15 @@ local function find_all_object_reference(scope_node, source)
                 tb_name = string.upper(utils.replace_env_vars(tbl_name)),
                 alias   = string.upper(alias_str),
             })
+        elseif tbl_name then
+            local up_tbl = string.upper(utils.replace_env_vars(tbl_name))
+            if utils.get_session_table and utils.get_session_table(up_tbl) then
+                table.insert(tables, {
+                    db_name = nil,
+                    tb_name = up_tbl,
+                    alias   = string.upper(alias_str ~= "" and alias_str or tbl_name),
+                })
+            end
         end
         ::continue::
     end
@@ -278,6 +287,15 @@ local function find_all_tables_in_scope(scope_node, source)
                     tb_name = string.upper(utils.replace_env_vars(tbl_name)),
                     alias   = string.upper(alias_str),
                 })
+            elseif tbl_name then
+                local up_tbl = string.upper(utils.replace_env_vars(tbl_name))
+                if utils.get_session_table and utils.get_session_table(up_tbl) then
+                    table.insert(tables, {
+                        db_name = nil,
+                        tb_name = up_tbl,
+                        alias   = string.upper(alias_str ~= "" and alias_str or tbl_name),
+                    })
+                end
             end
         end
         ::continue::

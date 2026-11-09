@@ -95,7 +95,12 @@ function M.complete_manual(findstart)
         elseif context.type == 'tables' then
             res = utils.get_tables(context.db_name)
         elseif context.type == 'databases' then
-            res = utils.get_databases()
+            res = vim.deepcopy(utils.get_databases() or {})
+            if utils.list_session_tables then
+                for _, vt in ipairs(utils.list_session_tables()) do
+                    table.insert(res, vt)
+                end
+            end
         elseif context.type == 'keywords' then
             res = context.candidates
         end
@@ -127,7 +132,12 @@ function M.complete_items()
         context_results = utils.get_tables(context.db_name)
     elseif context.type == 'databases' then
         context_kind    = Kind.Module
-        context_results = utils.get_databases()
+        context_results = vim.deepcopy(utils.get_databases() or {})
+        if utils.list_session_tables then
+            for _, vt in ipairs(utils.list_session_tables()) do
+                table.insert(context_results, vt)
+            end
+        end
     elseif context.type == 'keywords' then
         context_kind    = Kind.Keyword
         context_results = context.candidates

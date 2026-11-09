@@ -576,6 +576,42 @@ cursor plus the next two.
                 catalog used by completion and diagnostics. Run |:TDSync|
                 once per machine.
 
+                                                                *:TDSync-add*
+                                                             *:TDSync-update*
+                                                             *:TDSync-delete*
+:[range]TDSync[!] add [DB.OBJ ...]
+:[range]TDSync[!] update [DB.OBJ ...]
+:[range]TDSync delete [DB.OBJ ...]
+                Incrementally add, update, or delete one or many objects
+                in the local metadata catalog without running a full sync:
+
+                - `add`: fetch the given objects from `DBC.ColumnsV` via TPT
+                  and merge them into the local catalog.
+                - `update`: same as `add`, and any requested object that no
+                  longer exists on the server is removed from the catalog.
+                - `delete`: remove the given objects from the local catalog
+                  only (synchronous, no server call).
+
+                Target forms:
+                - `DB.OBJ [DB.OBJ ...]`: one or more qualified objects
+                  (separated by spaces and/or commas; `${VAR}` placeholders
+                  are expanded).
+                - `DB.*`: whole database (valid for `add`, `update`, and
+                  `delete`).
+                - No arguments with a visual range (`:'<,'>TDSync add`):
+                  object names are read from the visual selection.
+                - No arguments without a range (`:TDSync add`): uses the
+                  `object_reference` node under the cursor.
+                - Single-part name (`:TDSync add vt_name`): registers a
+                  session-only volatile/temporary table (not written to
+                  disk). By default columns are extracted from the
+                  `CREATE VOLATILE TABLE` / `CREATE GLOBAL TEMPORARY TABLE`
+                  statement in the current buffer. With `!` (`:TDSync add!
+                  vt_name`), a one-shot BTEQ job creates the empty table
+                  (`WITH NO DATA`) and runs `HELP COLUMN vt_name.*` on the
+                  server. `:TDSync delete vt_name` removes it from the
+                  session registry.
+
                                                                       *:TDU*
 :TDU            Open the user manager (see |vim-teradata-connections|).
 

@@ -86,30 +86,9 @@ local function collect(node, types, stop, acc)
     return acc
 end
 
---- Resolves an `object_reference` into { db, name } following the same rules as
---- sql-autocomplete/treesitter.lua:find_all_tables_in_scope.
+--- Resolves an `object_reference` into { db, name } via util.resolve_object_reference.
 local function resolve_object_reference(obj_ref, source)
-    local db_node     = tsu.child_by_field(obj_ref, 'database')
-    local schema_node = tsu.child_by_field(obj_ref, 'schema')
-    local name_node   = tsu.child_by_field(obj_ref, 'name')
-
-    local db   = schema_node and node_text(schema_node, source) or nil
-    local name = name_node and node_text(name_node, source) or nil
-
-    if not db_node and not schema_node and not name_node then
-        local ids = {}
-        for child in obj_ref:iter_children() do
-            if child:type() == 'identifier' then table.insert(ids, child) end
-        end
-        if #ids == 1 then
-            name = node_text(ids[1], source)
-        elseif #ids == 2 then
-            db, name = node_text(ids[1], source), node_text(ids[2], source)
-        elseif #ids >= 3 then
-            db, name = node_text(ids[#ids - 1], source), node_text(ids[#ids], source)
-        end
-    end
-    return db, name
+    return require('vim-teradata.util').resolve_object_reference(obj_ref, source)
 end
 
 --- Builds the relation list of the statement's own FROM clause.

@@ -1,0 +1,38 @@
+DEFINE JOB EXPORT_DATA
+DESCRIPTION 'Export data from Teradata to a file'
+(
+    DEFINE SCHEMA FILE_SCHEMA
+    (
+        full_line varchar(500)
+    );
+
+    DEFINE OPERATOR SQL_SELECTOR
+    TYPE SELECTOR
+    SCHEMA FILE_SCHEMA
+    ATTRIBUTES
+    (
+        VARCHAR SelectStmt = @select_stmt,
+        VARCHAR PrivateLogName = 'selector_log',
+        VARCHAR UserName = @user,
+        VARCHAR UserPassword = '$tdwallet('||@user||')',
+        VARCHAR LogonMech = @logon_mech,
+        VARCHAR TdpId = @tdpid,
+        VARCHAR ReportModeOn = 'Y'
+    );
+
+    DEFINE OPERATOR FILE_WRITER
+    TYPE DATACONNECTOR CONSUMER
+    SCHEMA *
+    ATTRIBUTES
+    (
+        VARCHAR PrivateLogName = 'dataconnector_log',
+        VARCHAR DirectoryPath = @data_path,
+        VARCHAR FileName = @file_name,
+        VARCHAR Format = 'DELIMITED',
+        VARCHAR OpenMode = 'Write',
+        VARCHAR TextDelimiter = ','
+    );
+
+    APPLY TO OPERATOR (FILE_WRITER)
+    SELECT * FROM OPERATOR (SQL_SELECTOR);
+);

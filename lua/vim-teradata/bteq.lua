@@ -676,8 +676,9 @@ function M.run_updates(statements, on_done, opts)
 end
 
 M._get_range_sql = get_range_sql
--- exposed for tests
+-- exposed for tests and internal callers
 M._build_script = build_script
 M._request_lines = request_lines
+M._run_single_query = run_single_query
 
 return M

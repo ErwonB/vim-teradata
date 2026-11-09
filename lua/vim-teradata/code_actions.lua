@@ -1109,7 +1109,7 @@ end
 ---@param rel table
 ---@return string|nil
 local function lock_table_name(rel)
-    if not rel or rel.derived or not rel.table then return nil end
+    if not rel or rel.derived or rel.local_table or not rel.table then return nil end
     if rel.db and rel.db ~= "" then
         return rel.db .. "." .. rel.table
     end
