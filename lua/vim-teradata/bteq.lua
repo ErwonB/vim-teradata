@@ -52,10 +52,12 @@ local function request_lines(sql, options, output_path)
     local body = {}
     if options.operation == 'output' and not options.skip_retlimit then
         body[#body + 1] = '.set retlimit ' .. config.options.retlimit .. ' 2048'
+        body[#body + 1] = '.set retcancel on'
     else
         -- EXPLAIN / syntax: no row limit. RETLIMIT is sticky inside a
         -- persistent session, so it is always set explicitly (0 = no limit).
         body[#body + 1] = '.set retlimit 0 2048'
+        body[#body + 1] = '.set retcancel off'
     end
     body[#body + 1] = '.EXPORT FILE = ' .. sq(output_path) .. ';'
     vim.list_extend(body, vim.split(sql, '\n'))
