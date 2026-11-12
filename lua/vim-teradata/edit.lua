@@ -45,9 +45,12 @@ local HEADER_LINES = 2     -- header + dashes
 ---@field meta TDEditMeta
 ---@field original string[][]
 ---@field populate function
+---@field rebind_grid_maps function|nil
+---@field hint_suffix string|nil
 ---@field editing boolean
+---@field pending table<integer,table<integer,string>>      -- row_id -> col_id -> new value
 ---@field keys table<string,integer[]>                      -- table_key -> original column indexes
----@field saved_maps table<string,function>
+---@field grid_snapshot string[][]|nil
 
 ---@type table<integer,TDEditState>
 local state = {}
