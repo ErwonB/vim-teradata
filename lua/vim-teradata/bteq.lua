@@ -11,6 +11,21 @@ local M      = {}
 --- @type table<string, integer>
 local result_session = {}
 
+--- query id -> { user = <user obj>, session_buf = int|nil, rows_found = int|nil, retlimit_applied = bool }
+--- (what a full export needs to know about the query that produced a preview)
+--- @type table<string, table>
+local query_ctx = {}
+
+local output_callback_with
+
+--- Context recorded for output query `id` (nil for ids from older history).
+--- @param id string|nil
+--- @return table|nil
+function M.query_context(id)
+    return id and query_ctx[tostring(id)] or nil
+end
+
+
 local function sq(s)
     return "'" .. (s:gsub("'", "''")) .. "'"
 end
@@ -139,6 +154,11 @@ end
 --- @type table|nil  { sql = string, id = string }
 local last_run = nil
 
+--- Id of the most recent output query.
+--- @return string|nil
+function M.latest_id()
+    return last_run and last_run.id
+end
 --- Returns true when `id` is the id of the most recent output query.
 --- @param id string|nil
 --- @return boolean
@@ -165,18 +185,7 @@ local function find_result_win(id)
     return scan(vim.api.nvim_tabpage_list_wins(0)) or scan(vim.api.nvim_list_wins())
 end
 
---- Strips leading whitespace, `-- line` comments and `/* block */` comments.
---- @param s string
---- @return string
-local function strip_leading_noise(s)
-    while true do
-        local before = s
-        s = s:gsub('^%s+', '')
-        s = s:gsub('^%-%-[^\n]*', '')
-        s = s:gsub('^/%*.-%*/', '')
-        if s == before then return s end
-    end
-end
+local strip_leading_noise = util.strip_leading_noise
 
 --- True when a single statement is an EXPLAIN request (case-insensitive).
 --- @param stmt string
@@ -255,6 +264,12 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
         -- replacement / terminator handling as the original submission.
         last_run = { sql = sql, id = id, session_buf = sess and session_buf or nil }
         if sess then result_session[id] = session_buf end
+        query_ctx[id] = {
+            user = current_user,
+            session_buf = sess and session_buf or nil,
+            rows_found = nil,
+            retlimit_applied = not opts.skip_retlimit,
+        }
     else
         output_path = vim.fn.tempname()
     end
@@ -288,6 +303,7 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
             local rows = nil
             if operation == 'output' then
                 rows = util.extract_rows_found(res.log_content)
+                if query_ctx[id] then query_ctx[id].rows_found = rows end
             end
 
             local message
@@ -338,6 +354,22 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
     return id
 end
 
+--- Runs an already prepared SELECT in the persistent session of `session_buf`
+--- with no row limit, writing the BTEQ export to `output_path`. It is a side
+--- channel: no history entry, `last_run` and the per-query context are untouched.
+--- @param session_buf integer
+--- @param sql string
+--- @param output_path string
+--- @param on_done fun(res: table)  called on the main loop
+--- @return table|nil handle, string|nil err
+function M.export_in_session(session_buf, sql, output_path, on_done)
+    local sess = session_buf and session.get(session_buf)
+    if not sess then return nil, 'The BTEQ session of this query is no longer open.' end
+    local body, post = request_lines(sql, { operation = 'output', skip_retlimit = true }, output_path)
+    local handle = sess:submit(body, post, function(res) vim.schedule(function() on_done(res) end) end)
+    return handle
+end
+
 local function run_multiple(sqls, operation, handle_result)
     if #sqls == 0 then
         return vim.notify('No SQL statements found.', vim.log.levels.WARN)
@@ -375,24 +407,7 @@ function M.query_output(args)
     local count = (args.count and args.count > 0) and args.count or 1
     local sqls = get_node_statements(count)
     run_multiple(sqls, 'output', function(res, context)
-        if res.rc == 0 then
-            local result_path = context.result_path
-            if vim.fn.getfsize(result_path) > 0 then
-                ui.display_output(result_path, context.query_id)
-                local actual_lines = util.extract_rows_found(res.log_content)
-                if context.retlimit_applied
-                    and actual_lines and actual_lines > config.options.retlimit then
-                    vim.notify(
-                        string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
-                        vim.log.levels.WARN
-                    )
-                end
-            else
-                vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
-            end
-        else
-            ui.display_error(res.msg)
-        end
+        output_callback_with(res, context)
     end)
 end
 
@@ -423,7 +438,7 @@ end
 
 --- @param display_opts table|nil forwarded to ui.display_output,
 ---                      e.g. { reuse_win = 1001 }
-local function output_callback_with(res, context, display_opts)
+function output_callback_with(res, context, display_opts)
     if res.rc == 0 then
         local result_path = context.result_path
         if vim.fn.getfsize(result_path) > 0 then
@@ -431,10 +446,17 @@ local function output_callback_with(res, context, display_opts)
             local actual_lines = util.extract_rows_found(res.log_content)
             if context.retlimit_applied
                 and actual_lines and actual_lines > config.options.retlimit then
-                vim.notify(
-                    string.format('%d actual lines, only %d displayed', actual_lines, config.options.retlimit),
-                    vim.log.levels.WARN
-                )
+                local msg = string.format('%d actual lines, only %d displayed.', actual_lines, config.options.retlimit)
+                local ex = config.options.export or {}
+                if ex.enabled ~= false then
+                    local key = ex.keymap
+                    if type(key) == 'string' and key ~= '' then
+                        msg = msg .. string.format(' Press %s in the grid (or :TDExport) for the full result.', key)
+                    else
+                        msg = msg .. ' Use :TDExport for the full result.'
+                    end
+                end
+                vim.notify(msg, vim.log.levels.WARN)
             end
         else
             vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
@@ -577,7 +599,7 @@ function M.session_command(args)
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN, title)
     end
 
-    vim.notify('Opening BTEQ session for ' .. user.user .. '@' .. user.tdpid .. '…',
+    vim.notify('Opening BTEQ session for ' .. user.user .. '@' .. user.tdpid .. 'ÔÇª',
         vim.log.levels.INFO, title)
     session.open(buf, user, {
         logon = build_header(user.user, user.tdpid, user.log_mech),

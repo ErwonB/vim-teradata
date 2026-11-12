@@ -1,0 +1,38 @@
+USING CHARACTER SET UTF8
+DEFINE JOB VTD_EXPORT_QUERY
+DESCRIPTION 'vim-teradata: export a SELECT in report mode (SELECTOR) to a delimited file'
+(
+    /* All-VARCHAR schema derived from the query itself, suited to a delimited file. */
+    DEFINE SCHEMA QUERY_SCHEMA FROM SELECT DELIMITED @select_stmt;
+
+    DEFINE OPERATOR QUERY_SOURCE
+    TYPE SELECTOR
+    SCHEMA QUERY_SCHEMA
+    ATTRIBUTES
+    (
+        VARCHAR SelectStmt     = @select_stmt,
+        VARCHAR UserName       = @user,
+        VARCHAR UserPassword   = '$tdwallet('||@user||')',
+        VARCHAR LogonMech      = @logon_mech,
+        VARCHAR TdpId          = @tdpid,
+        VARCHAR ReportModeOn   = 'Y',
+        VARCHAR PrivateLogName = 'vtd_selector_log'
+    );
+
+    DEFINE OPERATOR FILE_WRITER
+    TYPE DATACONNECTOR CONSUMER
+    SCHEMA *
+    ATTRIBUTES
+    (
+        VARCHAR DirectoryPath  = @data_path,
+        VARCHAR FileName       = @file_name,
+        VARCHAR Format         = 'DELIMITED',
+        VARCHAR OpenMode       = 'WriteAppend',
+        VARCHAR TextDelimiter  = @delimiter,
+        VARCHAR QuotedData     = 'No',
+        VARCHAR PrivateLogName = 'vtd_writer_log'
+    );
+
+    APPLY TO OPERATOR (FILE_WRITER)
+    SELECT * FROM OPERATOR (QUERY_SOURCE);
+);

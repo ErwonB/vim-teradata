@@ -8,6 +8,7 @@ It provides query execution via BTEQ, on-the-fly syntax diagnostics, schema-awar
 ## Features
 - **Query execution via BTEQ**: Run single queries, multistatement batches, visual ranges, and track jobs in the background.
 - **Persistent sessions**: Attach a long-lived BTEQ session to a buffer with `:TDSession` to keep volatile tables, query bands and transactions between queries. No extra dependency, works on Linux, macOS and Windows.
+- **Full-result export via TPT for large result sets**: Background export of complete query outputs to delimited files with job tracking and head grid preview.
 - **Tree-sitter diagnostics**: Fast syntax and reference linting for Teradata SQL statements.
 - **Schema-aware autocompletion**: Native completion for tables, columns, and databases supporting `blink.cmp`, `nvim-cmp`, and `omnifunc`.
 - **Query history & bookmarks**: Search past queries using your choice of picker (`fzf-lua`, `snacks`, `telescope`, `fzf.vim`, or built-in `native` picker).

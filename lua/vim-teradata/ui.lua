@@ -98,14 +98,21 @@ end
 --- @param opts table|nil { reuse_win = integer } replace the result buffer
 ---             already shown in that window instead of opening a new split.
 function M.display_output(file_path, query_id, opts)
-    local lines = vim.fn.readfile(file_path)
+    opts = opts or {}
+    local lines = opts.max_lines and vim.fn.readfile(file_path, '', opts.max_lines) or vim.fn.readfile(file_path)
     if #lines == 0 then
         vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
         return
     end
+    local tpt_view = opts.source == 'tpt'
 
     local regex_special_chars = "|.*+?^$(){}[]\\`~"
     local separator = vim.fn.escape(config.options.sep, regex_special_chars)
+    if opts.has_header == false then
+        local names = {}
+        for i = 1, #vim.fn.split(lines[1], separator) do names[i] = 'col' .. i end
+        table.insert(lines, 1, table.concat(names, config.options.sep))
+    end
     local header = vim.fn.split(lines[1], separator)
     local data = {}
     for i = 2, #lines do
@@ -119,7 +126,8 @@ function M.display_output(file_path, query_id, opts)
         data[i] = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, row)
     end
 
-    local buffer_name = query_id and 'Teradata Result - ' .. query_id or 'Teradata Result'
+    local buffer_name = (tpt_view and 'Teradata Export' or 'Teradata Result')
+        .. (query_id and ' - ' .. query_id or '')
     local reuse_win = opts and opts.reuse_win or nil
     if reuse_win and vim.api.nvim_win_is_valid(reuse_win) then
         -- Same query as the one already on screen: swap the grid in place instead
@@ -169,6 +177,27 @@ function M.display_output(file_path, query_id, opts)
             end
             vim.bo[bufnr].modifiable = false
             return
+        end
+    end
+
+    local export_key = (config.ensure().export or {}).keymap
+    local export_bound = false
+    if not tpt_view and opts.editable ~= false and config.options.export.enabled
+        and type(export_key) == 'string' and export_key ~= '' then
+        export_bound = true
+        vim.keymap.set('n', export_key, function()
+            if require('vim-teradata.edit').is_editing(bufnr) then
+                return vim.notify('Save or cancel your edits before exporting.',
+                    vim.log.levels.WARN, { title = 'Teradata' })
+            end
+            require('vim-teradata.export').run(result_id)
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: full export via TPT' })
+    end
+    local hint_suffix
+    if export_bound then
+        local qc = require('vim-teradata.bteq').query_context(result_id)
+        if qc and qc.rows_found and qc.rows_found > #data then
+            hint_suffix = ('  <%s> Full export'):format(export_key)
         end
     end
 
@@ -227,17 +256,19 @@ function M.display_output(file_path, query_id, opts)
         end
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
-        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort'
+        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort' ..
+            (hint_suffix or '')
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
         vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
-        vim.api.nvim_buf_set_extmark(
-            bufnr,
-            ns_id,
-            #buffer_lines - 1,
-            0,
-            { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
-        )
+        local mark = { virt_text = { { extmark, "Comment" } }, virt_text_pos = "eol" }
+        if tpt_view then
+            local shown = #(grid.get(bufnr, 'all_data') or {})
+            local total = opts.rows_total or shown
+            mark.virt_lines = { { { ('TPT export ÔÇö first %s of %s rows, read-only. Filters/sort apply to these rows only. Full file: %s')
+                :format(shown, total, file_path), 'WarningMsg' } } }
+        end
+        vim.api.nvim_buf_set_extmark(bufnr, ns_id, #buffer_lines - 1, 0, mark)
 
         pcall(function() require('vim-teradata.edit').decorate(bufnr) end)
 
@@ -401,11 +432,12 @@ function M.display_output(file_path, query_id, opts)
 
     populate_buffer()
 
-    if config.options.edit_enabled and original_query then
+    if config.options.edit_enabled and original_query and opts.editable ~= false then
         require('vim-teradata.edit').attach(bufnr, original_query, {
             data             = vim.deepcopy(data),
             populate         = populate_buffer,
             rebind_grid_maps = bind_grid_maps,
+            hint_suffix      = hint_suffix,
         })
     end
 end
@@ -419,6 +451,76 @@ function M.display_error(msg)
     vim.notify(msg, vim.log.levels.ERROR, { title = 'Teradata Error' })
 end
 
+--- Centered modal confirmation. Only `y` (or the keys in `keys`) confirms;
+--- n / q / <Esc> / leaving the window cancel; <CR> does nothing.
+--- @param o { title: string, lines: table[], on_confirm: fun()|nil, footer: string|nil, keys: table<string, fun()>|nil, on_cancel: fun()|nil }
+--- @return integer win
+function M.confirm_box(o)
+    local texts, width = {}, 0
+    for i, l in ipairs(o.lines or {}) do
+        texts[i] = l[1] or ''
+        width = math.max(width, vim.fn.strdisplaywidth(texts[i]))
+    end
+    local footer = o.footer or ' [y] Export   [n / q / Esc] Cancel '
+    local title = o.title or ''
+    width = math.max(width + 2, vim.fn.strdisplaywidth(footer), vim.fn.strdisplaywidth(title))
+    width = math.min(width, math.max(10, vim.o.columns - 4))
+    local height = math.max(1, math.min(#texts, math.max(1, vim.o.lines - 6)))
+
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].bufhidden = 'wipe'
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, texts)
+    local ns = vim.api.nvim_create_namespace('vim-teradata-confirm')
+    for i, l in ipairs(o.lines or {}) do
+        vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
+            end_row = i - 1, end_col = #texts[i], hl_group = l[2] or 'Normal',
+        })
+    end
+    vim.bo[buf].modifiable = false
+
+    local win = vim.api.nvim_open_win(buf, true, {
+        relative = 'editor',
+        style = 'minimal',
+        border = 'rounded',
+        width = width,
+        height = height,
+        row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
+        col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+        title = title,
+        title_pos = 'center',
+        footer = footer,
+        footer_pos = 'center',
+    })
+
+    local done = false
+    local function close()
+        if vim.api.nvim_win_is_valid(win) then pcall(vim.api.nvim_win_close, win, true) end
+    end
+    local function finish(fn)
+        if done then return end
+        done = true
+        close()
+        if fn then fn() end
+    end
+
+    local keys = vim.deepcopy(o.keys or {})
+    if not o.keys then keys.y = o.on_confirm end
+    local mo = { buffer = buf, silent = true, nowait = true }
+    for key, fn in pairs(keys) do
+        vim.keymap.set('n', key, function() finish(fn) end, mo)
+    end
+    for _, key in ipairs({ 'n', 'q', '<Esc>' }) do
+        vim.keymap.set('n', key, function() finish(o.on_cancel) end, mo)
+    end
+    vim.keymap.set('n', '<CR>', '<Nop>', mo)
+    vim.api.nvim_create_autocmd({ 'WinLeave', 'BufLeave' }, {
+        buffer = buf,
+        once = true,
+        callback = function() vim.schedule(function() finish(o.on_cancel) end) end,
+    })
+    return win
+end
+
 function M.display_help()
     local help_text = {
         'Global commands:',
@@ -428,6 +530,7 @@ function M.display_help()
         '  :TDS          Manage settings',
         '  :TDB          Manage bookmarks',
         '  :TDJ          Job manager',
+        '  :TDExport [id]   Export the full result via TPT',
         '  :TDSessions   List open persistent BTEQ sessions',
         '  :TDSync       Refresh metadata cache for autocomplete',
         '  :TDHelp       Display this help',
@@ -459,6 +562,8 @@ function M.display_help()
         '  <X>           Set cell to NULL',
         '  <S>           Save pending edits',
         '  <C>           Cancel edits',
+        string.format('  <%s>           Full export via TPT (confirmation box)',
+            (config.options.export or {}).keymap or 'F'),
     }
 
     local bufnr = M.open_scratch('Teradata Help', 25)
@@ -894,7 +999,7 @@ local function format_jobs_table(jobs)
     local lines, line_ids = { header, sep }, {}
     for _, j in ipairs(jobs) do
         local msg = tostring(j.message or '')
-        if #msg > w.msg then msg = msg:sub(1, w.msg - 1) .. "…" end
+        if #msg > w.msg then msg = msg:sub(1, w.msg - 1) .. "ÔÇª" end
         table.insert(lines, string.format(
             "%-" .. w.id .. "s | %-" .. w.op .. "s | %-" .. w.st .. "s | %-" .. w.usr .. "s | %" .. w.rows .. "s | %s",
             tostring(j.id),
@@ -963,6 +1068,22 @@ function M.show_jobs()
         if not id then return end
         local job = util.jobs_get(id)
         if not job then return end
+        if job.operation == 'export' then
+            if job.status == 'running' then
+                return vim.notify('Export still running.', vim.log.levels.INFO, { title = 'Teradata' })
+            end
+            if job.status ~= 'ok' or not job.result_path or vim.fn.filereadable(job.result_path) == 0 then
+                return vim.notify('Export file not available for job ' .. job.id, vim.log.levels.WARN)
+            end
+            local head = tonumber((config.ensure().export or {}).head_lines) or config.options.retlimit or 100
+            return M.display_output(job.result_path, job.source_id, {
+                max_lines = head + 1,
+                editable = false,
+                source = 'tpt',
+                rows_total = job.rows_total or job.rows,
+                has_header = job.has_header,
+            })
+        end
         if job.operation == 'output' then
             if job.result_path and vim.fn.filereadable(job.result_path) == 1 then
                 M.display_output(job.result_path, job.id)
@@ -1000,6 +1121,18 @@ function M.show_jobs()
         if not job then return end
         if job.status == 'running' then
             return vim.notify('Job is running. Cancel it first (x).', vim.log.levels.WARN)
+        end
+        if job.operation == 'export' then
+            local size = job.result_path and vim.fn.getfsize(job.result_path) or -1
+            local label = size >= 0 and (' (' .. util.human_bytes(size) .. ')') or ''
+            vim.ui.select({ 'Yes', 'No' }, { prompt = 'Delete export file' .. label .. '?' }, function(choice)
+                if choice ~= 'Yes' then return end
+                util.remove_files(job.result_path or '')
+                util.jobs_remove(id)
+                vim.notify('Removed job ' .. id, vim.log.levels.INFO)
+                populate()
+            end)
+            return
         end
         util.remove_files(job.query_path or '')
         util.remove_files(job.result_path or '')

@@ -24,10 +24,29 @@ function M.check()
     end
 
     local tpt_bin = vim.fn.exepath("tbuild")
+    local export_cfg = config.export or {}
     if tpt_bin ~= "" then
         vim.health.ok("tbuild (TPT) found at " .. tpt_bin)
+    elseif export_cfg.enabled then
+        vim.health.warn("tbuild not found in PATH; full exports (:TDExport) need it (or set export.enabled = false)")
     else
         vim.health.info("tbuild not found in PATH (optional; needed only for TPT exports)")
+    end
+
+    for _, route in ipairs({ "W", "R" }) do
+        local ok_script, export_script = pcall(require("vim-teradata.config").get_tpt_export_script, route)
+        if ok_script and export_script and vim.fn.filereadable(export_script) == 1 then
+            vim.health.ok(("TPT export script (route %s): %s"):format(route, export_script))
+        else
+            vim.health.warn(("TPT export script for route %s not found (export.tpt_script or the bundled lua/vim-teradata/tpt/*.tpt)"):format(route))
+        end
+    end
+    for _, tool in ipairs({ "twbkill", "twbrmcp", "tlogview" }) do
+        if vim.fn.exepath(tool) ~= "" then
+            vim.health.ok(tool .. " found")
+        else
+            vim.health.info(tool .. " not found in PATH (cancel cleanup / log hints unavailable)")
+        end
     end
 
     -- 3. Tree-sitter parser

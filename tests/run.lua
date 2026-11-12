@@ -8,10 +8,10 @@ local failed = 0
 local function test(name, fn)
     local ok, err = pcall(fn)
     if ok then
-        io.stdout:write("  ✓ " .. name .. "\n")
+        io.stdout:write("  Ô£ô " .. name .. "\n")
         passed = passed + 1
     else
-        io.stdout:write("  ✗ " .. name .. "\n    " .. tostring(err) .. "\n")
+        io.stdout:write("  Ô£ù " .. name .. "\n    " .. tostring(err) .. "\n")
         failed = failed + 1
     end
 end
@@ -29,6 +29,7 @@ local files = {
     'tests/catalog_test.lua',
     'tests/session_test.lua',
     'tests/bteq_script_test.lua',
+    'tests/export_test.lua',
 }
 
 io.stdout:write("Running vim-teradata test suite...\n")

@@ -34,6 +34,8 @@
 ---@field history_max integer|nil                     max history files kept per dir (nil = unlimited)
 ---@field diagnostics { enabled: boolean, debounce_ms: integer }
 ---@field treesitter_folds boolean
+---@field export { enabled: boolean, keymap: string|false, confirm: boolean, operator: 'auto'|'export'|'selector', max_sessions: integer, head_lines: integer|nil, timeout_ms: integer|nil, tpt_script: string|nil }
+---@field exports_dir_name string
 ---@field users VimTeradata.User[]
 ---@field current_user_index integer|nil
 
@@ -101,6 +103,21 @@ M.defaults = {
     diagnostics = { enabled = true, debounce_ms = 150 },
     treesitter_folds = false,
 
+    -- full-result export through TPT (see :TDExport)
+    export = {
+        enabled      = true,
+        keymap       = 'F',       -- result-buffer key; false/'' disables it
+        confirm      = true,      -- show the confirmation box before starting
+        operator     = 'auto',    -- 'auto': EXPORT on the wrapped query when possible, else SELECTOR
+                                  -- 'export': EXPORT only (refuse queries that can't be wrapped)
+                                  -- 'selector': SELECTOR in report mode, query unchanged
+        max_sessions = 4,         -- EXPORT operator only
+        head_lines   = nil,       -- rows loaded when opening an export in a grid; nil = retlimit
+        timeout_ms   = nil,       -- nil/0 = no timeout (independent from timeout_ms)
+        tpt_script   = nil,       -- override the bundled script path
+    },
+    exports_dir_name = 'exports',
+
     -- Users list
     users = {},
     current_user_index = nil,
@@ -156,6 +173,19 @@ local function validate(o)
     vim.validate('keymaps', o.keymaps, 'table')
     vim.validate('users', o.users, 'table')
     vim.validate('diagnostics', o.diagnostics, 'table')
+    vim.validate('export', o.export, 'table')
+    vim.validate('exports_dir_name', o.exports_dir_name, 'string')
+    local ex = o.export
+    if not vim.tbl_contains({ 'auto', 'export', 'selector' }, ex.operator) then
+        vim.notify("[vim-teradata] export.operator must be 'auto', 'export' or 'selector'; using 'auto'",
+            vim.log.levels.WARN)
+        ex.operator = 'auto'
+    end
+    if type(ex.max_sessions) ~= 'number' or ex.max_sessions < 1 or ex.max_sessions % 1 ~= 0 then
+        vim.notify('[vim-teradata] export.max_sessions must be a positive integer; using 4',
+            vim.log.levels.WARN)
+        ex.max_sessions = 4
+    end
     if not vim.tbl_contains({ 'always', 'modeline', 'never' }, o.sql_detection) then
         vim.notify("[vim-teradata] sql_detection must be 'always', 'modeline' or 'never'; using 'always'",
             vim.log.levels.WARN)
@@ -169,6 +199,16 @@ function M.get_tpt_script()
     local o = M.options
     if o.tpt_script and o.tpt_script ~= '' then return o.tpt_script end
     return vim.api.nvim_get_runtime_file('lua/vim-teradata/sql-autocomplete/tpt/export_db.tpt', false)[1]
+end
+
+--- Absolute path of the TPT query-export script (lazy; plugin must be on 'runtimepath').
+---@param route 'W'|'R'|nil W: EXPORT on the wrapped query (default); R: SELECTOR in report mode
+---@return string|nil
+function M.get_tpt_export_script(route)
+    local o = M.options.export or M.defaults.export
+    if o.tpt_script and o.tpt_script ~= '' then return o.tpt_script end
+    local name = route == 'R' and 'export_query_selector.tpt' or 'export_query.tpt'
+    return vim.api.nvim_get_runtime_file('lua/vim-teradata/tpt/' .. name, false)[1]
 end
 
 --- Absolute path of the TPT objects export script (lazy; plugin must be on 'runtimepath').
@@ -201,6 +241,7 @@ function M.setup(opts)
         M.options.history_dir,
         M.options.history_dir .. '/' .. M.options.queries_dir_name,
         M.options.history_dir .. '/' .. M.options.resultsets_dir_name,
+        M.options.history_dir .. '/' .. M.options.exports_dir_name,
         M.options.bookmarks_dir,
         M.options.bookmarks_dir .. '/' .. M.options.global_bookmarks_dir_name,
         M.options.bookmarks_dir .. '/' .. M.options.user_bookmarks_dir_name,

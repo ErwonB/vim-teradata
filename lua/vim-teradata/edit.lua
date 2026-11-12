@@ -805,7 +805,6 @@ end
 
 local function execute(bufnr, statements)
     local bteq = require('vim-teradata.bteq')
-    local query_id = require('vim-teradata.grid_state').get(bufnr, 'query_id')
     bteq.run_updates(statements, function(res, counts)
         if res.rc ~= 0 then
             require('vim-teradata.ui').display_error(res.msg)
@@ -933,8 +932,8 @@ function M.decorate(bufnr)
     local maps = config.options.edit_keymaps
     if st.meta.editable then
         set_hint(bufnr, string.format(
-            '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <%s> Edit',
-            maps.toggle))
+            '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <%s> Edit%s',
+            maps.toggle, st.hint_suffix or ''))
     end
 end
 
@@ -956,6 +955,7 @@ function M.attach(bufnr, sql, opts)
         original         = opts.data,
         populate         = opts.populate,
         rebind_grid_maps = opts.rebind_grid_maps,
+        hint_suffix      = opts.hint_suffix,
         editing          = false,
         pending          = {},
         keys             = {},

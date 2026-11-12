@@ -80,6 +80,35 @@ local function purge_legacy_flat_catalog()
     end
 end
 
+--- Strips leading whitespace, `-- line` comments and `/* block */` comments.
+--- @param s string
+--- @return string
+function M.strip_leading_noise(s)
+    while true do
+        local before = s
+        s = s:gsub('^%s+', '')
+        s = s:gsub('^%-%-[^\n]*', '')
+        s = s:gsub('^/%*.-%*/', '')
+        if s == before then return s end
+    end
+end
+
+--- Human-readable byte size (1024-based, one decimal under 10).
+--- @param n number
+--- @return string
+function M.human_bytes(n)
+    n = tonumber(n) or 0
+    local units = { 'B', 'KB', 'MB', 'GB', 'TB', 'PB' }
+    local i = 1
+    while n >= 1024 and i < #units do
+        n = n / 1024
+        i = i + 1
+    end
+    if i == 1 then return ('%d B'):format(n) end
+    if n < 10 then return ('%.1f %s'):format(n, units[i]) end
+    return ('%d %s'):format(math.floor(n + 0.5), units[i])
+end
+
 --- Safely removes one or more files.
 --- @param ... string One or more file paths to delete.
 function M.remove_files(...)
@@ -772,7 +801,7 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
     }
 end
 
-local function tbuild_bin()
+function M.tbuild_bin()
     local bin = 'tbuild'
     if vim.fn.has('win32') == 1 then
         -- On Windows, tbuild.exe relaunches itself from argv[0], so a bare name
@@ -784,6 +813,7 @@ local function tbuild_bin()
     end
     return bin
 end
+local tbuild_bin = M.tbuild_bin
 
 --- Runs a Teradata export script and processes the resulting data into structured files.
 --- @return nil
@@ -1523,20 +1553,39 @@ end
 
 function M.prune_history()
     local max = config.options.history_max
-    if not max or max <= 0 then return end
     local keep = {}
     for _, j in ipairs(M.jobs_all()) do
         if j.status == 'running' then
             if j.query_path then keep[vim.fs.basename(j.query_path)] = true end
-            if j.result_path then keep[vim.fs.basename(j.result_path)] = true end
+            if j.result_path then
+                local base = vim.fs.basename(j.result_path)
+                keep[base] = true
+                keep[base .. '.part'] = true
+                keep[base:gsub('%.[^.]*$', '') .. '.jobvars'] = true
+            end
         end
     end
-    for _, name in ipairs({ 'queries_dir_name', 'resultsets_dir_name' }) do
+
+    local exports_dir = M.get_history_path('exports_dir_name')
+    local now = os.time()
+    for _, name in ipairs(vim.fn.isdirectory(exports_dir) == 1 and vim.fn.readdir(exports_dir) or {}) do
+        if (name:match('%.jobvars$') or name:match('%.part$')) and not keep[name] then
+            local st = vim.uv.fs_stat(exports_dir .. '/' .. name)
+            if st and now - st.mtime.sec > 86400 then vim.uv.fs_unlink(exports_dir .. '/' .. name) end
+        end
+    end
+
+    if not max or max <= 0 then return end
+    for _, name in ipairs({ 'queries_dir_name', 'resultsets_dir_name', 'exports_dir_name' }) do
         local dir = M.get_history_path(name)
-        local files = vim.fn.readdir(dir)
-        table.sort(files) -- ids start with a timestamp: lexical == chronological
-        for i = 1, #files - max do
-            if not keep[files[i]] then vim.uv.fs_unlink(dir .. '/' .. files[i]) end
+        if vim.fn.isdirectory(dir) == 1 then
+            local files = vim.tbl_filter(function(f)
+                return not f:match('%.jobvars$') and not f:match('%.part$')
+            end, vim.fn.readdir(dir))
+            table.sort(files) -- ids start with a timestamp: lexical == chronological
+            for i = 1, #files - max do
+                if not keep[files[i]] then vim.uv.fs_unlink(dir .. '/' .. files[i]) end
+            end
         end
     end
 end

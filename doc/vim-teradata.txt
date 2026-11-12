@@ -32,6 +32,7 @@ CONTENTS                                               *vim-teradata-contents*
         8.1 Buffer mappings ................... |vim-teradata-buffer-mappings|
         8.2 OPE operations .................... |vim-teradata-ope|
         8.3 UI buffer mappings ................ |vim-teradata-ui-mappings|
+        8.4 Result buffer mappings ........ |vim-teradata-result-mappings|
     9. User guide ............................. |vim-teradata-user-guide|
         9.1 Running queries ................... |vim-teradata-guide-run|
         9.2 Diagnostics ..................... |vim-teradata-guide-diagnostics|
@@ -43,6 +44,7 @@ CONTENTS                                               *vim-teradata-contents*
         9.8 Editing results ................... |vim-teradata-guide-editing|
         9.9 Editing & formatting .............. |vim-teradata-guide-format|
         9.10 Persistent sessions .............. |vim-teradata-guide-sessions|
+        9.11 Full exports ..................... |vim-teradata-guide-export|
     10. Filetypes ............................. |vim-teradata-filetypes|
     11. Troubleshooting ....................... |vim-teradata-troubleshooting|
     12. FAQ ................................... |vim-teradata-faq|
@@ -335,7 +337,8 @@ sep ~
     Type: `string`            Default: `"~"`
 
     Field separator used in BTEQ result CSV files. Change only if your
-    data may contain `~`.
+    data may contain `~`. Full exports (|:TDExport|) also refuse a `sep`
+    containing a single quote or a newline.
 
                                              *vim-teradata-opt-edit_enabled*
 edit_enabled ~
@@ -404,6 +407,87 @@ data_dir ~
     Paths used for history, bookmarks, and the autocomplete metadata
     cache. Defaults derive from `vim.fn.stdpath('data') .. '/teradata'`.
 
+                                            *vim-teradata-opt-exports_dir_name*
+exports_dir_name ~
+    Type: `string`            Default: `"exports"`
+
+    Subdirectory of |vim-teradata-opt-history_dir| where full exports are
+    written, as `<history_dir>/exports/<id>.csv`. See
+    |vim-teradata-guide-export|.
+
+                                                  *vim-teradata-opt-export*
+export ~
+    Type: `table`
+
+    Full-result export through TPT: the `F` key in result buffers and
+    |:TDExport|. See |vim-teradata-guide-export|. Sub-options:
+
+                                          *vim-teradata-opt-export.enabled*
+    enabled ~
+        Type: `boolean`       Default: `true`
+
+        When false, the `F` key is not bound and |:TDExport| is refused.
+
+                                          *vim-teradata-opt-export.keymap*
+    keymap ~
+        Type: `string|false`  Default: `"F"`
+
+        Result-buffer key that starts a full export, see
+        |vim-teradata-result-mappings|. Set to `false` or `""` to disable
+        the key (|:TDExport| still works). Use `"gF"` to keep the `F{char}`
+        motion available inside result buffers.
+
+                                          *vim-teradata-opt-export.confirm*
+    confirm ~
+        Type: `boolean`       Default: `true`
+
+        Show the confirmation box (query id, rows, size estimate, target
+        file, operator) before the export starts. `false` starts at once.
+
+                                         *vim-teradata-opt-export.operator*
+    operator ~
+        Type: `string`        Default: `"auto"`
+
+        TPT operator used for the export:
+            "auto"      EXPORT operator on the wrapped query when possible,
+                        otherwise SELECTOR (report mode, query unchanged).
+                        See |vim-teradata-guide-export|.
+            "export"    EXPORT operator only (FastExport protocol). Several
+                        sessions, see |vim-teradata-opt-export.max_sessions|.
+                        Queries that can't be wrapped are refused.
+            "selector"  SELECTOR operator in report mode, query unchanged. A
+                        single session. Use it on sites without utility
+                        sessions, or to force this route for every query.
+
+                                      *vim-teradata-opt-export.max_sessions*
+    max_sessions ~
+        Type: `number`        Default: `4`
+
+        Number of sessions for the EXPORT operator. Must be a positive
+        integer. Ignored when the query runs with the SELECTOR operator.
+
+                                      *vim-teradata-opt-export.head_lines*
+    head_lines ~
+        Type: `number|nil`    Default: `nil`
+
+        Number of rows loaded when an export job is opened in a grid from
+        |:TDJ| (`<CR>`). `nil` uses |vim-teradata-opt-retlimit|.
+
+                                      *vim-teradata-opt-export.timeout_ms*
+    timeout_ms ~
+        Type: `number|nil`    Default: `nil`
+
+        Timeout of the TPT process in milliseconds. `nil` or `0` disables
+        it. Independent from |vim-teradata-opt-timeout_ms|.
+
+                                      *vim-teradata-opt-export.tpt_script*
+    tpt_script ~
+        Type: `string|nil`    Default: `nil`
+
+        Path of a TPT script that replaces the bundled one (`export_query`
+        or `export_query_selector`, chosen by the route, see
+        |vim-teradata-guide-export|).
+
 ------------------------------------------------------------------------------
 5.3 Default keymaps                             *vim-teradata-default-keymaps*
 
@@ -458,7 +542,7 @@ Query execution and editing commands (:TD, :TDO, :TDE, :TDV, :TDM,
 :TDMV, :TDF, :TDFF, :TDCodeAction, :TDSession) are buffer-local to
 buffers with filetype `teradata` (see |vim-teradata-filetypes|). Global
 utilities (:TDH, :TDR, :TDHelp, :TDU, :TDS, :TDB, :TDJ, :TDSync,
-:TDRerun, :TDSessions) are available in any buffer.
+:TDRerun, :TDSessions, :TDExport) are available in any buffer.
 
 Several commands accept a count. `[N]` below denotes an optional count
 that defaults to 1. For example `:3TDO` runs the statement under the
@@ -479,11 +563,19 @@ cursor plus the next two.
                                                                       *:TDO*
 :[N]TDO         Run the current statement plus the next N-1 statements
                 via BTEQ and display the results in a split. Honours
-                |vim-teradata-opt-retlimit|.
+                |vim-teradata-opt-retlimit|. See also |:TDExport| to
+                export the full result.
 
                                                                       *:TDV*
 :[range]TDV     Run statements of the visual selection (split on `;`)
                 and show results. Visual-mode equivalent of |:TDO|.
+
+                                                                 *:TDExport*
+:TDExport [id]  Export the full result of the latest output query, or of
+                history entry {id}, to a delimited file via TPT (tbuild),
+                in the background. A confirmation box is shown first.
+                Ids complete from the query history. See
+                |vim-teradata-guide-export|.
 
                                                                       *:TDM*
 :[N]TDM         Multistatement run: send the current statement plus the
@@ -732,6 +824,25 @@ its own local mappings. The common idiom is:
 Buffer-specific mappings are shown as virtual text on the last line of
 each buffer when it opens.
 
+------------------------------------------------------------------------------
+8.4 Result buffer mappings                  *vim-teradata-result-mappings*
+
+Result buffers (|:TDO| / |:TDV| grids) define these mappings on top of the
+editing keys (|vim-teradata-guide-editing|) and the re-run key
+(|vim-teradata-opt-rerun_keymaps|).
+
+                                                        *vim-teradata-result-F*
+F       Full export via TPT, after a confirmation box. Exports the full
+        result of the query shown in the grid to a file in the background,
+        see |vim-teradata-guide-export|.
+
+        `F` shadows the `F{char}` motion (find backwards) inside result
+        buffers only. Change the key with |vim-teradata-opt-export.keymap|,
+        for example `gF`, or set it to `false` to disable it.
+
+        Not bound on EXPLAIN / SHOW grids and on grids that show an export.
+        Refused while the grid is in edit mode: save or cancel first.
+
 ==============================================================================
 9. USER GUIDE                                        *vim-teradata-user-guide*
 
@@ -743,8 +854,9 @@ Both render the result set in a table-formatted split buffer and report
 Teradata errors as BTEQ would.
 
 Use |vim-teradata-opt-retlimit| to cap row counts. Very large result sets
-(roughly > 10k rows) work but are not the primary use case; prefer TPT
-for heavy exports.
+(roughly > 10k rows) work but are not the primary use case; for heavy
+exports use |:TDExport| (or `F` in the grid), which runs TPT in the
+background, see |vim-teradata-guide-export|.
 
 For dependent statements that must share a transaction or session
 state, use the multistatement variants |:TDM| / |:TDMV|, or open a
@@ -820,6 +932,12 @@ the user. A session runs one command at a time: a command waiting for
 its turn shows `Queued`, then `Running`. Canceling (`x`) a queued
 command removes it from the queue; canceling the running command is
 described in |vim-teradata-guide-sessions|.
+
+Full exports (|vim-teradata-guide-export|) appear with `operation` set to
+`export`. While running they show `TPT running`; when done, the rows
+column shows the exported row count. `<CR>` on a finished export opens
+the head of the file in a read-only grid, and `d` deletes the export file
+(the history query stays).
 
 ------------------------------------------------------------------------------
 9.7 Code actions                                  *vim-teradata-guide-actions*
@@ -982,6 +1100,123 @@ Caveats ~
       you end it or close the session.
     - `.EXPORT`, `.SET` and other BTEQ commands typed in your SQL affect
       the whole session and can interfere with the plugin's own export.
+
+------------------------------------------------------------------------------
+9.11 Full exports                                  *vim-teradata-guide-export*
+
+A result grid from |:TDO| / |:TDV| is a preview: BTEQ fetches at most
+|vim-teradata-opt-retlimit| rows. To get the whole result, export it. The
+export runs the same query through TPT (`tbuild`) in the background and
+writes a delimited file; the grid is never loaded with it.
+
+Workflow ~
+    1. Run |:TDO|. When the result is truncated, the warning says so and
+       mentions `F`.
+    2. Press `F` in the grid, or run |:TDExport| (with no argument it
+       exports the latest output query; `:TDExport {id}` exports a history
+       entry).
+    3. A confirmation box shows the query id, the user, the row count (when
+       known), a size estimate, the target file, and the operator (the
+       route and the reason, see "How the query is sent"). Press
+       `y` to start. `n`, `q` or `<Esc>` cancel, and leaving the box cancels
+       too. `<CR>` does nothing, so an accidental Enter cannot start it.
+       Set |vim-teradata-opt-export.confirm| to `false` to skip the box.
+    4. The job appears in |:TDJ| with `operation` `export`. One export per
+       query id runs at a time.
+    5. When it finishes, press `<CR>` on the job in |:TDJ| to open the first
+       rows (|vim-teradata-opt-export.head_lines|) in a read-only grid. A
+       hint line shows the row counts and the full file path. Filters and
+       sorting in that grid apply to those rows only; open the file itself
+       for the full data.
+
+How the query is sent ~
+    Route W (EXPORT operator, the default when possible): the query is
+    wrapped so that every column becomes text:
+
+        SELECT TRIM(t.c1) AS c1, ..., TRIM(t.cN) AS cN
+        FROM (<query>) AS t (c1, ..., cN);
+
+    `TRIM` formats numbers and dates with the column FORMAT, like BTEQ, so
+    the export matches the preview. A leading `LOCKING ... FOR ACCESS`
+    modifier is moved outside the wrapper. Route W uses the multi-session
+    EXPORT operator.
+
+    Route R (SELECTOR operator in report mode, single session, query
+    unchanged) is used when the query can't be wrapped: a top-level
+    `ORDER BY` (including `TOP n ... ORDER BY` and set operations ending
+    with `ORDER BY`), a `WITH` (CTE), an unrecognised `LOCK` form, no
+    preview header, the tree-sitter teradata parser unavailable, or
+    |vim-teradata-opt-export.operator| set to `selector`. The dialog's
+    Operator line shows the route and the reason.
+
+    If a wrapped export fails on a data type (TPT12108, TPT02639, or
+    TRIM on BYTE, VARBYTE, LOB, JSON, XML, PERIOD or UDT columns), it is
+    retried once automatically in report mode within the same |:TDJ| job,
+    with a notification. Setting |vim-teradata-opt-export.operator| to
+    `selector` forces report mode from the start.
+
+The query runs twice: once for the preview and once for the export. If
+the row count differs between the two, a warning reports it; the data may
+have changed in between.
+
+Output format ~
+    Files are delimited by |vim-teradata-opt-sep| and not quoted, like the
+    BTEQ output. Fields containing the separator break the columns, as
+    they do in BTEQ. NULL values are written as empty fields, while the
+    BTEQ preview shows |vim-teradata-opt-null_token|. The export grid is
+    read-only, so this cannot be mis-edited.
+
+    LOB columns are not supported by the EXPORT operator. Queries with LOB
+    columns fail in route W and are retried automatically in report mode
+    (see "How the query is sent" above). Set
+    |vim-teradata-opt-export.operator| to `selector` to skip the wrapped
+    attempt.
+
+Only single SELECT statements can be exported. EXPLAIN, SHOW, DDL, DML
+and multistatement results (|:TDM|) are refused with a message.
+
+Persistent sessions ~
+    TPT opens its own sessions, so it cannot see what lives in your
+    |:TDSession|: volatile tables, `SET QUERY_BAND ... FOR SESSION`,
+    `DATABASE` or other session state. The confirmation box shows a warning
+    when the query ran in a persistent session. If the query reads a
+    volatile or session table, the TPT export is blocked and the box offers
+    `[b] Export with BTEQ inside the session` instead of `[y]`. That runs the
+    query in the session with no row limit, writes the file, and never loads
+    it into a grid. It is slower than TPT.
+
+Cancel and cleanup ~
+    `x` on the job in |:TDJ| cancels it. When `twbkill` and `twbrmcp` are
+    available, the job is also killed on the Teradata side and its TPT
+    checkpoint files are removed. The partial file is deleted. Cancelling
+    shows no error.
+
+    `d` on a finished export job deletes its export file after asking for
+    confirmation. The history query (`queries/<id>.sql`) is kept, so you
+    can export it again.
+
+Files ~
+    Export files are written to:
+
+        history_dir/exports/<id>.csv
+
+    The directory name is set by |vim-teradata-opt-exports_dir_name|.
+    |:TDJ| and the history pruning (|vim-teradata-opt-history_max|) manage
+    these files too.
+
+Errors ~
+    On failure the job shows the useful lines of the TPT log. If the TPT job
+    id is known, the job also shows a hint to read the full TPT log:
+
+        tlogview -j <jobid> -f '*' -g
+
+    |:checkhealth| vim-teradata reports the TPT script that will be used
+    and whether the Teradata Tools and Utilities (`tbuild`, `twbkill`,
+    `twbrmcp`, `tlogview`) are found.
+
+Settings ~
+    See |vim-teradata-opt-export|. The `F` key is described in
+    |vim-teradata-result-mappings|.
 
 ==============================================================================
 10. FILETYPES                                         *vim-teradata-filetypes*
