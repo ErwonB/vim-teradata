@@ -831,6 +831,24 @@ Result buffers (|:TDO| / |:TDV| grids) define these mappings on top of the
 editing keys (|vim-teradata-guide-editing|) and the re-run key
 (|vim-teradata-opt-rerun_keymaps|).
 
+<Up> / <Down>
+        Sort by the column under the cursor ascending (`<Up>`) or
+        descending (`<Down>`). Sorting is cumulative across columns: the
+        first sorted column is the primary sort key (`▲1` / `▼1`), the
+        second sorted column breaks ties in the first (`▲2` / `▼2`), and
+        so on. Pressing `<Up>` or `<Down>` on an already-sorted column
+        updates its direction in place at its current sort level.
+
+r       Reset all active column sorts and restore the original row order.
+
+<CR>    Filter rows to those matching the cell value under the cursor.
+
+u       Reset all active filters.
+
+- / <BS>
+        Remove the column under the cursor (`-`) or restore the most
+        recently removed column (`<BS>`).
+
                                                         *vim-teradata-result-F*
 F       Full export via TPT, after a confirmation box. Exports the full
         result of the query shown in the grid to a file in the background,

@@ -480,7 +480,8 @@ local function highlight_cells(bufnr)
     local widths           = buf_var(bufnr, 'teradata_column_widths')
     local row_ids          = buf_var(bufnr, 'teradata_displayed_ids')
     local col_ids          = buf_var(bufnr, 'teradata_displayed_col_ids')
-    local displayed_header = buf_var(bufnr, 'teradata_displayed_header') or {}
+    local displayed_header = buf_var(bufnr, 'teradata_rendered_header')
+        or buf_var(bufnr, 'teradata_displayed_header') or {}
     local displayed_data   = buf_var(bufnr, 'teradata_displayed_data') or {}
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
     if not (widths and row_ids and col_ids) then return end
@@ -742,7 +743,7 @@ end
 
 --- Neutralises the grid mappings that would rebuild the buffer mid-edit.
 --- `<cr>` is repurposed as "edit the cell under the cursor".
-local GRID_MAPS = { '<cr>', '-', '<bs>', 'u', '<Up>', '<Down>' }
+local GRID_MAPS = { '<cr>', '-', '<bs>', 'u', '<Up>', '<Down>', 'r' }
 
 local function is_cr(key)
     if not key then return false end
@@ -949,7 +950,7 @@ function M.decorate(bufnr)
     local maps = config.options.edit_keymaps
     if st.meta.editable then
         set_hint(bufnr, string.format(
-            '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <%s> Edit%s',
+            '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s',
             maps.toggle, st.hint_suffix or ''))
     end
 end

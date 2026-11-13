@@ -157,12 +157,15 @@ function M.display_output(file_path, query_id, opts)
     grid.set(bufnr, 'displayed_data', vim.deepcopy(data))
     grid.set(bufnr, 'displayed_header', vim.deepcopy(header))
     grid.set(bufnr, 'removed_columns', {})
+    grid.set(bufnr, 'sort_spec', {})
 
-    local row_ids, col_ids = {}, {}
-    for i = 1, #data do row_ids[i] = i end
-    for i = 1, #header do col_ids[i] = i end
-    grid.set(bufnr, 'displayed_ids', row_ids)
-    grid.set(bufnr, 'displayed_col_ids', col_ids)
+    do
+        local row_ids, col_ids = {}, {}
+        for i = 1, #data do row_ids[i] = i end
+        for i = 1, #header do col_ids[i] = i end
+        grid.set(bufnr, 'displayed_ids', row_ids)
+        grid.set(bufnr, 'displayed_col_ids', col_ids)
+    end
 
     local query_path = util.get_history_path('queries_dir_name') ..
         '/' .. vim.fn.fnamemodify(file_path, ":t:r") .. '.sql'
@@ -203,8 +206,10 @@ function M.display_output(file_path, query_id, opts)
 
     local function populate_buffer()
         vim.bo[bufnr].modifiable = true
-        local displayed_header = grid.get(bufnr, 'displayed_header') or {}
-        local displayed_data   = grid.get(bufnr, 'displayed_data') or {}
+        local displayed_header  = grid.get(bufnr, 'displayed_header') or {}
+        local displayed_data    = grid.get(bufnr, 'displayed_data') or {}
+        local displayed_col_ids = grid.get(bufnr, 'displayed_col_ids') or {}
+        local sort_spec         = grid.get(bufnr, 'sort_spec') or {}
 
         if #displayed_header == 0 then
             vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "All columns removed. Press <BS> to restore." })
@@ -212,9 +217,28 @@ function M.display_output(file_path, query_id, opts)
             return
         end
 
-        local col_widths = {}
+        local sort_by_col_id = {}
+        for level, spec in ipairs(sort_spec) do
+            sort_by_col_id[spec.col_id] = { level = level, ascending = spec.ascending }
+        end
+
+        local rendered_header = {}
         for i = 1, #displayed_header do
-            local max_width = vim.fn.strdisplaywidth(displayed_header[i] or '')
+            local base_h = displayed_header[i] or ''
+            local col_id = displayed_col_ids[i]
+            local s_info = col_id and sort_by_col_id[col_id]
+            if s_info then
+                local arrow = s_info.ascending and '▲' or '▼'
+                rendered_header[i] = string.format('%s %s%d', base_h, arrow, s_info.level)
+            else
+                rendered_header[i] = base_h
+            end
+        end
+        grid.set(bufnr, 'rendered_header', rendered_header)
+
+        local col_widths = {}
+        for i = 1, #rendered_header do
+            local max_width = vim.fn.strdisplaywidth(rendered_header[i] or '')
             for _, row in ipairs(displayed_data) do
                 if row[i] then
                     local cell_width = vim.fn.strdisplaywidth(row[i])
@@ -231,7 +255,7 @@ function M.display_output(file_path, query_id, opts)
         local visual_separator = ' | '
 
         local header_parts = {}
-        for i, h in ipairs(displayed_header) do
+        for i, h in ipairs(rendered_header) do
             table.insert(header_parts, util.formatString(h or '', col_widths[i]))
         end
         table.insert(buffer_lines, table.concat(header_parts, visual_separator))
@@ -251,7 +275,7 @@ function M.display_output(file_path, query_id, opts)
         end
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
-        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort' ..
+        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort' ..
             (hint_suffix or '')
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
@@ -285,6 +309,68 @@ function M.display_output(file_path, query_id, opts)
         return nil
     end
 
+    local function compare_cells(val_a, val_b, ascending)
+        val_a = val_a or ""
+        val_b = val_b or ""
+        if val_a == val_b then return nil end
+
+        local num_a = tonumber(val_a)
+        local num_b = tonumber(val_b)
+        if num_a and num_b and num_a ~= num_b then
+            if ascending then
+                return num_a < num_b
+            else
+                return num_a > num_b
+            end
+        end
+
+        if ascending then
+            return val_a < val_b
+        else
+            return val_a > val_b
+        end
+    end
+
+    local function apply_sort()
+        local displayed_data = grid.get(bufnr, 'displayed_data') or {}
+        local displayed_ids  = grid.get(bufnr, 'displayed_ids') or {}
+        local col_ids        = grid.get(bufnr, 'displayed_col_ids') or {}
+        local sort_spec      = grid.get(bufnr, 'sort_spec') or {}
+
+        local col_id_to_idx = {}
+        for idx, cid in ipairs(col_ids) do
+            col_id_to_idx[cid] = idx
+        end
+
+        local perm = {}
+        for i = 1, #displayed_data do perm[i] = i end
+        table.sort(perm, function(ia, ib)
+            if ia == ib then return false end
+            for _, spec in ipairs(sort_spec) do
+                local col_idx = col_id_to_idx[spec.col_id]
+                if col_idx then
+                    local cmp = compare_cells(
+                        displayed_data[ia][col_idx],
+                        displayed_data[ib][col_idx],
+                        spec.ascending
+                    )
+                    if cmp ~= nil then return cmp end
+                end
+            end
+            local id_a = displayed_ids[ia] or ia
+            local id_b = displayed_ids[ib] or ib
+            return id_a < id_b
+        end)
+
+        local sorted_data, sorted_ids = {}, {}
+        for i, p in ipairs(perm) do
+            sorted_data[i] = displayed_data[p]
+            sorted_ids[i]  = displayed_ids[p]
+        end
+        grid.set(bufnr, 'displayed_data', sorted_data)
+        grid.set(bufnr, 'displayed_ids', sorted_ids)
+    end
+
     local function bind_grid_maps()
         vim.keymap.set('n', '<cr>', function()
             local lnum = vim.fn.line('.')
@@ -315,6 +401,7 @@ function M.display_output(file_path, query_id, opts)
             local displayed_data      = grid.get(bufnr, 'displayed_data') or {}
             local removed_columns     = grid.get(bufnr, 'removed_columns') or {}
             local col_ids             = grid.get(bufnr, 'displayed_col_ids') or {}
+            local sort_spec           = grid.get(bufnr, 'sort_spec') or {}
 
             local removed_col_id      = table.remove(col_ids, col_idx_to_remove)
             local removed_header      = table.remove(displayed_header, col_idx_to_remove)
@@ -328,10 +415,24 @@ function M.display_output(file_path, query_id, opts)
                 header = removed_header,
                 data = removed_column_data
             })
+
+            local new_sort_spec, removed_from_sort = {}, false
+            for _, spec in ipairs(sort_spec) do
+                if spec.col_id == removed_col_id then
+                    removed_from_sort = true
+                else
+                    table.insert(new_sort_spec, spec)
+                end
+            end
+
             grid.set(bufnr, 'displayed_header', displayed_header)
             grid.set(bufnr, 'displayed_data', displayed_data)
             grid.set(bufnr, 'displayed_col_ids', col_ids)
             grid.set(bufnr, 'removed_columns', removed_columns)
+            if removed_from_sort then
+                grid.set(bufnr, 'sort_spec', new_sort_spec)
+                apply_sort()
+            end
             populate_buffer()
         end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: remove column' })
 
@@ -343,11 +444,16 @@ function M.display_output(file_path, query_id, opts)
             local col_to_restore   = table.remove(removed_columns)
             local displayed_header = grid.get(bufnr, 'displayed_header') or {}
             local displayed_data   = grid.get(bufnr, 'displayed_data') or {}
+            local displayed_ids    = grid.get(bufnr, 'displayed_ids') or {}
+            local all_data         = grid.get(bufnr, 'all_data') or {}
             local col_ids          = grid.get(bufnr, 'displayed_col_ids') or {}
 
             table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
             for i, row in ipairs(displayed_data) do
-                table.insert(row, col_to_restore.index, col_to_restore.data[i] or '')
+                local row_id = displayed_ids[i]
+                local cell = (row_id and all_data[row_id] and all_data[row_id][col_to_restore.col_id])
+                    or col_to_restore.data[i] or ''
+                table.insert(row, col_to_restore.index, cell)
             end
             table.insert(col_ids, col_to_restore.index, col_to_restore.col_id)
             grid.set(bufnr, 'displayed_header', displayed_header)
@@ -360,14 +466,26 @@ function M.display_output(file_path, query_id, opts)
         vim.keymap.set('n', 'u', function()
             local all_data = grid.get(bufnr, 'all_data') or {}
             local displayed_data = grid.get(bufnr, 'displayed_data') or {}
+            local col_ids = grid.get(bufnr, 'displayed_col_ids') or {}
             if #displayed_data == #all_data then
                 vim.notify("No filters to reset.", vim.log.levels.INFO)
                 return
             end
-            local ids = {}
-            for i = 1, #all_data do ids[i] = i end
-            grid.set(bufnr, 'displayed_data', vim.deepcopy(all_data))
+            local ids, new_data = {}, {}
+            for i = 1, #all_data do
+                ids[i] = i
+                local row = {}
+                for j, cid in ipairs(col_ids) do
+                    row[j] = (all_data[i] and all_data[i][cid]) or ''
+                end
+                new_data[i] = row
+            end
+            grid.set(bufnr, 'displayed_data', new_data)
             grid.set(bufnr, 'displayed_ids', ids)
+            local sort_spec = grid.get(bufnr, 'sort_spec') or {}
+            if #sort_spec > 0 then
+                apply_sort()
+            end
             populate_buffer()
             vim.notify("Filters reset.", vim.log.levels.INFO)
         end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: reset filters' })
@@ -376,43 +494,35 @@ function M.display_output(file_path, query_id, opts)
             local col_idx = get_column_from_cursor()
             if not col_idx then return end
 
-            local displayed_data = grid.get(bufnr, 'displayed_data') or {}
-            local displayed_ids  = grid.get(bufnr, 'displayed_ids') or {}
+            local col_ids = grid.get(bufnr, 'displayed_col_ids') or {}
+            local col_id  = col_ids[col_idx]
+            if not col_id then return end
 
-            local perm = {}
-            for i = 1, #displayed_data do perm[i] = i end
-            table.sort(perm, function(ia, ib)
-                local val_a = displayed_data[ia][col_idx] or ""
-                local val_b = displayed_data[ib][col_idx] or ""
-
-                local num_a = tonumber(val_a)
-                local num_b = tonumber(val_b)
-
-                if num_a and num_b then
-                    if ascending then
-                        return num_a < num_b
-                    else
-                        return num_a > num_b
-                    end
+            local sort_spec = grid.get(bufnr, 'sort_spec') or {}
+            local found = false
+            for _, spec in ipairs(sort_spec) do
+                if spec.col_id == col_id then
+                    spec.ascending = ascending
+                    found = true
+                    break
                 end
-
-                if ascending then
-                    return val_a < val_b
-                else
-                    return val_a > val_b
-                end
-            end)
-
-            local sorted_data, sorted_ids = {}, {}
-            for i, p in ipairs(perm) do
-                sorted_data[i] = displayed_data[p]
-                sorted_ids[i]  = displayed_ids[p]
             end
-            grid.set(bufnr, 'displayed_data', sorted_data)
-            grid.set(bufnr, 'displayed_ids', sorted_ids)
+            if not found then
+                table.insert(sort_spec, { col_id = col_id, ascending = ascending })
+            end
+            grid.set(bufnr, 'sort_spec', sort_spec)
+
+            apply_sort()
             populate_buffer()
-            local dir = ascending and "ascending" or "descending"
-            vim.notify("Sorted column " .. col_idx .. " " .. dir, vim.log.levels.INFO)
+
+            local all_header = grid.get(bufnr, 'all_header') or {}
+            local parts = {}
+            for level, spec in ipairs(sort_spec) do
+                local name  = all_header[spec.col_id] or ('col' .. spec.col_id)
+                local arrow = spec.ascending and '▲' or '▼'
+                table.insert(parts, string.format('%s %s%d', name, arrow, level))
+            end
+            vim.notify("Sorted by: " .. table.concat(parts, ", "), vim.log.levels.INFO)
         end
 
         vim.keymap.set('n', '<Up>', function()
@@ -422,6 +532,18 @@ function M.display_output(file_path, query_id, opts)
         vim.keymap.set('n', '<Down>', function()
             sort_column(false)
         end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: sort column descending' })
+
+        vim.keymap.set('n', 'r', function()
+            local sort_spec = grid.get(bufnr, 'sort_spec') or {}
+            if #sort_spec == 0 then
+                vim.notify("No sort to reset.", vim.log.levels.INFO)
+                return
+            end
+            grid.set(bufnr, 'sort_spec', {})
+            apply_sort()
+            populate_buffer()
+            vim.notify("Sort reset.", vim.log.levels.INFO)
+        end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: reset sort' })
     end
     bind_grid_maps()
 
@@ -552,8 +674,12 @@ function M.display_help()
         '  <C-x><C-u>    Interactive completion picker',
         '',
         'Result buffer:',
+        '  <Up/Down>     Sort column asc/desc (cumulative multi-column sort)',
+        '  <r>           Reset sort order',
+        '  <CR>          Filter by cell value (or edit cell in edit mode)',
+        '  <u>           Reset filters',
+        '  <-> / <BS>    Remove / restore column',
         '  <E>           Toggle edit mode',
-        '  <CR>          Edit cell under cursor',
         '  <X>           Set cell to NULL',
         '  <S>           Save pending edits',
         '  <C>           Cancel edits',

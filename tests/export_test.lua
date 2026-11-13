@@ -295,3 +295,91 @@ test("confirm_box: <CR> is inert, y confirms, q cancels", function()
     press('b')
     assert(custom == 1 and not vim.api.nvim_win_is_valid(win))
 end)
+
+test("display_output supports cumulative multi-column sorting and reset", function()
+    local id = 'multi_sort_test'
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, 'p')
+    local path = dir .. '/' .. id .. '.csv'
+    vim.fn.writefile({
+        'DEPT~ROLE~SALARY',
+        'Sales~Analyst~50',
+        'Eng~Dev~100',
+        'Sales~Dev~80',
+        'Eng~Dev~120',
+        'Sales~Analyst~70',
+    }, path)
+
+    local function press(keys)
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), 'x', false)
+    end
+
+    with_history_query(id, function()
+        require('vim-teradata.ui').display_output(path, id, { editable = false })
+        local grid = require('vim-teradata.grid_state')
+        local buf = vim.api.nvim_get_current_buf()
+
+        -- Helper to place cursor at start of displayed column `col_idx` (1-based)
+        local function goto_col(col_idx)
+            local widths = grid.get(buf, 'column_widths')
+            local col_pos = 1
+            for i = 1, col_idx - 1 do
+                col_pos = col_pos + widths[i] + 3 -- ' | '
+            end
+            vim.fn.cursor(3, 1)
+            vim.cmd('normal! ' .. col_pos .. '|')
+        end
+
+        -- 1. Sort DEPT ascending (primary: ▲1)
+        goto_col(1)
+        press('<Up>')
+        local data = grid.get(buf, 'displayed_data')
+        assert(data[1][1] == 'Eng' and data[2][1] == 'Eng', 'Eng rows should come first')
+        assert(data[3][1] == 'Sales' and data[4][1] == 'Sales' and data[5][1] == 'Sales')
+        local hdr = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+        assert(hdr:find('DEPT ▲1', 1, true), 'expected DEPT ▲1 in header, got: ' .. hdr)
+
+        -- 2. Sort ROLE ascending (secondary: ▲2)
+        goto_col(2)
+        press('<Up>')
+        data = grid.get(buf, 'displayed_data')
+        assert(data[1][1] == 'Eng' and data[2][1] == 'Eng', 'primary sort on DEPT preserved')
+        assert(data[3][2] == 'Analyst' and data[4][2] == 'Analyst' and data[5][2] == 'Dev',
+            'secondary sort on ROLE should order Analyst before Dev within Sales')
+        hdr = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+        assert(hdr:find('DEPT ▲1', 1, true) and hdr:find('ROLE ▲2', 1, true),
+            'expected both DEPT ▲1 and ROLE ▲2 in header, got: ' .. hdr)
+
+        -- 3. Sort SALARY descending (tertiary: ▼3)
+        goto_col(3)
+        press('<Down>')
+        data = grid.get(buf, 'displayed_data')
+        assert(data[1][1] == 'Eng' and data[1][3] == '120', 'Eng Dev 120 should be first')
+        assert(data[2][1] == 'Eng' and data[2][3] == '100', 'Eng Dev 100 should be second')
+        assert(data[3][1] == 'Sales' and data[3][2] == 'Analyst' and data[3][3] == '70',
+            'Sales Analyst 70 should precede Sales Analyst 50')
+        assert(data[4][1] == 'Sales' and data[4][2] == 'Analyst' and data[4][3] == '50')
+        assert(data[5][1] == 'Sales' and data[5][2] == 'Dev' and data[5][3] == '80')
+
+        -- 4. Flip primary sort DEPT to descending (▼1) while preserving ROLE ▲2 and SALARY ▼3
+        goto_col(1)
+        press('<Down>')
+        data = grid.get(buf, 'displayed_data')
+        assert(data[1][1] == 'Sales' and data[1][2] == 'Analyst' and data[1][3] == '70')
+        assert(data[2][1] == 'Sales' and data[2][2] == 'Analyst' and data[2][3] == '50')
+        assert(data[3][1] == 'Sales' and data[3][2] == 'Dev' and data[3][3] == '80')
+        assert(data[4][1] == 'Eng' and data[4][2] == 'Dev' and data[4][3] == '120')
+        assert(data[5][1] == 'Eng' and data[5][2] == 'Dev' and data[5][3] == '100')
+
+        -- 5. Reset sort with 'r' -> restores original row order and clears indicators
+        press('r')
+        local ids = grid.get(buf, 'displayed_ids')
+        assert(vim.deep_equal(ids, { 1, 2, 3, 4, 5 }), 'expected original row order after reset')
+        hdr = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+        assert(not hdr:find('▲', 1, true) and not hdr:find('▼', 1, true),
+            'expected no sort indicators after reset, got: ' .. hdr)
+
+        close_current_grid()
+    end)
+    vim.fn.delete(dir, 'rf')
+end)
