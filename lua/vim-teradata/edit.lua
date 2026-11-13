@@ -950,7 +950,7 @@ function M.decorate(bufnr)
     local maps = config.options.edit_keymaps
     if st.meta.editable then
         set_hint(bufnr, string.format(
-            '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s',
+            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s',
             maps.toggle, st.hint_suffix or ''))
     end
 end

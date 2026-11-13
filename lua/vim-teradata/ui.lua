@@ -204,6 +204,68 @@ function M.display_output(file_path, query_id, opts)
         end
     end
 
+    local function get_column_from_cursor()
+        local col = vim.fn.virtcol('.') - 1
+        local widths = grid.get(bufnr, 'column_widths')
+        if not widths then return nil end
+        local current_pos = 0
+        local visual_separator = ' | '
+        for i, width in ipairs(widths) do
+            if col >= current_pos and col < current_pos + width then
+                return i
+            end
+            current_pos = current_pos + width + #visual_separator
+        end
+        return nil
+    end
+
+    local function update_winbar()
+        if not vim.api.nvim_buf_is_valid(bufnr) then return end
+        local win = vim.fn.bufwinid(bufnr)
+        if win == -1 or not vim.api.nvim_win_is_valid(win) then return end
+        local rendered_header = grid.get(bufnr, 'rendered_header')
+            or grid.get(bufnr, 'displayed_header') or {}
+        local displayed_data  = grid.get(bufnr, 'displayed_data') or {}
+        if #rendered_header == 0 then
+            vim.wo[win].winbar = ''
+            return
+        end
+        local col_idx  = get_column_from_cursor()
+        local col_part = col_idx
+            and string.format('Col %d/%d: %s', col_idx, #rendered_header, (rendered_header[col_idx] or ''):gsub('%%', '%%%%'))
+            or string.format('%d cols', #rendered_header)
+        local lnum     = vim.api.nvim_win_get_cursor(win)[1]
+        local row_idx  = lnum - 2
+        local row_info = (row_idx >= 1 and row_idx <= #displayed_data)
+            and string.format('Row %d/%d', row_idx, #displayed_data)
+            or string.format('%d rows', #displayed_data)
+        vim.wo[win].winbar = string.format(
+            '%%#Title# %s %%#Comment# (%s)',
+            col_part, row_info
+        )
+    end
+
+    local function jump_to_column(target_col)
+        local widths = grid.get(bufnr, 'column_widths')
+        if not widths or #widths == 0 then return end
+        target_col = math.max(1, math.min(#widths, target_col))
+        local virt_col = 1
+        local sep_len = 3 -- #' | '
+        for i = 1, target_col - 1 do
+            virt_col = virt_col + widths[i] + sep_len
+        end
+        vim.cmd('normal! ' .. virt_col .. '|')
+        update_winbar()
+    end
+
+    local function step_column(delta)
+        local widths = grid.get(bufnr, 'column_widths')
+        if not widths or #widths == 0 then return end
+        local cur = get_column_from_cursor() or 1
+        local count = vim.v.count1
+        jump_to_column(cur + delta * count)
+    end
+
     local function populate_buffer()
         vim.bo[bufnr].modifiable = true
         local displayed_header  = grid.get(bufnr, 'displayed_header') or {}
@@ -212,8 +274,10 @@ function M.display_output(file_path, query_id, opts)
         local sort_spec         = grid.get(bufnr, 'sort_spec') or {}
 
         if #displayed_header == 0 then
+            grid.set(bufnr, 'rendered_header', {})
             vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "All columns removed. Press <BS> to restore." })
             vim.bo[bufnr].modifiable = false
+            update_winbar()
             return
         end
 
@@ -275,7 +339,7 @@ function M.display_output(file_path, query_id, opts)
         end
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
-        local extmark = '<Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort' ..
+        local extmark = '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort' ..
             (hint_suffix or '')
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
@@ -290,23 +354,9 @@ function M.display_output(file_path, query_id, opts)
         vim.api.nvim_buf_set_extmark(bufnr, ns_id, #buffer_lines - 1, 0, mark)
 
         pcall(function() require('vim-teradata.edit').decorate(bufnr) end)
+        update_winbar()
 
         vim.bo[bufnr].modifiable = false
-    end
-
-    local function get_column_from_cursor()
-        local col = vim.fn.virtcol('.') - 1
-        local widths = grid.get(bufnr, 'column_widths')
-        if not widths then return nil end
-        local current_pos = 0
-        local visual_separator = ' | '
-        for i, width in ipairs(widths) do
-            if col >= current_pos and col < current_pos + width then
-                return i
-            end
-            current_pos = current_pos + width + #visual_separator
-        end
-        return nil
     end
 
     local function compare_cells(val_a, val_b, ascending)
@@ -547,6 +597,41 @@ function M.display_output(file_path, query_id, opts)
     end
     bind_grid_maps()
 
+    local nav_opts = { buffer = bufnr, silent = true, nowait = true }
+    vim.keymap.set('n', '<Tab>', function() step_column(1) end,
+        vim.tbl_extend('force', nav_opts, { desc = 'Teradata: next column' }))
+    vim.keymap.set('n', '<S-Tab>', function() step_column(-1) end,
+        vim.tbl_extend('force', nav_opts, { desc = 'Teradata: previous column' }))
+    vim.keymap.set('n', '<Right>', function() step_column(1) end,
+        vim.tbl_extend('force', nav_opts, { desc = 'Teradata: next column' }))
+    vim.keymap.set('n', '<Left>', function() step_column(-1) end,
+        vim.tbl_extend('force', nav_opts, { desc = 'Teradata: previous column' }))
+    vim.keymap.set('n', 'g0', function() jump_to_column(1) end,
+        vim.tbl_extend('force', nav_opts, { desc = 'Teradata: first column' }))
+    vim.keymap.set('n', 'g$', function()
+        local widths = grid.get(bufnr, 'column_widths') or {}
+        jump_to_column(#widths)
+    end, vim.tbl_extend('force', nav_opts, { desc = 'Teradata: last column' }))
+
+    local aug = vim.api.nvim_create_augroup('VimTeradata', { clear = false })
+    vim.api.nvim_create_autocmd({ 'CursorMoved', 'BufWinEnter' }, {
+        group = aug,
+        buffer = bufnr,
+        callback = update_winbar,
+    })
+    vim.api.nvim_create_autocmd('BufLeave', {
+        group = aug,
+        buffer = bufnr,
+        callback = function()
+            local win = vim.api.nvim_get_current_win()
+            vim.schedule(function()
+                if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) ~= bufnr then
+                    vim.wo[win].winbar = ''
+                end
+            end)
+        end,
+    })
+
     populate_buffer()
 
     if config.options.edit_enabled and original_query and opts.editable ~= false then
@@ -674,6 +759,7 @@ function M.display_help()
         '  <C-x><C-u>    Interactive completion picker',
         '',
         'Result buffer:',
+        '  <Tab/S-Tab>   Next / previous column (supports [count], also <Left/Right>, g0, g$)',
         '  <Up/Down>     Sort column asc/desc (cumulative multi-column sort)',
         '  <r>           Reset sort order',
         '  <CR>          Filter by cell value (or edit cell in edit mode)',

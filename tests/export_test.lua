@@ -383,3 +383,52 @@ test("display_output supports cumulative multi-column sorting and reset", functi
     end)
     vim.fn.delete(dir, 'rf')
 end)
+
+test("display_output supports column navigation and winbar indicator", function()
+    local id = 'col_nav_test'
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, 'p')
+    local path = dir .. '/' .. id .. '.csv'
+    vim.fn.writefile({
+        'COL_A~COL_B~COL_C~COL_D',
+        '10~b2~c1~d1',
+        '20~b1~c2~d2',
+    }, path)
+
+    local function press(keys)
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), 'x', false)
+    end
+
+    with_history_query(id, function()
+        require('vim-teradata.ui').display_output(path, id, { editable = false })
+        local buf = vim.api.nvim_get_current_buf()
+        local win = vim.api.nvim_get_current_win()
+        assert(vim.api.nvim_buf_is_valid(buf))
+
+        -- Place cursor on first data row, column 1
+        vim.fn.cursor(3, 1)
+        press('g0')
+        assert(vim.wo[win].winbar:find('Col 1/4: COL_A', 1, true), 'expected Col 1/4 in winbar: ' .. vim.wo[win].winbar)
+
+        -- Step 1 column right with <Tab> -> Col 2
+        press('<Tab>')
+        assert(vim.wo[win].winbar:find('Col 2/4: COL_B', 1, true), 'expected Col 2/4 in winbar: ' .. vim.wo[win].winbar)
+
+        -- Step 2 columns right with 2<Tab> -> Col 4
+        press('2<Tab>')
+        assert(vim.wo[win].winbar:find('Col 4/4: COL_D', 1, true), 'expected Col 4/4 in winbar: ' .. vim.wo[win].winbar)
+
+        -- Step 1 column left with <S-Tab> -> Col 3
+        press('<S-Tab>')
+        assert(vim.wo[win].winbar:find('Col 3/4: COL_C', 1, true), 'expected Col 3/4 in winbar: ' .. vim.wo[win].winbar)
+
+        -- Jump to first column with g0 and last column with g$
+        press('g0')
+        assert(vim.wo[win].winbar:find('Col 1/4: COL_A', 1, true))
+        press('g$')
+        assert(vim.wo[win].winbar:find('Col 4/4: COL_D', 1, true))
+
+        close_current_grid()
+    end)
+    vim.fn.delete(dir, 'rf')
+end)

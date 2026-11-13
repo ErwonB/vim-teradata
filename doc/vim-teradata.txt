@@ -831,6 +831,13 @@ Result buffers (|:TDO| / |:TDV| grids) define these mappings on top of the
 editing keys (|vim-teradata-guide-editing|) and the re-run key
 (|vim-teradata-opt-rerun_keymaps|).
 
+<Tab> / <S-Tab>, <Right> / <Left>
+        Move the cursor to the next (`<Tab>`, `<Right>`) or previous
+        (`<S-Tab>`, `<Left>`) column on the current row. Accepts a
+        `[count]` prefix (e.g. `3<Tab>` jumps 3 columns right).
+
+g0 / g$ Jump to the first (`g0`) or last (`g$`) column on the current row.
+
 <Up> / <Down>
         Sort by the column under the cursor ascending (`<Up>`) or
         descending (`<Down>`). Sorting is cumulative across columns: the
