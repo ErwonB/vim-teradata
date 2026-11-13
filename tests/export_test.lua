@@ -183,12 +183,14 @@ test("dialog lines show conditional rows and warnings", function()
     text = table.concat(text, '\n')
     assert(text:find('Grid already shows every row', 1, true))
     assert(text:find('Overwrites the existing export', 1, true))
-    assert(text:find('ÔÇª', 1, true))
+    assert(text:find('…', 1, true))
     assert(lines[#lines][2] == 'WarningMsg')
 end)
 
 local function with_history_query(id, fn)
-    local qpath = util.get_history_path('queries_dir_name') .. '/' .. id .. '.sql'
+    local qdir = util.get_history_path('queries_dir_name')
+    vim.fn.mkdir(qdir, 'p')
+    local qpath = qdir .. '/' .. id .. '.sql'
     vim.fn.writefile({ 'select 1;' }, qpath)
     local ok, err = pcall(fn)
     util.remove_files(qpath)
@@ -203,8 +205,9 @@ end
 
 test("display_output max_lines reads only the head", function()
     local id = 'exp_head_test'
-    local path = vim.fn.tempname() .. '\\' .. id .. '.csv'
-    vim.fn.mkdir(vim.fn.fnamemodify(path, ':h'), 'p')
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, 'p')
+    local path = dir .. '/' .. id .. '.csv'
     local rows = { 'a~b' }
     for i = 1, 9 do rows[#rows + 1] = i .. '~x' .. i end
     vim.fn.writefile(rows, path)
@@ -218,14 +221,14 @@ test("display_output max_lines reads only the head", function()
         assert(vim.fn.maparg('F', 'n', false, true).buffer ~= 1, 'F must not be bound on export grids')
         close_current_grid()
     end)
-    vim.fn.delete(vim.fn.fnamemodify(path, ':h'), 'rf')
+    vim.fn.delete(dir, 'rf')
 end)
 
 test("display_output synthesises col1..colN without a header", function()
     local id = 'exp_nohdr_test'
     local dir = vim.fn.tempname()
     vim.fn.mkdir(dir, 'p')
-    local path = dir .. '\\' .. id .. '.csv'
+    local path = dir .. '/' .. id .. '.csv'
     vim.fn.writefile({ '1~x~y', '2~z~w' }, path)
     with_history_query(id, function()
         require('vim-teradata.ui').display_output(path, id, { editable = false, has_header = false })
@@ -233,6 +236,31 @@ test("display_output synthesises col1..colN without a header", function()
         local buf = vim.api.nvim_get_current_buf()
         assert(vim.deep_equal(grid.get(buf, 'all_header'), { 'col1', 'col2', 'col3' }))
         assert(#grid.get(buf, 'all_data') == 2)
+        close_current_grid()
+    end)
+    vim.fn.delete(dir, 'rf')
+end)
+
+test("display_output aligns UTF-8 accented characters by display width", function()
+    local id = 'exp_utf8_test'
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, 'p')
+    local path = dir .. '/' .. id .. '.csv'
+    vim.fn.writefile({
+        'FIELD_ZONE_NAME~LANG_CD~ADDL_INFO',
+        'Amount of payment debt arrears~EN~R',
+        "Montant d'encours en arri\195\169r\195\169 de paiement~FR~R",
+    }, path)
+    with_history_query(id, function()
+        require('vim-teradata.ui').display_output(path, id, { editable = false })
+        local buf = vim.api.nvim_get_current_buf()
+        local lines = vim.api.nvim_buf_get_lines(buf, 0, 4, false)
+        local w_hdr = vim.fn.strdisplaywidth(lines[1])
+        local w_sep = vim.fn.strdisplaywidth(lines[2])
+        local w_en  = vim.fn.strdisplaywidth(lines[3])
+        local w_fr  = vim.fn.strdisplaywidth(lines[4])
+        assert(w_hdr == w_sep and w_sep == w_en and w_en == w_fr,
+            string.format('expected equal display widths, got hdr=%d sep=%d en=%d fr=%d', w_hdr, w_sep, w_en, w_fr))
         close_current_grid()
     end)
     vim.fn.delete(dir, 'rf')

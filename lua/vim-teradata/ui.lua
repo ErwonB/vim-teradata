@@ -260,7 +260,7 @@ function M.display_output(file_path, query_id, opts)
         if tpt_view then
             local shown = #(grid.get(bufnr, 'all_data') or {})
             local total = opts.rows_total or shown
-            mark.virt_lines = { { { ('TPT export ÔÇö first %s of %s rows, read-only. Filters/sort apply to these rows only. Full file: %s')
+            mark.virt_lines = { { { ('TPT export — first %s of %s rows, read-only. Filters/sort apply to these rows only. Full file: %s')
                 :format(shown, total, file_path), 'WarningMsg' } } }
         end
         vim.api.nvim_buf_set_extmark(bufnr, ns_id, #buffer_lines - 1, 0, mark)
@@ -994,7 +994,7 @@ local function format_jobs_table(jobs)
     local lines, line_ids = { header, sep }, {}
     for _, j in ipairs(jobs) do
         local msg = tostring(j.message or '')
-        if #msg > w.msg then msg = msg:sub(1, w.msg - 1) .. "ÔÇª" end
+        if #msg > w.msg then msg = msg:sub(1, w.msg - 1) .. "…" end
         table.insert(lines, string.format(
             "%-" .. w.id .. "s | %-" .. w.op .. "s | %-" .. w.st .. "s | %-" .. w.usr .. "s | %" .. w.rows .. "s | %s",
             tostring(j.id),

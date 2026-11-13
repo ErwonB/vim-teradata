@@ -34,7 +34,7 @@ local function user_label(u)
     return ('%s@%s (%s)'):format(u.user, u.tdpid, u.log_mech)
 end
 
---- Shortens `s` to at most `max` characters, replacing the middle with 'ÔÇª'.
+--- Shortens `s` to at most `max` characters, replacing the middle with '…'.
 ---@param s string
 ---@param max integer
 ---@return string
@@ -43,7 +43,7 @@ function M._truncate_middle(s, max)
     if len <= max or max < 3 then return s end
     local keep = max - 1
     local head = math.ceil(keep / 2)
-    return vim.fn.strcharpart(s, 0, head) .. 'ÔÇª' .. vim.fn.strcharpart(s, len - (keep - head))
+    return vim.fn.strcharpart(s, 0, head) .. '…' .. vim.fn.strcharpart(s, len - (keep - head))
 end
 
 ---@param lines string[]
@@ -450,7 +450,7 @@ function M.dialog_lines(ctx, max_width)
         add('Rows', 'unknown (history entry without a row count)')
     end
     if ctx.estimate_bytes then
-        add('Estimate', ('~%s     (Ôëê%d B/row from the preview)'):format(
+        add('Estimate', ('~%s     (≈%d B/row from the preview)'):format(
             util.human_bytes(ctx.estimate_bytes), math.floor(ctx.avg_row_bytes + 0.5)))
     end
     add('Target', M._truncate_middle(ctx.target_path, math.max(20, max_width - 12)))
@@ -468,7 +468,7 @@ function M.dialog_lines(ctx, max_width)
     add('', 'The exported grid is read-only (no editing)')
     for _, w in ipairs(ctx.warnings or {}) do
         for i, part in ipairs(wrap(w, math.max(30, math.min(70, max_width - 4)))) do
-            lines[#lines + 1] = { (i == 1 and ' ÔÜá ' or '   ') .. part, 'WarningMsg' }
+            lines[#lines + 1] = { (i == 1 and ' ⚠ ' or '   ') .. part, 'WarningMsg' }
         end
     end
     return lines

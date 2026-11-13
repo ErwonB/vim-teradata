@@ -599,7 +599,7 @@ function M.session_command(args)
         return vim.notify('No user selected. Use :TDU to set up users.', vim.log.levels.WARN, title)
     end
 
-    vim.notify('Opening BTEQ session for ' .. user.user .. '@' .. user.tdpid .. 'ÔÇª',
+    vim.notify('Opening BTEQ session for ' .. user.user .. '@' .. user.tdpid .. '…',
         vim.log.levels.INFO, title)
     session.open(buf, user, {
         logon = build_header(user.user, user.tdpid, user.log_mech),
