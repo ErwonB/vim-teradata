@@ -456,33 +456,46 @@ local function apply_to_grid(bufnr, i, j, value)
     grid.set(bufnr, 'displayed_data', displayed)
 end
 
---- Computes the byte offset at which displayed column `j` starts.
-local function col_offset(widths, j)
+--- Computes the rendered byte width of a cell padded to `disp_width` display columns.
+local function cell_byte_width(cell, disp_width)
+    local s = cell or ''
+    local pad = math.max(0, (disp_width or 0) - vim.fn.strdisplaywidth(s))
+    return #s + pad
+end
+
+--- Computes the byte range [start_col, end_col) at which displayed column `j`
+--- appears on a line rendered from `row_cells`.
+local function col_byte_range(row_cells, widths, j)
     local pos = 0
-    for k = 1, j - 1 do pos = pos + (widths[k] or 0) + #SEP end
-    return pos
+    for k = 1, j - 1 do
+        pos = pos + cell_byte_width(row_cells and row_cells[k], widths[k]) + #SEP
+    end
+    local w = cell_byte_width(row_cells and row_cells[j], widths[j])
+    return pos, pos + w
 end
 
 --- Dims non-updatable columns and highlights cells with a pending edit.
 local function highlight_cells(bufnr)
     local st = state[bufnr]
-    local widths  = buf_var(bufnr, 'teradata_column_widths')
-    local row_ids = buf_var(bufnr, 'teradata_displayed_ids')
-    local col_ids = buf_var(bufnr, 'teradata_displayed_col_ids')
+    local widths           = buf_var(bufnr, 'teradata_column_widths')
+    local row_ids          = buf_var(bufnr, 'teradata_displayed_ids')
+    local col_ids          = buf_var(bufnr, 'teradata_displayed_col_ids')
+    local displayed_header = buf_var(bufnr, 'teradata_displayed_header') or {}
+    local displayed_data   = buf_var(bufnr, 'teradata_displayed_data') or {}
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
     if not (widths and row_ids and col_ids) then return end
     if not st.editing then return end
 
     for j, col_id in ipairs(col_ids) do
         local col = st.meta.columns[col_id]
-        local pos = col_offset(widths, j)
-        local width = widths[j] or 0
 
         -- read-only columns: dim header + all rows
         if not (col and col.eligible) then
             for i = 0, #row_ids do
+                local row_cells = (i == 0) and displayed_header or displayed_data[i]
+                local pos, end_col = col_byte_range(row_cells, widths, j)
                 pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, HEADER_LINES + i - 1, pos, {
-                    end_col = pos + width,
+                    end_col = end_col,
                     hl_group = 'Comment',
                 })
             end
@@ -491,8 +504,9 @@ local function highlight_cells(bufnr)
             for i, row_id in ipairs(row_ids) do
                 local pending = st.pending[row_id]
                 if pending and pending[col_id] ~= nil then
+                    local pos, end_col = col_byte_range(displayed_data[i], widths, j)
                     pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, HEADER_LINES + i - 1, pos, {
-                        end_col = pos + width,
+                        end_col = end_col,
                         hl_group = 'DiffText',
                     })
                 end

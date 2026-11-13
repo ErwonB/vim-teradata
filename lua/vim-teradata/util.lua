@@ -1591,12 +1591,13 @@ function M.prune_history()
 end
 
 function M.formatString(s, width)
-    local len = #s
+    s = s or ''
+    local len = vim.fn.strdisplaywidth(s)
     if len >= width then
         return s
     end
     local padding = string.rep(' ', width - len)
-    return padding .. s
+    return s .. padding
 end
 
 --- Generates a unique query ID based on timestamp and a sequence/clock suffix.

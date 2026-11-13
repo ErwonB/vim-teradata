@@ -8,10 +8,10 @@ local failed = 0
 local function test(name, fn)
     local ok, err = pcall(fn)
     if ok then
-        io.stdout:write("  Ô£ô " .. name .. "\n")
+        io.stdout:write("  ✓ " .. name .. "\n")
         passed = passed + 1
     else
-        io.stdout:write("  Ô£ù " .. name .. "\n    " .. tostring(err) .. "\n")
+        io.stdout:write("  ✗ " .. name .. "\n    " .. tostring(err) .. "\n")
         failed = failed + 1
     end
 end

@@ -214,10 +214,13 @@ function M.display_output(file_path, query_id, opts)
 
         local col_widths = {}
         for i = 1, #displayed_header do
-            local max_width = #displayed_header[i]
+            local max_width = vim.fn.strdisplaywidth(displayed_header[i] or '')
             for _, row in ipairs(displayed_data) do
-                if row[i] and #row[i] > max_width then
-                    max_width = #row[i]
+                if row[i] then
+                    local cell_width = vim.fn.strdisplaywidth(row[i])
+                    if cell_width > max_width then
+                        max_width = cell_width
+                    end
                 end
             end
             table.insert(col_widths, max_width)
@@ -229,11 +232,7 @@ function M.display_output(file_path, query_id, opts)
 
         local header_parts = {}
         for i, h in ipairs(displayed_header) do
-            if col_widths[i] < 100 then
-                table.insert(header_parts, string.format('%-' .. col_widths[i] .. 's', h))
-            else
-                table.insert(header_parts, util.formatString(h or '', col_widths[i]))
-            end
+            table.insert(header_parts, util.formatString(h or '', col_widths[i]))
         end
         table.insert(buffer_lines, table.concat(header_parts, visual_separator))
 
@@ -246,11 +245,7 @@ function M.display_output(file_path, query_id, opts)
         for _, row in ipairs(displayed_data) do
             local row_parts = {}
             for i, cell in ipairs(row) do
-                if col_widths[i] < 100 then
-                    table.insert(row_parts, string.format('%-' .. col_widths[i] .. 's', cell or ''))
-                else
-                    table.insert(row_parts, util.formatString(cell or '', col_widths[i]))
-                end
+                table.insert(row_parts, util.formatString(cell or '', col_widths[i]))
             end
             table.insert(buffer_lines, table.concat(row_parts, visual_separator))
         end
