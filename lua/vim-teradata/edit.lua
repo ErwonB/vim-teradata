@@ -948,10 +948,13 @@ function M.decorate(bufnr)
     local st = state[bufnr]
     if not st or st.editing then return end
     local maps = config.options.edit_keymaps
+    local vkeys = ((config.options.virtual or {}).keymaps or {})
+    local totals_hint = (type(vkeys.footer_next) == 'string' and vkeys.footer_next ~= '')
+        and ('  <%s> Totals'):format(vkeys.footer_next) or ''
     if st.meta.editable then
         set_hint(bufnr, string.format(
-            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s',
-            maps.toggle, st.hint_suffix or ''))
+            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s%s',
+            maps.toggle, totals_hint, st.hint_suffix or ''))
     end
 end
 

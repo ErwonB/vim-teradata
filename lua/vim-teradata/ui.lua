@@ -170,10 +170,29 @@ function M.display_output(file_path, query_id, opts)
     local query_path = util.get_history_path('queries_dir_name') ..
         '/' .. vim.fn.fnamemodify(file_path, ":t:r") .. '.sql'
     local original_query = table.concat(vim.fn.readfile(query_path), "\n")
+
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDCalc', function(cmd_opts)
+        local cur_vcol = vim.fn.virtcol('.')
+        local vc1, vc2 = cur_vcol, cur_vcol
+        if cmd_opts.range == 2
+            and cmd_opts.line1 == vim.fn.line("'<")
+            and cmd_opts.line2 == vim.fn.line("'>") then
+            local vm = vim.fn.visualmode()
+            if vm == 'v' or vm == '\22' then
+                local mc1, mc2 = vim.fn.virtcol("'<"), vim.fn.virtcol("'>")
+                if mc1 > 0 and mc2 > 0 and mc2 < 2147483647 then
+                    vc1, vc2 = mc1, mc2
+                end
+            end
+        end
+        require('vim-teradata.virtual').calc_selection(bufnr, cmd_opts.line1, cmd_opts.line2, vc1, vc2)
+    end, { range = true, desc = 'Teradata: quick calc on selection or range' })
+
     if original_query then
         explain.process_results(bufnr, original_query, lines)
         local lower = original_query:lower():gsub("^%s*", "")
         if lower:match("^explain") or lower:match("^show") then
+            grid.set(bufnr, 'is_explain_or_show', true)
             if lower:match("^explain") then
                 local help_line = " <Folds: za / zR / zM>   High-cost steps in red"
                 vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { "", help_line })
@@ -182,6 +201,9 @@ function M.display_output(file_path, query_id, opts)
             return
         end
     end
+
+    local vcfg = config.ensure().virtual or {}
+    grid.set(bufnr, 'virtual_footer_mode', vcfg.footer_default or 'off')
 
     local export_key = (config.ensure().export or {}).keymap
     local export_bound = false
@@ -339,8 +361,11 @@ function M.display_output(file_path, query_id, opts)
         end
 
         local ns_id = vim.api.nvim_create_namespace("HelperBuffer")
+        local vkeys = ((config.options.virtual or {}).keymaps or {})
+        local totals_hint = (type(vkeys.footer_next) == 'string' and vkeys.footer_next ~= '')
+            and ('  <%s> Totals'):format(vkeys.footer_next) or ''
         local extmark = '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort' ..
-            (hint_suffix or '')
+            totals_hint .. (hint_suffix or '')
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
         vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
@@ -354,6 +379,7 @@ function M.display_output(file_path, query_id, opts)
         vim.api.nvim_buf_set_extmark(bufnr, ns_id, #buffer_lines - 1, 0, mark)
 
         pcall(function() require('vim-teradata.edit').decorate(bufnr) end)
+        pcall(function() require('vim-teradata.virtual').render_footer(bufnr) end)
         update_winbar()
 
         vim.bo[bufnr].modifiable = false
@@ -594,6 +620,43 @@ function M.display_output(file_path, query_id, opts)
             populate_buffer()
             vim.notify("Sort reset.", vim.log.levels.INFO)
         end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: reset sort' })
+
+        local vkeys = ((config.options.virtual or {}).keymaps or {})
+        if type(vkeys.footer_next) == 'string' and vkeys.footer_next ~= '' then
+            vim.keymap.set('n', vkeys.footer_next, function()
+                require('vim-teradata.virtual').cycle_footer(bufnr, 1)
+            end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: next totals footer mode' })
+        end
+        if type(vkeys.footer_prev) == 'string' and vkeys.footer_prev ~= '' then
+            vim.keymap.set('n', vkeys.footer_prev, function()
+                require('vim-teradata.virtual').cycle_footer(bufnr, -1)
+            end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: previous totals footer mode' })
+        end
+        if type(vkeys.quick_calc) == 'string' and vkeys.quick_calc ~= '' then
+            vim.keymap.set('x', vkeys.quick_calc, function()
+                local m = vim.fn.mode()
+                local cur_vcol = vim.fn.virtcol('.')
+                local v_l1, v_l2 = vim.fn.line('v'), vim.fn.line('.')
+                local v_c1, v_c2 = vim.fn.virtcol('v'), cur_vcol
+                vim.api.nvim_feedkeys(
+                    vim.api.nvim_replace_termcodes('<Esc>', true, false, true),
+                    'nx', false
+                )
+                local p1, p2 = vim.fn.getpos("'<"), vim.fn.getpos("'>")
+                local vm = (m == 'v' or m == 'V' or m == '\22') and m or vim.fn.visualmode()
+                local l1 = (p1[2] and p1[2] > 0) and p1[2] or v_l1
+                local l2 = (p2[2] and p2[2] > 0) and p2[2] or v_l2
+                local vc1, vc2
+                if vm == 'V' then
+                    vc1, vc2 = cur_vcol, cur_vcol
+                else
+                    local m_c1, m_c2 = vim.fn.virtcol("'<"), vim.fn.virtcol("'>")
+                    vc1 = (m_c1 and m_c1 > 0) and m_c1 or v_c1
+                    vc2 = (m_c2 and m_c2 > 0) and m_c2 or v_c2
+                end
+                require('vim-teradata.virtual').calc_selection(bufnr, l1, l2, vc1, vc2)
+            end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: quick calc on selection' })
+        end
     end
     bind_grid_maps()
 
@@ -769,6 +832,8 @@ function M.display_help()
         '  <X>           Set cell to NULL',
         '  <S>           Save pending edits',
         '  <C>           Cancel edits',
+        '  gS/gs         Cycle totals footer',
+        '  <leader>=     Quick calc on selection',
         string.format('  <%s>           Full export via TPT (confirmation box)',
             (config.options.export or {}).keymap or 'F'),
     }

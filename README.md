@@ -13,6 +13,7 @@ It provides query execution via BTEQ, on-the-fly syntax diagnostics, schema-awar
 - **Schema-aware autocompletion**: Native completion for tables, columns, and databases supporting `blink.cmp`, `nvim-cmp`, and `omnifunc`.
 - **Query history & bookmarks**: Search past queries using your choice of picker (`fzf-lua`, `snacks`, `telescope`, `fzf.vim`, or built-in `native` picker).
 - **In-grid editing**: Edit query result tables directly with staged preview and updates generation.
+- **Virtual answerset totals & quick-calc**: Cycle in-grid summary footers (`sum`, `avg`, `min`, `max`, `count`, `nulls`, `distinct`) and inspect visual selections in a floating stats popup without extra database round trips.
 - **Health check**: Built-in `:checkhealth vim-teradata` to verify TTU binaries, tree-sitter parsers, and connection profiles.
 
 ---

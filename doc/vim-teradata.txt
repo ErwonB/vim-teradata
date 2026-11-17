@@ -45,6 +45,7 @@ CONTENTS                                               *vim-teradata-contents*
         9.9 Editing & formatting .............. |vim-teradata-guide-format|
         9.10 Persistent sessions .............. |vim-teradata-guide-sessions|
         9.11 Full exports ..................... |vim-teradata-guide-export|
+        9.12 Virtual answerset ................ |vim-teradata-guide-virtual|
     10. Filetypes ............................. |vim-teradata-filetypes|
     11. Troubleshooting ....................... |vim-teradata-troubleshooting|
     12. FAQ ................................... |vim-teradata-faq|
@@ -488,6 +489,43 @@ export ~
         or `export_query_selector`, chosen by the route, see
         |vim-teradata-guide-export|).
 
+                                                   *vim-teradata-opt-virtual*
+virtual ~
+    Type: `table`
+
+    In-grid virtual answerset features (summary footer and selection
+    quick-calc). See |vim-teradata-guide-virtual|. Sub-options: >lua
+
+        virtual = {
+          footer_default  = 'off',        -- one of virtual.MODES
+          footer_scope    = 'displayed',  -- 'displayed' | 'all'
+          yank_quick_calc = false,
+          keymaps = {
+            footer_next = 'gS',
+            footer_prev = 'gs',
+            quick_calc  = '<leader>=',
+          },
+        }
+<
+    footer_default ~
+        Initial summary footer mode when a result grid opens (`"off"`,
+        `"sum"`, `"avg"`, `"min"`, `"max"`, `"count"`, `"nulls"`, or
+        `"distinct"`).
+
+    footer_scope ~
+        `"displayed"` computes footer aggregates over currently visible
+        rows (respecting filters); `"all"` computes over the full loaded
+        result set.
+
+    yank_quick_calc ~
+        When `true`, running quick-calc also yanks a tab-separated
+        `sum\tavg\tmin\tmax` line into the unnamed register `""`.
+
+    keymaps ~
+        Result-buffer local mappings for cycling the footer (`footer_next`,
+        `footer_prev`) and triggering visual selection quick-calc
+        (`quick_calc`).
+
 ------------------------------------------------------------------------------
 5.3 Default keymaps                             *vim-teradata-default-keymaps*
 
@@ -606,6 +644,13 @@ cursor plus the next two.
                 re-run in that same session, so it still sees its volatile
                 tables. If that session has been closed, the query runs in
                 a one-shot job and a warning is shown.
+
+                                                                    *:TDCalc*
+:[range]TDCalc  Compute descriptive statistics (`count`, `nulls`, `sum`,
+                `avg`, `min`, `max`, `distinct`) for the selected cells or
+                line range in a result buffer and display them in a
+                floating window. Buffer-local to result buffers. See
+                |vim-teradata-guide-virtual|.
 
 ------------------------------------------------------------------------------
 7.2 History & search                                *vim-teradata-cmd-history*
@@ -855,6 +900,15 @@ u       Reset all active filters.
 - / <BS>
         Remove the column under the cursor (`-`) or restore the most
         recently removed column (`<BS>`).
+
+gS / gs Cycle the virtual summary footer mode forward (`gS`) or backward
+        (`gs`) through `off`, `sum`, `avg`, `min`, `max`, `count`, `nulls`,
+        and `distinct`. See |vim-teradata-guide-virtual|.
+
+<leader>= (visual mode)
+        Open the quick-calc floating popup with pooled and per-column
+        statistics for the visual selection. See
+        |vim-teradata-guide-virtual|.
 
                                                         *vim-teradata-result-F*
 F       Full export via TPT, after a confirmation box. Exports the full
@@ -1242,6 +1296,39 @@ Errors ~
 Settings ~
     See |vim-teradata-opt-export|. The `F` key is described in
     |vim-teradata-result-mappings|.
+
+------------------------------------------------------------------------------
+9.12 Virtual answerset                             *vim-teradata-guide-virtual*
+
+A result grid can compute in-memory aggregations and descriptive statistics
+without another database round trip. All calculations run in Lua on the
+cells loaded in the grid (note that standard IEEE-754 double precision
+applies beyond ~15 significant digits).
+
+Summary footer ~
+    Press `gS` (or `gs` to step backwards) in any result buffer to cycle a
+    two-line virtual footer attached below the last data row:
+
+        off -> sum (Σ) -> avg (x̄) -> min (↓) -> max (↑) -> count (#)
+            -> nulls (∅) -> distinct (≠)
+
+    Because the footer is rendered as virtual lines (`virt_lines` in the
+    `TeradataVirtual` highlight group), row numbers, cursor-to-cell mapping,
+    filtering (`<CR>`), column removal (`-`), sorting (`<Up>`/`<Down>`) and
+    in-grid editing (`<E>`) continue to work unchanged. By default the
+    footer reflects the currently displayed rows (`footer_scope =
+    "displayed"`); set `virtual.footer_scope = "all"` to aggregate across
+    unfiltered rows.
+
+Quick calc ~
+    Select cells in visual mode (`v`, `V`, or `<C-v>`) and press
+    `<leader>=`, or run |:TDCalc| over a range, to open a compact floating
+    window at the cursor listing `count`, `nulls`, `sum`, `avg`, `min`,
+    `max`, and `distinct`. When multiple columns are spanned, the popup
+    shows both pooled statistics across all selected cells and a column-by-
+    column breakdown. Move the cursor or press `q` / `<Esc>` to dismiss the
+    float. Set `virtual.yank_quick_calc = true` to also copy a tab-separated
+    `sum\tavg\tmin\tmax` line to the unnamed register.
 
 ==============================================================================
 10. FILETYPES                                         *vim-teradata-filetypes*

@@ -30,6 +30,7 @@ local files = {
     'tests/session_test.lua',
     'tests/bteq_script_test.lua',
     'tests/export_test.lua',
+    'tests/virtual_test.lua',
 }
 
 io.stdout:write("Running vim-teradata test suite...\n")

@@ -36,6 +36,7 @@
 ---@field treesitter_folds boolean
 ---@field export { enabled: boolean, keymap: string|false, confirm: boolean, operator: 'auto'|'export'|'selector', max_sessions: integer, head_lines: integer|nil, timeout_ms: integer|nil, tpt_script: string|nil }
 ---@field exports_dir_name string
+---@field virtual { footer_default: string, footer_scope: 'displayed'|'all', yank_quick_calc: boolean, keymaps: { footer_next: string, footer_prev: string, quick_calc: string } }
 ---@field users VimTeradata.User[]
 ---@field current_user_index integer|nil
 
@@ -118,6 +119,18 @@ M.defaults = {
     },
     exports_dir_name = 'exports',
 
+    -- Virtual answerset (summary footer + selection quick-calc)
+    virtual = {
+        footer_default  = 'off',        -- one of virtual.MODES
+        footer_scope    = 'displayed',  -- 'displayed' | 'all'
+        yank_quick_calc = false,
+        keymaps = {
+            footer_next = 'gS',
+            footer_prev = 'gs',
+            quick_calc  = '<leader>=',
+        },
+    },
+
     -- Users list
     users = {},
     current_user_index = nil,
@@ -190,6 +203,20 @@ local function validate(o)
         vim.notify("[vim-teradata] sql_detection must be 'always', 'modeline' or 'never'; using 'always'",
             vim.log.levels.WARN)
         o.sql_detection = 'always'
+    end
+    vim.validate('virtual', o.virtual, 'table')
+    local virt = o.virtual
+    local valid_modes = { 'off', 'sum', 'avg', 'min', 'max', 'count', 'nulls', 'distinct' }
+    if not vim.tbl_contains(valid_modes, virt.footer_default) then
+        vim.notify("[vim-teradata] virtual.footer_default must be one of "
+            .. table.concat(valid_modes, ', ') .. "; using 'off'",
+            vim.log.levels.WARN)
+        virt.footer_default = 'off'
+    end
+    if not vim.tbl_contains({ 'displayed', 'all' }, virt.footer_scope) then
+        vim.notify("[vim-teradata] virtual.footer_scope must be 'displayed' or 'all'; using 'displayed'",
+            vim.log.levels.WARN)
+        virt.footer_scope = 'displayed'
     end
 end
 
