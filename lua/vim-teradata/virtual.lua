@@ -1,4 +1,5 @@
--- vim-teradata: virtual answerset (Patch 1 — summary footer + selection quick-calc).
+-- vim-teradata: virtual answerset (Patch 1 — summary footer + selection quick-calc;
+-- Patch 2 — computed virtual columns).
 --
 -- Note on numeric precision:
 -- Calculations in this module use standard Lua numbers (IEEE-754 double-precision
@@ -28,6 +29,10 @@ local MODE_LABELS = {
     distinct = '≠ ',
 }
 
+local function trim(s)
+    return (s:gsub('^%s+', ''):gsub('%s+$', ''))
+end
+
 local function ensure_hl()
     vim.api.nvim_set_hl(0, 'TeradataVirtual', { link = 'Special', default = true })
 end
@@ -36,6 +41,17 @@ local function null_token()
     return (config.options and config.options.null_token)
         or (config.defaults and config.defaults.null_token)
         or 'NULL'
+end
+
+local function virt_cfg()
+    return (config.options and config.options.virtual)
+        or (config.defaults and config.defaults.virtual)
+        or {}
+end
+
+local function header_prefix()
+    local p = virt_cfg().header_prefix
+    return p ~= nil and p or 'ƒ '
 end
 
 --- Parses a Teradata/BTEQ-rendered cell into a Lua number.
@@ -47,7 +63,7 @@ end
 --- @return number|nil
 function M.to_number(s)
     if type(s) ~= 'string' then return nil end
-    local trimmed = s:gsub('^%s+', ''):gsub('%s+$', '')
+    local trimmed = trim(s)
     if trimmed == '' or trimmed == null_token() then return nil end
 
     if trimmed:find('%s') or trimmed:match('^%-?0[xX]') then return nil end
@@ -81,7 +97,7 @@ function M.to_number(s)
 end
 
 local function decimal_places(s)
-    local trimmed = s:gsub('^%s+', ''):gsub('%s+$', ''):gsub('%-$', '')
+    local trimmed = trim(s):gsub('%-$', '')
     local mant, exp = trimmed:match('^[^%.]*(%.?%d*)[eE]([+-]?%d+)$')
     if mant and exp then
         local d = math.max(0, #mant - 1) - (tonumber(exp) or 0)
@@ -137,7 +153,7 @@ function M.stats(values)
 
     for i = 1, count do
         local raw = values[i]
-        local trimmed = type(raw) == 'string' and (raw:gsub('^%s+', ''):gsub('%s+$', '')) or ''
+        local trimmed = type(raw) == 'string' and trim(raw) or ''
         if trimmed == '' or trimmed == tok then
             count_null = count_null + 1
         else
@@ -240,8 +256,15 @@ local function column_values(bufnr, j, scope)
         local all_data = grid.get(bufnr, 'all_data')
         local col_ids  = grid.get(bufnr, 'displayed_col_ids') or {}
         local col_id   = col_ids[j]
+        local vvals    = grid.get(bufnr, 'virtual_values') or {}
         if all_data and col_id ~= nil then
             local vals = {}
+            if type(col_id) == 'string' and vvals[col_id] then
+                for i = 1, #all_data do
+                    vals[i] = vvals[col_id][i] or ''
+                end
+                return vals
+            end
             for i, row in ipairs(all_data) do
                 if row[col_id] ~= nil then
                     vals[#vals + 1] = row[col_id]
@@ -269,9 +292,7 @@ function M.render_footer(bufnr)
     if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
-    local vcfg = (config.options and config.options.virtual)
-        or (config.defaults and config.defaults.virtual)
-        or {}
+    local vcfg = virt_cfg()
     local mode = grid.get(bufnr, 'virtual_footer_mode') or vcfg.footer_default or 'off'
     if mode == 'off' or not MODE_LABELS[mode] then return end
 
@@ -285,7 +306,7 @@ function M.render_footer(bufnr)
 
     local sep_parts = {}
     local val_parts = {}
-    -- Patch 2: virtual columns will register here
+    -- Patch 2: virtual columns are registered in displayed_col_ids and displayed_data
     for j, w in ipairs(widths) do
         sep_parts[j] = string.rep('-', w)
         local st = M.stats(column_values(bufnr, j, scope))
@@ -317,9 +338,7 @@ end
 --- @return string new_mode
 function M.cycle_footer(bufnr, step)
     step = step or 1
-    local vcfg = (config.options and config.options.virtual)
-        or (config.defaults and config.defaults.virtual)
-        or {}
+    local vcfg = virt_cfg()
     local cur = grid.get(bufnr, 'virtual_footer_mode') or vcfg.footer_default or 'off'
     local idx = 1
     for i, m in ipairs(M.MODES) do
@@ -365,6 +384,785 @@ function M.columns_in_range(widths, c1, c2)
     end
     return cols
 end
+
+-- =============================================================================
+-- Patch 2 — Virtual computed columns & persistence
+-- =============================================================================
+
+local function strip_sql_comments_and_collapse(sql)
+    local out = {}
+    local i, n = 1, #sql
+    while i <= n do
+        local c = sql:sub(i, i)
+        local two = sql:sub(i, i + 1)
+        if c == "'" or c == '"' then
+            local start = i
+            i = i + 1
+            while i <= n do
+                if sql:sub(i, i) == c then
+                    if sql:sub(i + 1, i + 1) == c then
+                        i = i + 2
+                    else
+                        i = i + 1
+                        break
+                    end
+                else
+                    i = i + 1
+                end
+            end
+            out[#out + 1] = sql:sub(start, i - 1)
+        elseif two == '--' then
+            local nl = sql:find('\n', i + 2, true)
+            i = nl and (nl + 1) or (n + 1)
+            out[#out + 1] = ' '
+        elseif two == '/*' then
+            local _, e = sql:find('*/', i + 2, true)
+            i = e and (e + 1) or (n + 1)
+            out[#out + 1] = ' '
+        else
+            out[#out + 1] = c
+            i = i + 1
+        end
+    end
+    local s = table.concat(out):gsub('%s+', ' ')
+    return trim(s)
+end
+
+--- Computes a stable SHA-256 hash of a SQL statement with comments stripped
+--- and whitespace collapsed.
+--- @param sql string
+--- @return string|nil
+function M.normalize_sql_hash(sql)
+    if type(sql) ~= 'string' or sql == '' then return nil end
+    local norm = strip_sql_comments_and_collapse(sql)
+    if norm == '' then return nil end
+    return vim.fn.sha256(norm)
+end
+
+local function persistence_path()
+    local data_dir = (config.options and config.options.data_dir)
+        or (config.defaults and config.defaults.data_dir)
+        or (vim.fn.stdpath('data') .. '/teradata/sql-autocomplete')
+    return data_dir .. '/virtual_columns.json'
+end
+
+local function load_persistence_store()
+    local path = persistence_path()
+    if vim.fn.filereadable(path) == 0 then return {} end
+    local ok_r, lines = pcall(vim.fn.readfile, path)
+    if not ok_r or not lines or #lines == 0 then return {} end
+    local raw = table.concat(lines, '\n')
+    if trim(raw) == '' then return {} end
+    local ok_d, decoded = pcall(vim.json.decode, raw)
+    if not ok_d or type(decoded) ~= 'table' then
+        vim.notify('[vim-teradata] Corrupt virtual_columns.json ignored.', vim.log.levels.WARN)
+        return {}
+    end
+    return decoded
+end
+
+local function save_persistence_store(store)
+    local path = persistence_path()
+    local dir = vim.fn.fnamemodify(path, ':h')
+    if vim.fn.isdirectory(dir) == 0 then
+        vim.fn.mkdir(dir, 'p', 448)
+    end
+    local tmp = path .. '.tmp'
+    local ok_e, encoded = pcall(vim.json.encode, store)
+    if not ok_e then return end
+    vim.fn.writefile({ encoded }, tmp)
+    local ok_mv = vim.uv.fs_rename(tmp, path)
+    if not ok_mv then
+        pcall(vim.uv.fs_copyfile, tmp, path)
+        pcall(vim.fn.delete, tmp)
+    end
+end
+
+local function persist_buffer_columns(bufnr)
+    if virt_cfg().persist_columns == false then return end
+    local hash = grid.get(bufnr, 'query_sql_hash')
+    if not hash then return end
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+    local store = load_persistence_store()
+    if #vcols == 0 then
+        store[hash] = nil
+    else
+        local list = {}
+        for _, vc in ipairs(vcols) do
+            list[#list + 1] = { name = vc.name, expr = vc.expr }
+        end
+        store[hash] = list
+    end
+    save_persistence_store(store)
+end
+
+local function ensure_grid_basics(bufnr)
+    local all_header       = grid.get(bufnr, 'all_header')
+    local displayed_header = grid.get(bufnr, 'displayed_header') or {}
+    if not all_header then
+        all_header = vim.deepcopy(displayed_header)
+        grid.set(bufnr, 'all_header', all_header)
+    end
+    local all_data       = grid.get(bufnr, 'all_data')
+    local displayed_data = grid.get(bufnr, 'displayed_data') or {}
+    if not all_data then
+        all_data = vim.deepcopy(displayed_data)
+        grid.set(bufnr, 'all_data', all_data)
+    end
+    local displayed_ids = grid.get(bufnr, 'displayed_ids')
+    if not displayed_ids then
+        displayed_ids = {}
+        for i = 1, #displayed_data do displayed_ids[i] = i end
+        grid.set(bufnr, 'displayed_ids', displayed_ids)
+    end
+    local displayed_col_ids = grid.get(bufnr, 'displayed_col_ids')
+    if not displayed_col_ids then
+        displayed_col_ids = {}
+        for i = 1, #displayed_header do displayed_col_ids[i] = i end
+        grid.set(bufnr, 'displayed_col_ids', displayed_col_ids)
+    end
+    return all_header, all_data, displayed_header, displayed_data, displayed_ids, displayed_col_ids
+end
+
+local function refresh_grid_view(bufnr)
+    local pop = grid.get(bufnr, 'populate_fn')
+    if type(pop) == 'function' then
+        pop()
+    end
+end
+
+--- Splits a user specification into `(name, expr)`.
+--- Accepts `"margin = (price - cost) * qty"` or `"(price - cost) * qty"`.
+--- @param spec string
+--- @return string|nil name, string expr
+function M.split_col_spec(spec)
+    spec = trim(spec or '')
+    local q_name, q_rhs = spec:match('^"([^"]+)"%s*=%s*(.+)$')
+    if q_name and not q_rhs:match('^=') then
+        return q_name, trim(q_rhs)
+    end
+    local ident, rhs = spec:match('^([%a_][%w_]*)%s*=%s*(.+)$')
+    if ident and ident:upper() ~= 'CASE' and not rhs:match('^=') then
+        return ident, trim(rhs)
+    end
+    return nil, spec
+end
+
+--- Re-inserts virtual column values into `displayed_data` rows for every
+--- virtual column id currently present in `displayed_col_ids`.
+--- @param bufnr integer
+function M.reapply(bufnr)
+    local displayed_data    = grid.get(bufnr, 'displayed_data') or {}
+    local displayed_ids     = grid.get(bufnr, 'displayed_ids') or {}
+    local displayed_col_ids = grid.get(bufnr, 'displayed_col_ids') or {}
+    local vvals             = grid.get(bufnr, 'virtual_values') or {}
+    local tok               = null_token()
+
+    for j, cid in ipairs(displayed_col_ids) do
+        if type(cid) == 'string' and vvals[cid] then
+            local col_vals = vvals[cid]
+            for i = 1, #displayed_data do
+                local row = displayed_data[i]
+                if row then
+                    local row_id = displayed_ids[i] or i
+                    row[j] = col_vals[row_id] or tok
+                end
+            end
+        end
+    end
+    grid.set(bufnr, 'displayed_data', displayed_data)
+end
+
+--- Recomputes every virtual column for every row in `all_data` (accounting for
+--- pending in-grid edits when edit mode is active) and updates `displayed_data`.
+--- @param bufnr integer
+--- @return table<string, { div_zero: integer, errors: integer }>
+function M.recompute(bufnr)
+    local all_header, all_data = ensure_grid_basics(bufnr)
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+    local vvals = grid.get(bufnr, 'virtual_values') or {}
+    local tok   = null_token()
+
+    if #vcols == 0 then
+        grid.set(bufnr, 'virtual_values', {})
+        return {}
+    end
+
+    local expr_mod = require('vim-teradata.virtual_expr')
+
+    -- Map real column names -> index in all_header
+    local real_exact, real_upper = {}, {}
+    for idx, h in ipairs(all_header) do
+        real_exact[h] = idx
+        real_upper[h:upper()] = idx
+    end
+
+    local ok_e, edit_mod = pcall(require, 'vim-teradata.edit')
+    local edit_st = (ok_e and edit_mod._state) and edit_mod._state(bufnr) or nil
+    local pending = (edit_st and edit_st.editing and edit_st.pending) or nil
+
+    local stats_err = {}
+    local evaluated_vcols = {}
+
+    for _, vc in ipairs(vcols) do
+        local col_vals = {}
+        local div_zero = 0
+        local errs = 0
+
+        for row_id = 1, #all_data do
+            local row = all_data[row_id] or {}
+            local row_pend = pending and pending[row_id] or nil
+
+            local function lookup(col_name, quoted)
+                -- Check earlier virtual columns first
+                if not quoted then
+                    local up = col_name:upper()
+                    local ev_id = evaluated_vcols[up]
+                    if ev_id and vvals[ev_id] then
+                        return vvals[ev_id][row_id]
+                    end
+                    local r_idx = real_upper[up]
+                    if r_idx then
+                        if row_pend and row_pend[r_idx] ~= nil then
+                            return row_pend[r_idx]
+                        end
+                        return row[r_idx]
+                    end
+                else
+                    local ev_id = evaluated_vcols[col_name] or evaluated_vcols[col_name:upper()]
+                    if ev_id and vvals[ev_id] then
+                        return vvals[ev_id][row_id]
+                    end
+                    local r_idx = real_exact[col_name] or real_upper[col_name:upper()]
+                    if r_idx then
+                        if row_pend and row_pend[r_idx] ~= nil then
+                            return row_pend[r_idx]
+                        end
+                        return row[r_idx]
+                    end
+                end
+                return nil
+            end
+
+            local val, err = expr_mod.eval(vc.ast, lookup)
+            if err then
+                if err == 'division by zero' then
+                    div_zero = div_zero + 1
+                else
+                    errs = errs + 1
+                end
+            end
+            col_vals[row_id] = (val ~= nil) and val or tok
+        end
+
+        vvals[vc.id] = col_vals
+        evaluated_vcols[vc.name:upper()] = vc.id
+        evaluated_vcols[vc.name] = vc.id
+        stats_err[vc.name] = { div_zero = div_zero, errors = errs }
+    end
+
+    grid.set(bufnr, 'virtual_values', vvals)
+    M.reapply(bufnr)
+    return stats_err
+end
+
+local function next_auto_name(all_header, vcols)
+    local taken = {}
+    for _, h in ipairs(all_header) do taken[h:upper()] = true end
+    for _, vc in ipairs(vcols) do taken[vc.name:upper()] = true end
+    local k = 1
+    while taken['EXPR' .. k] do k = k + 1 end
+    return 'EXPR' .. k
+end
+
+local function validate_refs(refs, all_header, vcols, max_vcol_idx, self_name)
+    local known = {}
+    for _, h in ipairs(all_header) do
+        known[h] = true
+        known[h:upper()] = true
+    end
+    local limit = max_vcol_idx or #vcols
+    for i = 1, limit do
+        local vc = vcols[i]
+        if vc then
+            known[vc.name] = true
+            known[vc.name:upper()] = true
+        end
+    end
+    local self_up = self_name and self_name:upper() or nil
+    for _, r in ipairs(refs) do
+        if self_up and r:upper() == self_up then
+            return false, string.format("virtual column '%s' cannot reference itself", self_name)
+        end
+        if not known[r] and not known[r:upper()] then
+            return false, string.format("unknown column '%s'", r)
+        end
+    end
+    return true, nil
+end
+
+local function cursor_column_index(bufnr)
+    local widths = grid.get(bufnr, 'column_widths')
+    if not widths then return nil end
+    local col = vim.fn.virtcol('.') - 1
+    local pos = 0
+    for i, w in ipairs(widths) do
+        if col >= pos and col < pos + w then return i end
+        pos = pos + w + #SEP
+    end
+    return nil
+end
+
+--- Adds a computed virtual column to `bufnr`.
+--- Can be called as `add_column(bufnr, name, expr, opts)` or
+--- `add_column(bufnr, "name = expr", nil, opts)`.
+--- @param bufnr integer
+--- @param name string|nil
+--- @param expr string|nil
+--- @param opts table|nil { position = 'end'|'after_cursor', silent = boolean, from_persist = boolean }
+--- @return table|nil col_def, string|nil err
+function M.add_column(bufnr, name, expr, opts)
+    opts = opts or {}
+    bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_get_current_buf()
+    if grid.get(bufnr, 'is_explain_or_show') then
+        if not opts.silent then
+            vim.notify('Virtual columns are only available in Teradata result grids.',
+                vim.log.levels.WARN, { title = 'Teradata' })
+        end
+        return nil, 'not a result grid'
+    end
+
+    if expr == nil and type(name) == 'string' then
+        name, expr = M.split_col_spec(name)
+    end
+
+    local all_header, _, displayed_header, displayed_data, displayed_ids, displayed_col_ids =
+        ensure_grid_basics(bufnr)
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+
+    if not name or trim(name) == '' then
+        name = next_auto_name(all_header, vcols)
+    else
+        name = trim(name)
+        if name:match('^".*"$') then
+            name = name:sub(2, -2):gsub('""', '"')
+        else
+            name = name:upper()
+        end
+    end
+
+    if name == '' then
+        if not opts.silent then
+            vim.notify('Invalid virtual column name.', vim.log.levels.ERROR, { title = 'Teradata' })
+        end
+        return nil, 'invalid column name'
+    end
+
+    -- Reject duplicate column names
+    for _, h in ipairs(all_header) do
+        if h:upper() == name:upper() then
+            local msg = string.format("Column '%s' already exists in result.", name)
+            if not opts.silent then vim.notify(msg, vim.log.levels.WARN, { title = 'Teradata' }) end
+            return nil, msg
+        end
+    end
+    for _, vc in ipairs(vcols) do
+        if vc.name:upper() == name:upper() then
+            local msg = string.format("Virtual column '%s' already exists.", name)
+            if not opts.silent then vim.notify(msg, vim.log.levels.WARN, { title = 'Teradata' }) end
+            return nil, msg
+        end
+    end
+
+    local expr_mod = require('vim-teradata.virtual_expr')
+    local ast, perr = expr_mod.parse(expr or '')
+    if not ast then
+        local msg = 'Invalid expression: ' .. tostring(perr)
+        if not opts.silent then vim.notify(msg, vim.log.levels.ERROR, { title = 'Teradata' }) end
+        return nil, msg
+    end
+
+    local refs = expr_mod.references(ast)
+    local ok_ref, rerr = validate_refs(refs, all_header, vcols, #vcols, name)
+    if not ok_ref then
+        if not opts.silent then vim.notify(rerr, vim.log.levels.ERROR, { title = 'Teradata' }) end
+        return nil, rerr
+    end
+
+    local seq = (grid.get(bufnr, 'virtual_seq') or 0) + 1
+    grid.set(bufnr, 'virtual_seq', seq)
+    local vid = 'v' .. seq
+
+    local entry = {
+        id   = vid,
+        name = name,
+        expr = trim(expr),
+        ast  = ast,
+        refs = refs,
+    }
+    vcols[#vcols + 1] = entry
+    grid.set(bufnr, 'virtual_columns', vcols)
+
+    local err_stats = M.recompute(bufnr)
+    local vvals = grid.get(bufnr, 'virtual_values') or {}
+    local tok = null_token()
+
+    local ins_idx = #displayed_header + 1
+    if opts.position == 'after_cursor' then
+        local cidx = cursor_column_index(bufnr)
+        if cidx then ins_idx = math.min(#displayed_header + 1, cidx + 1) end
+    end
+
+    table.insert(displayed_header, ins_idx, header_prefix() .. name)
+    table.insert(displayed_col_ids, ins_idx, vid)
+    for i = 1, #displayed_data do
+        local row_id = displayed_ids[i] or i
+        local val = (vvals[vid] and vvals[vid][row_id]) or tok
+        table.insert(displayed_data[i], ins_idx, val)
+    end
+
+    grid.set(bufnr, 'displayed_header', displayed_header)
+    grid.set(bufnr, 'displayed_col_ids', displayed_col_ids)
+    grid.set(bufnr, 'displayed_data', displayed_data)
+
+    if not opts.from_persist then
+        persist_buffer_columns(bufnr)
+    end
+    refresh_grid_view(bufnr)
+
+    local st = err_stats[name]
+    if st and st.div_zero > 0 and not opts.silent then
+        vim.notify(string.format('%s: %d row(s) divided by zero', name, st.div_zero),
+            vim.log.levels.WARN, { title = 'Teradata' })
+    end
+
+    return entry, nil
+end
+
+local function normalize_lookup_name(name)
+    name = trim(name or '')
+    local pref = header_prefix()
+    if pref ~= '' and name:sub(1, #pref) == pref then
+        name = trim(name:sub(#pref + 1))
+    end
+    if name:match('^".*"$') then
+        name = name:sub(2, -2):gsub('""', '"')
+    end
+    return name:upper()
+end
+
+--- Removes a virtual column by name. Refuses if another virtual column depends on it.
+--- @param bufnr integer
+--- @param name string
+--- @return boolean ok, string|nil err
+function M.remove_column(bufnr, name)
+    bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_get_current_buf()
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+    local target_up = normalize_lookup_name(name)
+    if target_up == '' then
+        vim.notify('Specify a virtual column name to remove.', vim.log.levels.WARN, { title = 'Teradata' })
+        return false, 'missing column name'
+    end
+
+    local found_idx, target = nil, nil
+    for i, vc in ipairs(vcols) do
+        if vc.name:upper() == target_up or vc.id:upper() == target_up then
+            found_idx, target = i, vc
+            break
+        end
+    end
+    if not target then
+        local msg = string.format("Virtual column '%s' not found.", tostring(name))
+        vim.notify(msg, vim.log.levels.WARN, { title = 'Teradata' })
+        return false, msg
+    end
+
+    -- Refuse if referenced by another virtual column
+    for i, vc in ipairs(vcols) do
+        if i ~= found_idx then
+            for _, r in ipairs(vc.refs or {}) do
+                if r:upper() == target.name:upper() then
+                    local msg = string.format(
+                        "Cannot remove '%s': referenced by virtual column '%s'.",
+                        target.name, vc.name)
+                    vim.notify(msg, vim.log.levels.WARN, { title = 'Teradata' })
+                    return false, msg
+                end
+            end
+        end
+    end
+
+    table.remove(vcols, found_idx)
+    grid.set(bufnr, 'virtual_columns', vcols)
+
+    local vvals = grid.get(bufnr, 'virtual_values') or {}
+    vvals[target.id] = nil
+    grid.set(bufnr, 'virtual_values', vvals)
+
+    local displayed_header  = grid.get(bufnr, 'displayed_header') or {}
+    local displayed_data    = grid.get(bufnr, 'displayed_data') or {}
+    local displayed_col_ids = grid.get(bufnr, 'displayed_col_ids') or {}
+    for j = #displayed_col_ids, 1, -1 do
+        if displayed_col_ids[j] == target.id then
+            table.remove(displayed_col_ids, j)
+            table.remove(displayed_header, j)
+            for _, row in ipairs(displayed_data) do
+                table.remove(row, j)
+            end
+        end
+    end
+    grid.set(bufnr, 'displayed_header', displayed_header)
+    grid.set(bufnr, 'displayed_col_ids', displayed_col_ids)
+    grid.set(bufnr, 'displayed_data', displayed_data)
+
+    local removed_cols = grid.get(bufnr, 'removed_columns') or {}
+    for i = #removed_cols, 1, -1 do
+        if removed_cols[i].col_id == target.id then
+            table.remove(removed_cols, i)
+        end
+    end
+    grid.set(bufnr, 'removed_columns', removed_cols)
+
+    local sort_spec = grid.get(bufnr, 'sort_spec') or {}
+    for i = #sort_spec, 1, -1 do
+        if sort_spec[i].col_id == target.id then
+            table.remove(sort_spec, i)
+        end
+    end
+    grid.set(bufnr, 'sort_spec', sort_spec)
+
+    persist_buffer_columns(bufnr)
+    refresh_grid_view(bufnr)
+    return true, nil
+end
+
+--- Lists the virtual columns currently registered on `bufnr`.
+--- @param bufnr integer
+--- @return table[]
+function M.list_columns(bufnr)
+    bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_get_current_buf()
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+    local out = {}
+    for i, vc in ipairs(vcols) do
+        out[i] = {
+            id   = vc.id,
+            name = vc.name,
+            expr = vc.expr,
+            refs = vim.deepcopy(vc.refs),
+        }
+    end
+    return out
+end
+
+--- Edits the expression of an existing virtual column.
+--- If `new_expr` is omitted, prompts with `vim.ui.input` pre-filled with the current expression.
+--- @param bufnr integer
+--- @param name string|nil
+--- @param new_expr string|nil
+--- @return boolean ok, string|nil err
+function M.edit_column(bufnr, name, new_expr)
+    bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_get_current_buf()
+    local all_header = ensure_grid_basics(bufnr)
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+    if #vcols == 0 then
+        vim.notify('No virtual columns defined on this buffer.', vim.log.levels.WARN, { title = 'Teradata' })
+        return false, 'no virtual columns'
+    end
+
+    local target_up = normalize_lookup_name(name or '')
+    if target_up == '' then
+        local cidx = cursor_column_index(bufnr)
+        local col_ids = grid.get(bufnr, 'displayed_col_ids') or {}
+        local cid = cidx and col_ids[cidx] or nil
+        if type(cid) == 'string' then
+            target_up = cid:upper()
+        elseif #vcols == 1 then
+            target_up = vcols[1].name:upper()
+        end
+    end
+
+    local found_idx, target = nil, nil
+    for i, vc in ipairs(vcols) do
+        if vc.name:upper() == target_up or vc.id:upper() == target_up then
+            found_idx, target = i, vc
+            break
+        end
+    end
+    if not target then
+        local msg = string.format("Virtual column '%s' not found.", tostring(name or ''))
+        vim.notify(msg, vim.log.levels.WARN, { title = 'Teradata' })
+        return false, msg
+    end
+
+    local function apply_edit(input)
+        if not input or trim(input) == '' then return false, 'cancelled' end
+        input = trim(input)
+        local _, rhs = M.split_col_spec(input)
+        local expr_str = rhs or input
+
+        local expr_mod = require('vim-teradata.virtual_expr')
+        local ast, perr = expr_mod.parse(expr_str)
+        if not ast then
+            local msg = 'Invalid expression: ' .. tostring(perr)
+            vim.notify(msg, vim.log.levels.ERROR, { title = 'Teradata' })
+            return false, msg
+        end
+
+        local refs = expr_mod.references(ast)
+        local ok_ref, rerr = validate_refs(refs, all_header, vcols, found_idx - 1, target.name)
+        if not ok_ref then
+            vim.notify(rerr, vim.log.levels.ERROR, { title = 'Teradata' })
+            return false, rerr
+        end
+
+        target.expr = expr_str
+        target.ast  = ast
+        target.refs = refs
+
+        local err_stats = M.recompute(bufnr)
+        persist_buffer_columns(bufnr)
+        refresh_grid_view(bufnr)
+
+        local st = err_stats[target.name]
+        if st and st.div_zero > 0 then
+            vim.notify(string.format('%s: %d row(s) divided by zero', target.name, st.div_zero),
+                vim.log.levels.WARN, { title = 'Teradata' })
+        end
+        return true, nil
+    end
+
+    if new_expr ~= nil then
+        return apply_edit(new_expr)
+    end
+
+    local ok_res, err_res = true, nil
+    vim.ui.input({
+        prompt  = string.format('Virtual column %s = ', target.name),
+        default = target.expr,
+    }, function(input)
+        if input == nil then return end
+        ok_res, err_res = apply_edit(input)
+    end)
+    return ok_res, err_res
+end
+
+--- Prompts the user to add a virtual column via `vim.ui.input`.
+--- @param bufnr integer
+function M.prompt_add_column(bufnr)
+    bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_get_current_buf()
+    vim.ui.input({ prompt = 'Virtual column (name = expr): ' }, function(input)
+        if not input or trim(input) == '' then return end
+        M.add_column(bufnr, input, nil)
+    end)
+end
+
+--- Opens a scratch split listing the virtual columns of `bufnr` as `name = expr`.
+--- @param bufnr integer
+--- @return integer scratch_bufnr
+function M.show_columns(bufnr)
+    bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_get_current_buf()
+    local vcols = M.list_columns(bufnr)
+    local lines = {}
+    if #vcols == 0 then
+        lines[1] = '(no virtual columns)'
+    else
+        for _, vc in ipairs(vcols) do
+            lines[#lines + 1] = string.format('%s = %s', vc.name, vc.expr)
+        end
+    end
+    local sbuf = require('vim-teradata.ui').open_scratch('Teradata Virtual Columns', math.max(5, #lines + 2))
+    vim.bo[sbuf].modifiable = true
+    vim.api.nvim_buf_set_lines(sbuf, 0, -1, false, lines)
+    vim.bo[sbuf].modifiable = false
+    vim.keymap.set('n', 'q', function()
+        if vim.api.nvim_buf_is_valid(sbuf) then
+            vim.api.nvim_buf_delete(sbuf, { force = true })
+        end
+    end, { buffer = sbuf, silent = true, nowait = true })
+    return sbuf
+end
+
+--- Restores persisted virtual columns for `bufnr` when `original_query` matches
+--- a previously saved normalized SQL hash.
+--- @param bufnr integer
+--- @param original_query string|nil
+function M.restore_persisted_columns(bufnr, original_query)
+    if not original_query or original_query == '' then return end
+    local hash = M.normalize_sql_hash(original_query)
+    if not hash then return end
+    grid.set(bufnr, 'query_sql_hash', hash)
+
+    if virt_cfg().persist_columns == false then return end
+    local store = load_persistence_store()
+    local saved = store[hash]
+    if type(saved) ~= 'table' or #saved == 0 then return end
+
+    local skipped = {}
+    for _, item in ipairs(saved) do
+        if type(item) == 'table' and item.name and item.expr then
+            local entry = M.add_column(bufnr, item.name, item.expr, {
+                silent       = true,
+                from_persist = true,
+            })
+            if not entry then
+                skipped[#skipped + 1] = item.name
+            end
+        end
+    end
+    if #skipped > 0 then
+        vim.notify(
+            string.format('Skipped persisted virtual column(s) with missing references: %s',
+                table.concat(skipped, ', ')),
+            vim.log.levels.WARN,
+            { title = 'Teradata' }
+        )
+    end
+end
+
+--- Command-line completion for `:TDCol` and `:TDColEdit`.
+--- @param bufnr integer
+--- @param arg_lead string
+--- @param only_virtual boolean|nil
+--- @return string[]
+function M.complete(bufnr, arg_lead, only_virtual)
+    arg_lead = arg_lead or ''
+    local prefix, token = arg_lead:match('^(.*[^%w_])([%w_]*)$')
+    if not prefix then
+        prefix, token = '', arg_lead
+    end
+    local token_up = token:upper()
+    local candidates, seen = {}, {}
+
+    local function push(w)
+        if w and not seen[w] and w:upper():find(token_up, 1, true) == 1 then
+            seen[w] = true
+            candidates[#candidates + 1] = prefix .. w
+        end
+    end
+
+    local vcols = grid.get(bufnr, 'virtual_columns') or {}
+    for _, vc in ipairs(vcols) do
+        push(vc.name)
+    end
+
+    if not only_virtual then
+        local all_header = grid.get(bufnr, 'all_header') or grid.get(bufnr, 'displayed_header') or {}
+        for _, h in ipairs(all_header) do
+            push(h)
+        end
+        local expr_mod = require('vim-teradata.virtual_expr')
+        for _, fn in ipairs(expr_mod.FUNCTIONS or {}) do
+            push(fn)
+        end
+    end
+
+    table.sort(candidates)
+    return candidates
+end
+
+-- =============================================================================
+-- Patch 1 — Selection quick-calc
+-- =============================================================================
 
 local METRIC_ROWS = {
     { key = 'count',    label = 'count' },
@@ -512,9 +1310,7 @@ function M.calc_selection(bufnr, line1, line2, vcol1, vcol2)
         end
     end
 
-    local vcfg = (config.options and config.options.virtual)
-        or (config.defaults and config.defaults.virtual)
-        or {}
+    local vcfg = virt_cfg()
     if vcfg.yank_quick_calc == true then
         local s_sum = format_stat_for_mode(pooled, 'sum')
         local s_avg = format_stat_for_mode(pooled, 'avg')

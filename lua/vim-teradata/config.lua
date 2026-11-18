@@ -36,7 +36,7 @@
 ---@field treesitter_folds boolean
 ---@field export { enabled: boolean, keymap: string|false, confirm: boolean, operator: 'auto'|'export'|'selector', max_sessions: integer, head_lines: integer|nil, timeout_ms: integer|nil, tpt_script: string|nil }
 ---@field exports_dir_name string
----@field virtual { footer_default: string, footer_scope: 'displayed'|'all', yank_quick_calc: boolean, keymaps: { footer_next: string, footer_prev: string, quick_calc: string } }
+---@field virtual { footer_default: string, footer_scope: 'displayed'|'all', yank_quick_calc: boolean, persist_columns: boolean, header_prefix: string, keymaps: { footer_next: string, footer_prev: string, quick_calc: string, add_column: string } }
 ---@field users VimTeradata.User[]
 ---@field current_user_index integer|nil
 
@@ -119,15 +119,18 @@ M.defaults = {
     },
     exports_dir_name = 'exports',
 
-    -- Virtual answerset (summary footer + selection quick-calc)
+    -- Virtual answerset (summary footer + selection quick-calc + computed columns)
     virtual = {
         footer_default  = 'off',        -- one of virtual.MODES
         footer_scope    = 'displayed',  -- 'displayed' | 'all'
         yank_quick_calc = false,
+        persist_columns = true,
+        header_prefix   = 'ƒ ',
         keymaps = {
             footer_next = 'gS',
             footer_prev = 'gs',
             quick_calc  = '<leader>=',
+            add_column  = '=',
         },
     },
 

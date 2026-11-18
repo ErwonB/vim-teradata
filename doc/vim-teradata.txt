@@ -500,10 +500,13 @@ virtual ~
           footer_default  = 'off',        -- one of virtual.MODES
           footer_scope    = 'displayed',  -- 'displayed' | 'all'
           yank_quick_calc = false,
+          persist_columns = true,
+          header_prefix   = 'ƒ ',
           keymaps = {
             footer_next = 'gS',
             footer_prev = 'gs',
             quick_calc  = '<leader>=',
+            add_column  = '=',
           },
         }
 <
@@ -521,10 +524,20 @@ virtual ~
         When `true`, running quick-calc also yanks a tab-separated
         `sum\tavg\tmin\tmax` line into the unnamed register `""`.
 
+    persist_columns ~
+        When `true` (default), virtual column definitions are persisted per
+        normalized SQL hash in `<data_dir>/virtual_columns.json` and
+        re-applied automatically when the same query is re-run or reopened.
+
+    header_prefix ~
+        Display prefix prepended to virtual column headers in the grid
+        (default `"ƒ "`).
+
     keymaps ~
         Result-buffer local mappings for cycling the footer (`footer_next`,
-        `footer_prev`) and triggering visual selection quick-calc
-        (`quick_calc`).
+        `footer_prev`), triggering visual selection quick-calc
+        (`quick_calc`), and prompting for a new computed column
+        (`add_column`).
 
 ------------------------------------------------------------------------------
 5.3 Default keymaps                             *vim-teradata-default-keymaps*
@@ -651,6 +664,25 @@ cursor plus the next two.
                 line range in a result buffer and display them in a
                 floating window. Buffer-local to result buffers. See
                 |vim-teradata-guide-virtual|.
+
+                                                                     *:TDCol*
+                                                                    *:TDCol!*
+:TDCol [{name} =] {expr}
+:TDCol! {name}  Add a computed virtual column (`:TDCol`) or remove an
+                existing one (`:TDCol!`) in the current result buffer. When
+                `{name} =` is omitted, the column is named `EXPR1`, `EXPR2`,
+                etc. Completion suggests column names and supported SQL
+                functions. See |vim-teradata-guide-virtual|.
+
+                                                                 *:TDColEdit*
+:TDColEdit [{name}]
+                Edit the expression of virtual column `{name}` (or the
+                virtual column under the cursor) in an input prompt
+                pre-filled with its current expression.
+
+                                                                    *:TDCols*
+:TDCols         List the active virtual columns and their expressions in a
+                scratch split (`name = expr`).
 
 ------------------------------------------------------------------------------
 7.2 History & search                                *vim-teradata-cmd-history*
@@ -909,6 +941,9 @@ gS / gs Cycle the virtual summary footer mode forward (`gS`) or backward
         Open the quick-calc floating popup with pooled and per-column
         statistics for the visual selection. See
         |vim-teradata-guide-virtual|.
+
+=       Prompt to add a computed virtual column (`name = expr`). See
+        |:TDCol| and |vim-teradata-guide-virtual|.
 
                                                         *vim-teradata-result-F*
 F       Full export via TPT, after a confirmation box. Exports the full
@@ -1329,6 +1364,47 @@ Quick calc ~
     column breakdown. Move the cursor or press `q` / `<Esc>` to dismiss the
     float. Set `virtual.yank_quick_calc = true` to also copy a tab-separated
     `sum\tavg\tmin\tmax` line to the unnamed register.
+
+Computed columns ~
+    Press `=` in a result buffer or run `:TDCol margin = (price - cost) * qty`
+    to append a virtual column computed from existing columns (or earlier
+    virtual columns). Headers are prefixed with `ƒ ` (configurable via
+    `virtual.header_prefix`). Manage virtual columns with |:TDCol!|,
+    |:TDColEdit|, and |:TDCols|.
+
+    Expressions use Teradata SQL scalar syntax parsed by the `teradata`
+    tree-sitter grammar:
+    - Arithmetic: `+`, `-`, `*`, `/`, `MOD`, `%`, unary `+`/`-` (note: `/`
+      always performs floating-point division, never Teradata integer
+      truncation).
+    - String concatenation: `||`.
+    - Predicates & branching: `CASE [x] WHEN ... THEN ... ELSE ... END`,
+      `=`, `<>`, `!=`, `<`, `<=`, `>`, `>=`, `AND`, `OR`, `NOT`,
+      `IS [NOT] NULL`, `[NOT] BETWEEN`, `[NOT] IN (...)`, `[NOT] LIKE`.
+    - Scalar functions: `COALESCE`, `NULLIF`, `ZEROIFNULL`, `NULLIFZERO`,
+      `ABS`, `ROUND`, `TRUNC`, `CEILING`, `FLOOR`, `SQRT`, `LN`, `EXP`,
+      `POWER`, `LEAST`, `GREATEST`, `UPPER`, `LOWER`, `TRIM`, `LENGTH` /
+      `CHARACTER_LENGTH`, `SUBSTR` / `SUBSTRING`, `INDEX`, `POSITION`,
+      `OREPLACE`, `EXTRACT(YEAR|MONTH|DAY FROM d)`, and `CAST(x AS
+      INTEGER|DECIMAL(p,s)|VARCHAR(n)|DATE|FLOAT)`.
+    - Date arithmetic on `YYYY-MM-DD` and `YY/MM/DD` cells: `date1 - date2`
+      (days between), `date + n` / `date - n`.
+
+    NULL and divide-by-zero semantics ~
+        Any NULL operand in arithmetic or `||` produces `NULL`
+        (|vim-teradata-opt-null_token|). Division or modulo by zero yields
+        `NULL` and reports how many rows divided by zero in a warning.
+        All numeric calculations use IEEE-754 double-precision floats (~15
+        significant digits).
+
+    Edit mode & persistence ~
+        In edit mode (`<E>`), virtual columns are dimmed and read-only, never
+        included in generated `UPDATE` statements. Editing a source cell
+        immediately recomputes dependent virtual columns for live "what-if"
+        inspection; canceling (`<C>`) restores both. Definitions are saved in
+        `<data_dir>/virtual_columns.json` keyed by a normalized SHA-256 hash
+        of the SQL query, so re-running (`.`) or reopening from history
+        restores your computed columns automatically.
 
 ==============================================================================
 10. FILETYPES                                         *vim-teradata-filetypes*

@@ -188,6 +188,39 @@ function M.display_output(file_path, query_id, opts)
         require('vim-teradata.virtual').calc_selection(bufnr, cmd_opts.line1, cmd_opts.line2, vc1, vc2)
     end, { range = true, desc = 'Teradata: quick calc on selection or range' })
 
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDCol', function(cmd_opts)
+        local virt = require('vim-teradata.virtual')
+        if cmd_opts.bang then
+            virt.remove_column(bufnr, cmd_opts.args)
+        elseif cmd_opts.args == '' then
+            virt.prompt_add_column(bufnr)
+        else
+            virt.add_column(bufnr, cmd_opts.args, nil)
+        end
+    end, {
+        bang = true,
+        nargs = '*',
+        complete = function(arg_lead, cmd_line)
+            local is_bang = cmd_line:match('^%s*TDCol!') ~= nil
+            return require('vim-teradata.virtual').complete(bufnr, arg_lead, is_bang)
+        end,
+        desc = 'Teradata: add or remove (!) a virtual column',
+    })
+
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDColEdit', function(cmd_opts)
+        require('vim-teradata.virtual').edit_column(bufnr, cmd_opts.args, nil)
+    end, {
+        nargs = '?',
+        complete = function(arg_lead)
+            return require('vim-teradata.virtual').complete(bufnr, arg_lead, true)
+        end,
+        desc = 'Teradata: edit a virtual column expression',
+    })
+
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDCols', function()
+        require('vim-teradata.virtual').show_columns(bufnr)
+    end, { nargs = 0, desc = 'Teradata: list virtual columns' })
+
     if original_query then
         explain.process_results(bufnr, original_query, lines)
         local lower = original_query:lower():gsub("^%s*", "")
@@ -364,8 +397,10 @@ function M.display_output(file_path, query_id, opts)
         local vkeys = ((config.options.virtual or {}).keymaps or {})
         local totals_hint = (type(vkeys.footer_next) == 'string' and vkeys.footer_next ~= '')
             and ('  <%s> Totals'):format(vkeys.footer_next) or ''
+        local col_hint = (type(vkeys.add_column) == 'string' and vkeys.add_column ~= '')
+            and ('  <%s> ƒ Column'):format(vkeys.add_column) or ''
         local extmark = '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort' ..
-            totals_hint .. (hint_suffix or '')
+            totals_hint .. col_hint .. (hint_suffix or '')
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
         vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
@@ -522,12 +557,15 @@ function M.display_output(file_path, query_id, opts)
             local displayed_data   = grid.get(bufnr, 'displayed_data') or {}
             local displayed_ids    = grid.get(bufnr, 'displayed_ids') or {}
             local all_data         = grid.get(bufnr, 'all_data') or {}
+            local vvals            = grid.get(bufnr, 'virtual_values') or {}
             local col_ids          = grid.get(bufnr, 'displayed_col_ids') or {}
 
             table.insert(displayed_header, col_to_restore.index, col_to_restore.header)
             for i, row in ipairs(displayed_data) do
                 local row_id = displayed_ids[i]
-                local cell = (row_id and all_data[row_id] and all_data[row_id][col_to_restore.col_id])
+                local cid    = col_to_restore.col_id
+                local cell   = (row_id and all_data[row_id] and all_data[row_id][cid])
+                    or (row_id and vvals[cid] and vvals[cid][row_id])
                     or col_to_restore.data[i] or ''
                 table.insert(row, col_to_restore.index, cell)
             end
@@ -558,6 +596,7 @@ function M.display_output(file_path, query_id, opts)
             end
             grid.set(bufnr, 'displayed_data', new_data)
             grid.set(bufnr, 'displayed_ids', ids)
+            pcall(function() require('vim-teradata.virtual').reapply(bufnr) end)
             local sort_spec = grid.get(bufnr, 'sort_spec') or {}
             if #sort_spec > 0 then
                 apply_sort()
@@ -592,9 +631,12 @@ function M.display_output(file_path, query_id, opts)
             populate_buffer()
 
             local all_header = grid.get(bufnr, 'all_header') or {}
+            local vcols      = grid.get(bufnr, 'virtual_columns') or {}
+            local vcol_names = {}
+            for _, vc in ipairs(vcols) do vcol_names[vc.id] = vc.name end
             local parts = {}
             for level, spec in ipairs(sort_spec) do
-                local name  = all_header[spec.col_id] or ('col' .. spec.col_id)
+                local name  = all_header[spec.col_id] or vcol_names[spec.col_id] or ('col' .. spec.col_id)
                 local arrow = spec.ascending and '▲' or '▼'
                 table.insert(parts, string.format('%s %s%d', name, arrow, level))
             end
@@ -631,6 +673,11 @@ function M.display_output(file_path, query_id, opts)
             vim.keymap.set('n', vkeys.footer_prev, function()
                 require('vim-teradata.virtual').cycle_footer(bufnr, -1)
             end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: previous totals footer mode' })
+        end
+        if type(vkeys.add_column) == 'string' and vkeys.add_column ~= '' then
+            vim.keymap.set('n', vkeys.add_column, function()
+                require('vim-teradata.virtual').prompt_add_column(bufnr)
+            end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: add virtual column' })
         end
         if type(vkeys.quick_calc) == 'string' and vkeys.quick_calc ~= '' then
             vim.keymap.set('x', vkeys.quick_calc, function()
@@ -695,6 +742,7 @@ function M.display_output(file_path, query_id, opts)
         end,
     })
 
+    grid.set(bufnr, 'populate_fn', populate_buffer)
     populate_buffer()
 
     if config.options.edit_enabled and original_query and opts.editable ~= false then
@@ -705,6 +753,10 @@ function M.display_output(file_path, query_id, opts)
             hint_suffix      = hint_suffix,
         })
     end
+
+    pcall(function()
+        require('vim-teradata.virtual').restore_persisted_columns(bufnr, original_query)
+    end)
 end
 
 --- Displays an error message from a BTEQ execution.
@@ -834,6 +886,7 @@ function M.display_help()
         '  <C>           Cancel edits',
         '  gS/gs         Cycle totals footer',
         '  <leader>=     Quick calc on selection',
+        '  =             Add virtual computed column (:TDCol, :TDCol!, :TDColEdit, :TDCols)',
         string.format('  <%s>           Full export via TPT (confirmation box)',
             (config.options.export or {}).keymap or 'F'),
     }

@@ -335,12 +335,14 @@ function M.build_statements(st, diffs)
         -- group the row's changes by owning table
         local per_table, order = {}, {}
         for col_id, new_value in pairs(diffs[row_id]) do
-            local col = meta.columns[col_id]
-            if not per_table[col.table_key] then
-                per_table[col.table_key] = {}
-                table.insert(order, col.table_key)
+            local col = type(col_id) == 'number' and meta.columns[col_id] or nil
+            if col and col.eligible then
+                if not per_table[col.table_key] then
+                    per_table[col.table_key] = {}
+                    table.insert(order, col.table_key)
+                end
+                table.insert(per_table[col.table_key], { col_id = col_id, value = new_value })
             end
-            table.insert(per_table[col.table_key], { col_id = col_id, value = new_value })
         end
         table.sort(order)
 
@@ -559,6 +561,7 @@ function M.edit_cell(bufnr)
         end
 
         apply_to_grid(bufnr, cell.i, cell.j, input)
+        pcall(function() require('vim-teradata.virtual').recompute(bufnr) end)
         st.populate()
         highlight_cells(bufnr)
         M.set_edit_hint(bufnr)
@@ -589,6 +592,7 @@ function M.set_cell_null(bufnr)
     end
 
     apply_to_grid(bufnr, cell.i, cell.j, token)
+    pcall(function() require('vim-teradata.virtual').recompute(bufnr) end)
     st.populate()
     highlight_cells(bufnr)
     M.set_edit_hint(bufnr)
@@ -814,6 +818,7 @@ function M.cancel(bufnr)
         st.grid_snapshot = nil
     end
 
+    pcall(function() require('vim-teradata.virtual').recompute(bufnr) end)
     st.populate()
     M.decorate(bufnr)
     if cells > 0 then
@@ -867,6 +872,7 @@ local function execute(bufnr, statements)
             st.grid_snapshot = nil
             unlock_grid_maps(bufnr)
             vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+            pcall(function() require('vim-teradata.virtual').recompute(bufnr) end)
             st.populate()
             M.decorate(bufnr)
         end
@@ -901,8 +907,9 @@ function M.save(bufnr)
         local seen, keys = {}, {}
         for _, changes in pairs(diffs) do
             for col_id in pairs(changes) do
-                local tk = st.meta.columns[col_id].table_key
-                if not seen[tk] then
+                local col = type(col_id) == 'number' and st.meta.columns[col_id] or nil
+                local tk = col and col.table_key or nil
+                if tk and not seen[tk] then
                     seen[tk] = true
                     table.insert(keys, tk)
                 end
@@ -951,10 +958,12 @@ function M.decorate(bufnr)
     local vkeys = ((config.options.virtual or {}).keymaps or {})
     local totals_hint = (type(vkeys.footer_next) == 'string' and vkeys.footer_next ~= '')
         and ('  <%s> Totals'):format(vkeys.footer_next) or ''
+    local col_hint = (type(vkeys.add_column) == 'string' and vkeys.add_column ~= '')
+        and ('  <%s> ƒ Column'):format(vkeys.add_column) or ''
     if st.meta.editable then
         set_hint(bufnr, string.format(
-            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s%s',
-            maps.toggle, totals_hint, st.hint_suffix or ''))
+            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s%s%s',
+            maps.toggle, totals_hint, col_hint, st.hint_suffix or ''))
     end
 end
 

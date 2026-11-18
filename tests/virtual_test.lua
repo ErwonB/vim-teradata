@@ -228,3 +228,152 @@ test("EXPLAIN buffers are unaffected and refuse quick-calc politely", function()
     end)
     vim.fn.delete(dir, 'rf')
 end)
+
+test("Patch 2: scratch buffer virtual column registry, filter + reapply, and unknown ref rejection", function()
+    local buf = vim.api.nvim_create_buf(false, true)
+    grid.set(buf, 'all_header', { 'ITEM', 'PRICE', 'COST', 'QTY' })
+    grid.set(buf, 'all_data', {
+        { 'A', '10', '4', '2' },  -- margin = 12
+        { 'B', '20', '5', '3' },  -- margin = 45
+        { 'C', '15', '10', '1' }, -- margin = 5
+    })
+    grid.set(buf, 'displayed_header', { 'ITEM', 'PRICE', 'COST', 'QTY' })
+    grid.set(buf, 'displayed_data', {
+        { 'A', '10', '4', '2' },
+        { 'B', '20', '5', '3' },
+        { 'C', '15', '10', '1' },
+    })
+    grid.set(buf, 'displayed_ids', { 1, 2, 3 })
+    grid.set(buf, 'displayed_col_ids', { 1, 2, 3, 4 })
+
+    -- Reject unknown column reference
+    local bad_col, bad_err = virtual.add_column(buf, 'BAD', 'unknown_col + 1', { silent = true })
+    assert(bad_col == nil and bad_err ~= nil, 'expected unknown column reference to be rejected')
+    assert(#grid.get(buf, 'displayed_header') == 4, 'nothing should be added on error')
+
+    -- Add virtual column MARGIN = (price - cost) * qty
+    local col, err = virtual.add_column(buf, 'margin', '(price - cost) * qty', { silent = true })
+    assert(col and not err, 'expected virtual column to be added: ' .. tostring(err))
+    assert(col.id == 'v1' and col.name == 'MARGIN')
+
+    local d_hdr = grid.get(buf, 'displayed_header')
+    local d_cids = grid.get(buf, 'displayed_col_ids')
+    local d_data = grid.get(buf, 'displayed_data')
+    assert(d_hdr[5] == 'ƒ MARGIN', 'expected ƒ MARGIN header, got ' .. tostring(d_hdr[5]))
+    assert(d_cids[5] == 'v1', 'expected col_id v1, got ' .. tostring(d_cids[5]))
+    assert(d_data[1][5] == '12' and d_data[2][5] == '45' and d_data[3][5] == '5')
+
+    -- Simulate filtering to rows 2 and 3 and rebuilding from all_data + reapply
+    grid.set(buf, 'displayed_ids', { 2, 3 })
+    grid.set(buf, 'displayed_data', {
+        { 'B', '20', '5', '3', '' },
+        { 'C', '15', '10', '1', '' },
+    })
+    virtual.reapply(buf)
+    d_data = grid.get(buf, 'displayed_data')
+    assert(d_data[1][5] == '45' and d_data[2][5] == '5', 'virtual values should follow displayed_ids after reapply')
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
+test("Patch 2: full UI sort, remove/restore, footer sum, edit-mode what-if, and persistence", function()
+    local id1 = 'vcol_persist_1'
+    local id2 = 'vcol_persist_2'
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, 'p')
+    local path1 = dir .. '/' .. id1 .. '.csv'
+    local path2 = dir .. '/' .. id2 .. '.csv'
+    local rows = {
+        'ITEM~PRICE~COST~QTY',
+        'A~10~4~2',   -- margin = 12
+        'B~20~5~3',   -- margin = 45
+        'C~15~10~1',  -- margin = 5
+    }
+    vim.fn.writefile(rows, path1)
+    vim.fn.writefile(rows, path2)
+
+    local orig_data_dir = config.options.data_dir
+    config.options.data_dir = dir
+
+    local sql = 'SELECT ITEM, PRICE, COST, QTY FROM SALES;'
+    with_history_query(id1, sql, function()
+        ui.display_output(path1, id1, { editable = true })
+        local buf = vim.api.nvim_get_current_buf()
+
+        -- Add virtual column via :TDCol command
+        vim.cmd('TDCol margin = (price - cost) * qty')
+        local d_hdr = grid.get(buf, 'displayed_header')
+        assert(d_hdr[5] == 'ƒ MARGIN', 'expected ƒ MARGIN, got ' .. tostring(d_hdr[5]))
+
+        -- Sort ascending on virtual column 5 -> order should be C (5), A (12), B (45)
+        vim.fn.cursor(3, 1)
+        press('g$')
+        press('<Up>')
+        local d_data = grid.get(buf, 'displayed_data')
+        assert(d_data[1][1] == 'C' and d_data[2][1] == 'A' and d_data[3][1] == 'B',
+            'expected numerical sort on virtual column: C(5), A(12), B(45)')
+        press('r')
+
+        -- Remove (-) and restore (<BS>) virtual column
+        vim.fn.cursor(3, 1)
+        press('g$')
+        press('-')
+        assert(#grid.get(buf, 'displayed_header') == 4)
+        press('<BS>')
+        d_data = grid.get(buf, 'displayed_data')
+        assert(d_data[1][5] == '12' and d_data[2][5] == '45' and d_data[3][5] == '5')
+
+        -- Patch 1 footer (gS) sums the virtual column (12 + 45 + 5 = 62)
+        press('gS')
+        local ns = vim.api.nvim_get_namespaces()['vim-teradata-virtual']
+        local marks = vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })
+        local val_line = marks[1][4].virt_lines[2][1][1]
+        assert(val_line:find('62', 1, true), 'expected virtual column sum 62 in footer: ' .. val_line)
+
+        -- Edit mode: changing PRICE on row 1 from 10 to 20 updates MARGIN on row 1 from 12 to 32
+        -- and updates footer sum from 62 to 82; UPDATE statements never mention MARGIN; C restores both
+        press('E')
+        local widths = grid.get(buf, 'column_widths')
+        local col2_start = widths[1] + 3 + 1
+        local orig_input = vim.ui.input
+        vim.ui.input = function(_, cb) cb('20') end
+        vim.fn.cursor(3, 1)
+        vim.cmd('normal! ' .. col2_start .. '|')
+        press('<CR>')
+        vim.ui.input = orig_input
+
+        d_data = grid.get(buf, 'displayed_data')
+        assert(d_data[1][5] == '32', 'expected what-if MARGIN=32 after editing PRICE to 20, got ' .. tostring(d_data[1][5]))
+        marks = vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })
+        val_line = marks[1][4].virt_lines[2][1][1]
+        assert(val_line:find('82', 1, true), 'expected updated footer sum 82, got ' .. val_line)
+
+        local edit_mod = require('vim-teradata.edit')
+        local st = edit_mod._state(buf)
+        local stmts = edit_mod.build_statements(st, st.pending)
+        assert(#stmts == 1 and not stmts[1]:find('MARGIN', 1, true),
+            'generated UPDATE must never mention virtual column MARGIN: ' .. tostring(stmts[1]))
+
+        -- Cancel edit mode with C -> restores both PRICE (10) and MARGIN (12)
+        press('C')
+        d_data = grid.get(buf, 'displayed_data')
+        assert(d_data[1][2] == '10' and d_data[1][5] == '12',
+            'expected cancel to restore PRICE=10 and MARGIN=12')
+
+        close_current_grid()
+    end)
+
+    -- Persistence: opening a new result with the same SQL text (different id) restores ƒ MARGIN
+    with_history_query(id2, '  SELECT ITEM, PRICE, COST, QTY\n  FROM SALES; -- comment\n', function()
+        ui.display_output(path2, id2, { editable = false })
+        local buf2 = vim.api.nvim_get_current_buf()
+        local d_hdr2 = grid.get(buf2, 'displayed_header')
+        local d_data2 = grid.get(buf2, 'displayed_data')
+        assert(d_hdr2[5] == 'ƒ MARGIN', 'expected persisted ƒ MARGIN to be restored, got ' .. vim.inspect(d_hdr2))
+        assert(d_data2[1][5] == '12' and d_data2[2][5] == '45' and d_data2[3][5] == '5')
+        close_current_grid()
+    end)
+
+    config.options.data_dir = orig_data_dir
+    vim.fn.delete(dir, 'rf')
+end)
