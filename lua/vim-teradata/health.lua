@@ -109,6 +109,10 @@ function M.check()
             vim.health.warn("Active user has no tdpid; cannot locate its metadata catalog")
         elseif meta then
             vim.health.ok(string.format("Metadata catalog '%s' synced %s", key, os.date("%Y-%m-%d %H:%M", meta.synced_at)))
+            if (meta.format or 1) < util.CATALOG_FORMAT then
+                vim.health.info(string.format(
+                    "Catalog '%s' has no column types (built before column-type support); run :TDSync to enable types in completion and diagnostics", key))
+            end
         else
             vim.health.warn(string.format("No metadata catalog for '%s'; run :TDSync", key))
         end

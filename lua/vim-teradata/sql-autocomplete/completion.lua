@@ -1,4 +1,5 @@
 local utils = require('vim-teradata.util')
+local types = require('vim-teradata.types')
 local ts    = require('vim-teradata.sql-autocomplete.treesitter')
 
 -- LSP CompletionItemKind integers (protocol-neutral)
@@ -69,6 +70,50 @@ local function collect_column_candidates(context)
         end
     end
     return res
+end
+
+--- name -> list of { source, info } for the tables of a 'columns' context
+local function column_info_index(tables)
+    local idx = {}
+    if not utils.get_columns_with_info then return idx end
+    for _, it in ipairs(utils.get_columns_with_info(tables) or {}) do
+        local list = idx[it.name]
+        if not list then
+            list = {}
+            idx[it.name] = list
+        end
+        list[#list + 1] = it
+    end
+    return idx
+end
+
+--- Completion item for a column; infos may be nil (buffer fields, views, old catalogs).
+local function build_column_item(name, infos)
+    local item = { kind = Kind.Field, sortText = "1_" .. name, label = name }
+    if not infos or #infos == 0 then return item end
+
+    local distinct, seen = {}, {}
+    for _, it in ipairs(infos) do
+        local d = types.display(it.info)
+        if d and not seen[d] then
+            seen[d] = true
+            distinct[#distinct + 1] = d
+        end
+    end
+    if #distinct > 0 then
+        local desc = (#distinct == 1) and distinct[1] or (distinct[1] .. " | …")
+        item.detail = desc
+        item.labelDetails = { description = desc }
+    end
+
+    local lines = { "**" .. name .. "**", "" }
+    for _, it in ipairs(infos) do
+        local nul = (it.info.nullable == true and "NULL") or (it.info.nullable == false and "NOT NULL") or nil
+        lines[#lines + 1] = string.format("- `%s`: `%s`%s",
+            it.source, types.display(it.info) or "?", nul and (" · " .. nul) or "")
+    end
+    item.documentation = { kind = "markdown", value = table.concat(lines, "\n") }
+    return item
 end
 
 --- Provides manual SQL completion items or the start column for completion.
@@ -144,12 +189,17 @@ function M.complete_items()
     end
 
     context_results = context_results or {}
+    local info_idx = (context.type == 'columns') and column_info_index(context.tables) or nil
     for _, item_str in ipairs(context_results) do
-        table.insert(raw_items, {
-            kind     = context_kind,
-            sortText = "1_" .. item_str,
-            label    = item_str,
-        })
+        if info_idx then
+            table.insert(raw_items, build_column_item(item_str, info_idx[item_str]))
+        else
+            table.insert(raw_items, {
+                kind     = context_kind,
+                sortText = "1_" .. item_str,
+                label    = item_str,
+            })
+        end
     end
 
     -- -----------------------------------------------------------------------
@@ -265,12 +315,18 @@ function M.omnifunc(findstart, base)
     local res = {}
     for _, it in ipairs(M.complete_items()) do
         if b == '' or it.label:lower():sub(1, #b) == b then
-            res[#res + 1] = { word = it.label, abbr = it.label }
+            res[#res + 1] = {
+                word = it.label,
+                abbr = it.label,
+                menu = it.detail,
+                info = it.documentation and it.documentation.value or nil,
+            }
         end
     end
     return res
 end
 
 M._collect_column_candidates = collect_column_candidates
+M._build_column_item = build_column_item
 
 return M

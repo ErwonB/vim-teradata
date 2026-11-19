@@ -32,7 +32,7 @@
 ---@field keymaps table<string,string|table>
 ---@field timeout_ms integer|nil                      BTEQ job timeout in ms (nil/0 = none)
 ---@field history_max integer|nil                     max history files kept per dir (nil = unlimited)
----@field diagnostics { enabled: boolean, debounce_ms: integer }
+---@field diagnostics { enabled: boolean, debounce_ms: integer, types: boolean }
 ---@field treesitter_folds boolean
 ---@field export { enabled: boolean, keymap: string|false, confirm: boolean, operator: 'auto'|'export'|'selector', max_sessions: integer, head_lines: integer|nil, timeout_ms: integer|nil, tpt_script: string|nil }
 ---@field exports_dir_name string
@@ -101,7 +101,7 @@ M.defaults = {
     timeout_ms = nil,
     -- keep at most this many query/result files in history; nil disables pruning
     history_max = nil,
-    diagnostics = { enabled = true, debounce_ms = 150 },
+    diagnostics = { enabled = true, debounce_ms = 150, types = true },
     treesitter_folds = false,
 
     -- full-result export through TPT (see :TDExport)

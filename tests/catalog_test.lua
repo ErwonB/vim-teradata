@@ -199,3 +199,154 @@ test("patch-02: session table registered from buffer via :TDSync add vt and vali
     config.options.users = orig_users
     config.options.current_user_index = orig_idx
 end)
+
+test("column-types §10.2: _parse_export_lines handles 10-field typed, view, legacy 3-field, and UDT with comma", function()
+    local per_db, _, per_db_types = util._parse_export_lines({
+        "EDW,T1,AMOUNT,D,8,18,2,,Y,",
+        "EDW,V1,C1,,,,,,,",
+        "EDW,T2,C1",
+        "EDW,T3,G,UT,,,,,Y,A,B",
+    })
+    assert(vim.deep_equal(per_db.EDW.T1, { "AMOUNT" }))
+    assert(per_db_types.EDW.T1.AMOUNT.type == "DECIMAL(18,2)")
+    assert(per_db_types.EDW.T1.AMOUNT.nullable == true)
+
+    assert(vim.deep_equal(per_db.EDW.V1, { "C1" }))
+    assert(per_db_types.EDW.V1 == nil or per_db_types.EDW.V1.C1 == nil)
+
+    assert(vim.deep_equal(per_db.EDW.T2, { "C1" }))
+    assert(per_db_types.EDW.T2 == nil or per_db_types.EDW.T2.C1 == nil)
+
+    assert(vim.deep_equal(per_db.EDW.T3, { "G" }))
+    assert(per_db_types.EDW.T3.G.type == "A,B")
+end)
+
+test("column-types §10.3: typed full sync writes col_types and format=2, col_types never seen as a table", function()
+    local tmp_csv = vim.fn.tempname()
+    local cat_dir = vim.fn.tempname()
+    vim.fn.writefile({
+        "EDW,T1,C1,CV,20,,,1,Y,",
+        "EDW,T1,C2,I,4,,,,N,",
+    }, tmp_csv)
+
+    local done_ok = nil
+    util._split_data_db_file_to_lua(tmp_csv, cat_dir, { user = 'u', tdpid = 'h_typed' }, function(ok)
+        done_ok = ok
+    end)
+    vim.wait(1000, function() return done_ok ~= nil end)
+    assert(done_ok == true)
+
+    local edw = dofile(cat_dir .. "/EDW.lua")
+    assert(vim.deep_equal(edw.T1, { "C1", "C2" }))
+    assert(edw.is_table.T1 == true)
+    assert(edw.is_table.col_types == nil)
+    assert(edw.col_types.T1.C1[1] == "CV")
+    assert(edw.col_types.T1.C2[1] == "I")
+
+    local meta = dofile(cat_dir .. "/meta.lua")
+    assert(meta.format == 2, "Expected meta.format == 2, got " .. tostring(meta.format))
+
+    -- Verify util.get_tables does not return 'col_types'
+    local saved = {
+        data_dir = config.options.data_dir,
+        users = config.options.users,
+        idx = config.options.current_user_index,
+    }
+    config.options.data_dir = vim.fn.tempname()
+    config.options.users = { { user = 'u', tdpid = 'h_typed', log_mech = 'TD2' } }
+    config.options.current_user_index = 1
+    local active_dir = util.catalog_root() .. '/' .. util.catalog_key()
+    vim.fn.mkdir(active_dir, 'p')
+    for _, f in ipairs({ "EDW.lua", "data.lua", "meta.lua" }) do
+        vim.fn.writefile(vim.fn.readfile(cat_dir .. "/" .. f), active_dir .. "/" .. f)
+    end
+
+    local tables = util.get_tables("EDW")
+    for _, t in ipairs(tables) do
+        assert(t ~= "col_types", "col_types must never be returned as a table")
+    end
+    local info = util.get_column_info("EDW", "T1", "C1")
+    assert(info and info.code == "CV" and info.type == "VARCHAR(20) CHARACTER SET LATIN")
+
+    vim.fn.delete(config.options.data_dir, "rf")
+    config.options.data_dir = saved.data_dir
+    config.options.users = saved.users
+    config.options.current_user_index = saved.idx
+
+    vim.fn.delete(tmp_csv)
+    vim.fn.delete(cat_dir, "rf")
+end)
+
+test("column-types §10.3: merge_into_catalog with fetched_types add/update/untyped-update/delete and meta format preservation", function()
+    local cat_dir = vim.fn.tempname()
+    local user = { user = 'u', tdpid = 'test_host_types', log_mech = 'TD2' }
+
+    -- Pre-populate a legacy meta.lua without format -> partial sync should preserve format = 1
+    vim.fn.mkdir(cat_dir, "p")
+    vim.fn.writefile({ "return { synced_at = 1700000000 }" }, cat_dir .. "/meta.lua")
+
+    -- 1. Add EDW.T1 with types -> col_types.T1 present
+    local f1, _, t1 = util._parse_export_lines({
+        "EDW,T1,C1,CV,10,,,1,Y,",
+    })
+    local req1 = util.parse_object_names({ "edw.t1" })
+    util._merge_into_catalog(cat_dir, f1, req1, 'add', user, t1)
+    local edw1 = dofile(cat_dir .. "/EDW.lua")
+    assert(edw1.col_types and edw1.col_types.T1 and edw1.col_types.T1.C1[1] == "CV")
+    assert(edw1.is_table.col_types == nil)
+    local meta1 = dofile(cat_dir .. "/meta.lua")
+    assert(meta1.format == 1, "Expected partial sync on format-less meta to keep format = 1, got " .. tostring(meta1.format))
+
+    -- 2. Update EDW.T1 with a typed export where C1 changed from CV to I -> new type stored
+    local f2, _, t2 = util._parse_export_lines({
+        "EDW,T1,C1,I,4,,,,N,",
+    })
+    util._merge_into_catalog(cat_dir, f2, req1, 'update', user, t2)
+    local edw2 = dofile(cat_dir .. "/EDW.lua")
+    assert(edw2.col_types and edw2.col_types.T1 and edw2.col_types.T1.C1[1] == "I")
+    assert(edw2.is_table.col_types == nil)
+
+    -- 3. Update EDW.T1 with an untyped export (3-field lines) -> col_types.T1 gone
+    local f3, _, t3 = util._parse_export_lines({
+        "EDW,T1,C1",
+    })
+    util._merge_into_catalog(cat_dir, f3, req1, 'update', user, t3)
+    local edw3 = dofile(cat_dir .. "/EDW.lua")
+    assert(edw3.col_types == nil or edw3.col_types.T1 == nil)
+    assert(edw3.is_table.col_types == nil)
+
+    -- 4. Delete EDW.T1 -> file removed
+    util._merge_into_catalog(cat_dir, {}, req1, 'delete', user, {})
+    assert(vim.fn.filereadable(cat_dir .. "/EDW.lua") == 0)
+
+    vim.fn.delete(cat_dir, "rf")
+end)
+
+test("column-types §10.4: TPT script drift check and build_objects_select_stmt", function()
+    local tpt_path = config.get_tpt_script()
+    local tpt_obj_path = config.get_tpt_objects_script()
+    local tpt_text = table.concat(vim.fn.readfile(tpt_path), "\n")
+    local tpt_obj_text = table.concat(vim.fn.readfile(tpt_obj_path), "\n")
+
+    assert(tpt_text:lower():find("varchar(1024)", 1, true), "export_db.tpt must contain varchar(1024)")
+    assert(tpt_obj_text:lower():find("varchar(1024)", 1, true), "export_objects.tpt must contain varchar(1024)")
+
+    local sel = tpt_text:match("SelectStmt%s*=%s*'(.-)',%s*\r?\n%s*VARCHAR%s+PrivateLogName")
+    assert(sel, "Failed to extract SelectStmt from export_db.tpt")
+    local unescaped = sel:gsub("''", "'")
+
+    -- TPT strips newlines inside multi-line string literals without inserting spaces:
+    -- ensure every newline in SelectStmt is followed by leading whitespace.
+    for line in unescaped:gmatch("\n([^\n]+)") do
+        assert(line:match("^%s"), "Every continuation line in export_db.tpt SelectStmt must start with whitespace: " .. line)
+    end
+
+    local norm_tpt = unescaped:gsub("%s+", ""):lower()
+    local norm_lua = util.build_full_select_stmt():gsub("%s+", ""):lower()
+    assert(norm_tpt == norm_lua,
+        "export_db.tpt SelectStmt drifted from util.build_full_select_stmt():\nTPT: " .. norm_tpt .. "\nLUA: " .. norm_lua)
+
+    local obj_sql = util.build_objects_select_stmt(util.parse_object_names({ "edw.t1" }))
+    assert(obj_sql:find("coalesce(trim(c.ColumnType), '')", 1, true))
+    assert(obj_sql:find("t.TableName in ('T1')", 1, true))
+end)

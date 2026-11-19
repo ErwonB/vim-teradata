@@ -1,6 +1,14 @@
-local util = require('vim-teradata.util')
-local tsu  = require('vim-teradata.ts-util')
+local util  = require('vim-teradata.util')
+local tsu   = require('vim-teradata.ts-util')
+local types = require('vim-teradata.types')
 local M = {}
+
+local function type_checks_enabled()
+    local ok, cfg = pcall(require, 'vim-teradata.config')
+    if not ok or type(cfg.options) ~= 'table' then return true end
+    local d = cfg.options.diagnostics
+    return type(d) ~= 'table' or d.types ~= false
+end
 
 -- =============================================================================
 -- Configuration & Constants
@@ -131,6 +139,7 @@ local QUERY_SRC = {
     group_by_nodes = [[ (group_by) @gb ]],
     cte_select_exp = [[ (cte (statement (select (select_expression) @cte_sel_expr))) ]],
     invocation_nod = [[ (invocation) @inv ]],
+    binary_exprs   = [[ (binary_expression) @bin ]],
 }
 
 local QUERIES = setmetatable({}, {
@@ -583,8 +592,21 @@ local function collect_buffer_created_tables(root_or_bufnr, bufnr)
                                 end
                             end
                             local cname = name_node and get_text(name_node, bufnr)
+                            local type_node = child:field("type")[1]
+                            if not type_node and name_node then
+                                local after_name = false
+                                for sub in child:iter_children() do
+                                    if sub == name_node then
+                                        after_name = true
+                                    elseif after_name and sub:named() then
+                                        type_node = sub
+                                        break
+                                    end
+                                end
+                            end
+                            local type_text = type_node and get_text(type_node, bufnr) or nil
                             if cname then
-                                table.insert(explicit_cols, { name = cname, node = name_node })
+                                table.insert(explicit_cols, { name = cname, node = name_node, type_text = type_text })
                             end
                         end
                     end
@@ -1109,6 +1131,201 @@ local function check_field_validity(scope_nodes, bufnr, relation_map, active_tab
     end
 end
 
+local COMPARISON_OPS = { ['='] = true, ['<>'] = true, ['!='] = true, ['<'] = true, ['<='] = true, ['>'] = true, ['>='] = true }
+
+--- @return string|nil op ('=', '<>', 'LIKE', 'IN', ...), boolean negated
+local function binary_operator(bin, bufnr)
+    local negated = false
+    local op
+    for child in bin:iter_children() do
+        local t = child:type()
+        if t == 'keyword_not' then
+            negated = true
+        elseif t == 'keyword_like' then
+            op = 'LIKE'
+        elseif t == 'not_like' then
+            op = 'LIKE'
+            negated = true
+        elseif t == 'keyword_in' then
+            op = 'IN'
+        elseif t == 'not_in' then
+            op = 'IN'
+            negated = true
+        elseif not child:named() then
+            local txt = get_text(child, bufnr)
+            if COMPARISON_OPS[txt] then op = txt end
+        end
+    end
+    return op, negated
+end
+
+local function binary_operands(bin)
+    local left = bin:field('left')[1] or bin:named_child(0)
+    local right = bin:field('right')[1] or bin:named_child(bin:named_child_count() - 1)
+    return left, right
+end
+
+--- Resolves a `field` node to its catalog type.
+--- Returns nil whenever the answer is not certain (derived table, CTE, ambiguous or
+--- unresolved column, no type info): type checks must stay silent in those cases.
+--- @return TDColumnInfo|nil info, string|nil label
+local function field_column_info(field_node, bufnr, relation_map, active_tables)
+    if not field_node or field_node:type() ~= NODE.FIELD then return nil end
+    local col_node = field_node:field('name')[1]
+    local col = col_node and get_text(col_node, bufnr)
+    if not col then return nil end
+
+    local qualifier
+    for child in field_node:iter_children() do
+        if child:type() == NODE.OBJ_REF then
+            local q = child:named_child(child:named_child_count() - 1)
+            qualifier = q and get_text(q, bufnr)
+        end
+    end
+
+    local rel
+    if qualifier then
+        rel = relation_map[normalize(qualifier)]
+    else
+        for _, r in ipairs(active_tables) do
+            local res = relation_has_column(r, col)
+            if res == nil then return nil end     -- inconclusive
+            if res == true then
+                if rel then return nil end         -- ambiguous (reported elsewhere)
+                rel = r
+            end
+        end
+    end
+    if not rel or rel.derived or rel.is_cte then return nil end
+
+    local info
+    if rel.local_table or rel.session_table then
+        info = util.get_column_info(nil, rel.table, col)
+    elseif rel.db and rel.table then
+        info = util.get_column_info(rel.db, rel.table, col)
+    end
+    if not info then return nil end
+    return info, (qualifier and (qualifier .. '.') or '') .. col
+end
+
+--- @return table|nil { kind='column', info, label, node } | { kind='literal', lit='string'|'number', len, node }
+local function describe_operand(node, bufnr, relation_map, active_tables)
+    if not node then return nil end
+    local t = node:type()
+    if t == NODE.FIELD then
+        local info, label = field_column_info(node, bufnr, relation_map, active_tables)
+        if info then return { kind = 'column', info = info, label = label, node = node } end
+    elseif t == NODE.LITERAL then
+        if node:named_child_count() > 0 then return nil end -- NULL, typed literals, int '123', ...
+        local txt = get_text(node, bufnr) or ''
+        if txt:match("^'.*'$") then
+            local inner = txt:sub(2, -2):gsub("''", "'"):gsub('%s+$', '') -- trailing pad is ignored
+            return { kind = 'literal', lit = 'string', len = vim.fn.strchars(inner), node = node }
+        elseif txt:match('^[-+]?%d+%.?%d*$') or txt:match('^[-+]?%.%d+$') then
+            return { kind = 'literal', lit = 'number', node = node }
+        end
+    end
+    return nil
+end
+
+local function check_type_compatibility(scope_nodes, bufnr, relation_map, active_tables, diagnostics)
+    if not type_checks_enabled() or not util.has_catalog() then return end
+    local seen = {}
+
+    local function check_col_vs_literal(col, lit, op, negated)
+        if types.category(col.info) ~= 'char' then return end
+        if lit.lit == 'number' and (COMPARISON_OPS[op] or op == 'IN') then
+            add_diagnostic(diagnostics, lit.node, bufnr, SEVERITY.WARN, string.format(
+                'Numeric literal compared with %s column "%s": Teradata converts the column on every row ' ..
+                '(no index use, possible error 2620/3535 on non-numeric data). Quote the literal.',
+                types.display(col.info), col.label))
+        elseif lit.lit == 'string' and not negated and (op == '=' or op == 'IN')
+            and col.info.char_len and lit.len > col.info.char_len then
+            add_diagnostic(diagnostics, lit.node, bufnr, SEVERITY.WARN, string.format(
+                'String literal (%d chars) is longer than %s column "%s": this comparison can never be true.',
+                lit.len, types.display(col.info), col.label))
+        end
+    end
+
+    for _, node in ipairs(scope_nodes) do
+        for _, bin in QUERIES.binary_exprs:iter_captures(node, bufnr, 0, -1) do
+            if seen[bin:id()] or is_nested_in_subquery(bin, node) then goto continue end
+            seen[bin:id()] = true
+
+            local op, negated = binary_operator(bin, bufnr)
+            if not op then goto continue end
+            local lnode, rnode = binary_operands(bin)
+            local left = describe_operand(lnode, bufnr, relation_map, active_tables)
+
+            if op == 'LIKE' then
+                if left and left.kind == 'column' then
+                    local cat = types.category(left.info)
+                    if cat == 'numeric' or cat == 'date' or cat == 'time' or cat == 'timestamp' then
+                        add_diagnostic(diagnostics, left.node, bufnr, SEVERITY.WARN, string.format(
+                            'LIKE on %s column "%s" converts it to a string using its FORMAT; compare typed values instead.',
+                            types.display(left.info), left.label))
+                    end
+                end
+            elseif op == 'IN' then
+                if left and left.kind == 'column' and rnode and rnode:type() == 'list' then
+                    for item in rnode:iter_children() do
+                        if item:named() then
+                            local lit = describe_operand(item, bufnr, relation_map, active_tables)
+                            if lit and lit.kind == 'literal' then
+                                check_col_vs_literal(left, lit, 'IN', negated)
+                            end
+                        end
+                    end
+                end
+            elseif COMPARISON_OPS[op] then
+                local right = describe_operand(rnode, bufnr, relation_map, active_tables)
+                if left and right then
+                    if left.kind == 'column' and right.kind == 'literal' then
+                        check_col_vs_literal(left, right, op, negated)
+                    elseif left.kind == 'literal' and right.kind == 'column' then
+                        check_col_vs_literal(right, left, op, negated)
+                    elseif left.kind == 'column' and right.kind == 'column' then
+                        local ca, cb = types.category(left.info), types.category(right.info)
+                        if types.incompatible(ca, cb) then
+                            add_diagnostic(diagnostics, bin, bufnr, SEVERITY.WARN, string.format(
+                                'Comparing %s "%s" with %s "%s" requires an implicit conversion; indexes on the ' ..
+                                'converted side are not used and the join may need redistribution.',
+                                types.display(left.info), left.label, types.display(right.info), right.label))
+                        elseif ca == 'char' and cb == 'char' and left.info.charset and right.info.charset
+                            and left.info.charset ~= right.info.charset then
+                            add_diagnostic(diagnostics, bin, bufnr, SEVERITY.INFO, string.format(
+                                'Character set mismatch: "%s" is %s, "%s" is %s (implicit translation on every row).',
+                                left.label, left.info.charset, right.label, right.info.charset))
+                        end
+                    end
+                end
+            end
+            ::continue::
+        end
+
+        -- T6: SUM/AVG on character columns
+        for _, inv in QUERIES.invocation_nod:iter_captures(node, bufnr, 0, -1) do
+            if seen[inv:id()] or is_nested_in_subquery(inv, node) then goto next_inv end
+            seen[inv:id()] = true
+            local fn_ref = tsu.child_by_type(inv, NODE.OBJ_REF)
+            local fn = fn_ref and (get_text(fn_ref, bufnr) or ''):upper()
+            if fn == 'SUM' or fn == 'AVG' then
+                local term = tsu.child_by_type(inv, NODE.TERM)
+                local arg = term and term:named_child(0)
+                if arg and arg:type() == NODE.FIELD then
+                    local info, label = field_column_info(arg, bufnr, relation_map, active_tables)
+                    if info and types.category(info) == 'char' then
+                        add_diagnostic(diagnostics, arg, bufnr, SEVERITY.WARN, string.format(
+                            '%s() on %s column "%s": the column is implicitly converted to a number.',
+                            fn, types.display(info), label))
+                    end
+                end
+            end
+            ::next_inv::
+        end
+    end
+end
+
 local function check_undefined_alias(scope_nodes, bufnr, diagnostics, relation_map)
     local defined_aliases = {}
     if relation_map then
@@ -1461,6 +1678,7 @@ local function process_statement(stmt_node, bufnr, diagnostics, local_tables)
         check_undefined_alias(scope_nodes, bufnr, diagnostics, relation_map)
         check_duplicate_join_conditions(scope_nodes, bufnr, diagnostics)
         check_non_aggregated_columns(scope_nodes, bufnr, diagnostics)
+        check_type_compatibility(scope_nodes, bufnr, relation_map, active_tables, diagnostics)
     end
 end
 

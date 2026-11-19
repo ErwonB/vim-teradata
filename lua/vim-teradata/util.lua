@@ -1,5 +1,11 @@
 local config = require('vim-teradata.config')
+local types  = require('vim-teradata.types')
 local M = {}
+
+M.CATALOG_FORMAT = 2
+local EXPORT_TYPED_FIELDS = 10
+-- keys of a <DB>.lua file that are not table names
+local RESERVED_DB_KEYS = { is_table = true, col_types = true }
 
 -- cache.db[key]      -> { DB_NAME = true, ... }                      (data.lua of that catalog)
 -- cache.tb[key][DB]  -> { is_table = {...}, TABLE = { cols... } }    (<DB>.lua of that catalog)
@@ -229,35 +235,88 @@ local function sorted_keys(tbl)
     return keys
 end
 
-local function parse_export_line(raw, per_db, unique_dbs)
-    local line = trim(raw or "")
-    if line ~= "" then
-        local parts = {}
-        for token in line:gmatch("([^,]+)") do
-            table.insert(parts, trim(token))
+--- Splits on ',' keeping empty fields; every field is trimmed.
+local function split_fields(line)
+    local out, start = {}, 1
+    while true do
+        local i = line:find(",", start, true)
+        if not i then
+            out[#out + 1] = trim(line:sub(start))
+            break
         end
-        if #parts >= 3 then
-            local db, tbl, col = parts[1], parts[2], parts[3]
-            per_db[db] = per_db[db] or {}
-            per_db[db][tbl] = per_db[db][tbl] or {}
-            add_unique(per_db[db][tbl], col)
-            if unique_dbs then unique_dbs[db] = true end
-        else
-            vim.notify("Warning: Malformed line: " .. line, vim.log.levels.WARN)
+        out[#out + 1] = trim(line:sub(start, i - 1))
+        start = i + 1
+    end
+    return out
+end
+
+--- @param raw string
+--- @param per_db table        db -> table -> {column names}
+--- @param unique_dbs table|nil db -> true
+--- @param per_db_types table|nil db -> table -> column -> TDColumnInfo
+local function parse_export_line(raw, per_db, unique_dbs, per_db_types)
+    local line = trim(raw or "")
+    if line == "" then return end
+    local p = split_fields(line)
+    local db, tbl, col = p[1], p[2], p[3]
+    if #p < 3 or db == "" or tbl == "" or col == "" then
+        vim.notify("Warning: Malformed line: " .. line, vim.log.levels.WARN)
+        return
+    end
+    per_db[db] = per_db[db] or {}
+    per_db[db][tbl] = per_db[db][tbl] or {}
+    add_unique(per_db[db][tbl], col)
+    if unique_dbs then unique_dbs[db] = true end
+
+    if per_db_types and #p >= EXPORT_TYPED_FIELDS then
+        local info = types.build_info({
+            code = p[4], len = p[5], tot = p[6], frac = p[7],
+            chartype = p[8], nullable = p[9],
+            udt = table.concat(p, ",", EXPORT_TYPED_FIELDS), -- last field may contain commas
+        })
+        if info then
+            per_db_types[db] = per_db_types[db] or {}
+            per_db_types[db][tbl] = per_db_types[db][tbl] or {}
+            per_db_types[db][tbl][col] = info
         end
     end
 end
 
 local function parse_export_lines(lines)
-    local per_db = {}
-    local unique_dbs = {}
+    local per_db, unique_dbs, per_db_types = {}, {}, {}
     for _, raw in ipairs(lines or {}) do
-        parse_export_line(raw, per_db, unique_dbs)
+        parse_export_line(raw, per_db, unique_dbs, per_db_types)
     end
-    return per_db, unique_dbs
+    return per_db, unique_dbs, per_db_types
 end
 
-local function write_db_file(db_filename, tables, atomic)
+--- Serialized `col_types = {...}` block, or nil when there is nothing to write.
+local function encode_col_types(tables, col_types)
+    if type(col_types) ~= "table" then return nil end
+    local lines = { "col_types = {" }
+    local any = false
+    for _, tname in ipairs(sorted_keys(tables)) do
+        local ct = col_types[tname]
+        if type(ct) == "table" and next(ct) then
+            local parts = {}
+            for _, cname in ipairs(sorted_keys(ct)) do
+                local info = types.decode(ct[cname])
+                if info then
+                    parts[#parts + 1] = string.format('["%s"] = %s', escape_lua_string(cname), types.encode(info))
+                end
+            end
+            if #parts > 0 then
+                lines[#lines + 1] = string.format('  ["%s"] = { %s },', escape_lua_string(tname), table.concat(parts, ", "))
+                any = true
+            end
+        end
+    end
+    if not any then return nil end
+    lines[#lines + 1] = "}"
+    return table.concat(lines, "\n")
+end
+
+local function write_db_file(db_filename, tables, atomic, col_types)
     local target = atomic and (db_filename .. ".tmp") or db_filename
     local is_table = {}
     table.insert(is_table, "is_table = {")
@@ -280,6 +339,11 @@ local function write_db_file(db_filename, tables, atomic)
     end
     table.insert(is_table, "}")
     f:write(table.concat(is_table, "\n"))
+    local types_block = encode_col_types(tables, col_types)
+    if types_block then
+        f:write(",\n")
+        f:write(types_block)
+    end
     f:write("}\n")
     f:close()
     if atomic then
@@ -347,17 +411,18 @@ local function split_data_db_file_to_lua(input_filename, catalog_dir, user, on_d
     input_file:close()
 
     -- Accumulators
-    local per_db = {}     -- db -> table -> {columns}
-    local unique_dbs = {} -- db -> true
+    local per_db = {}       -- db -> table -> {columns}
+    local unique_dbs = {}   -- db -> true
+    local per_db_types = {} -- db -> table -> column -> TDColumnInfo
 
     -- Parse lines
     process_in_chunks(lines, 5000, function(raw)
-        parse_export_line(raw, per_db, unique_dbs)
+        parse_export_line(raw, per_db, unique_dbs, per_db_types)
     end, function()
         -- Write per-db files
         for db_name, tables in pairs(per_db) do
             local db_filename = data_files_dir .. "/" .. db_name .. ".lua"
-            write_db_file(db_filename, tables, false)
+            write_db_file(db_filename, tables, false, per_db_types[db_name])
         end
 
         local function fail(msg)
@@ -380,8 +445,8 @@ local function split_data_db_file_to_lua(input_filename, catalog_dir, user, on_d
         local meta_file = io.open(data_files_dir .. "/meta.lua", "w")
         if meta_file then
             meta_file:write("-- Auto-generated. Do not edit.\n")
-            meta_file:write(string.format("return { synced_at = %d, tdpid = %q, user = %q }\n",
-                os.time(), user.tdpid or "", user.user or ""))
+            meta_file:write(string.format("return { synced_at = %d, tdpid = %q, user = %q, format = %d }\n",
+                os.time(), user.tdpid or "", user.user or "", M.CATALOG_FORMAT))
             meta_file:close()
         end
 
@@ -546,6 +611,67 @@ function M.get_columns(table_db_tb)
     return acc
 end
 
+--- Type info of one column, from the catalog (db given) or the session registry (db nil).
+--- @return TDColumnInfo|nil
+function M.get_column_info(database, tablename, columnname)
+    if not tablename or not columnname then return nil end
+    local tb = tablename:gsub("%s+", ""):upper()
+    local col = columnname:gsub("%s+", ""):upper()
+
+    if not database then
+        local sess = M.get_session_table(tb)
+        local e = sess and sess.types and sess.types[col]
+        return e and types.decode(e) or nil
+    end
+
+    local key, dir = active_catalog()
+    if not key then return nil end
+    local db = database:gsub("%s+", ""):upper()
+    local db_file = dir .. "/" .. db .. ".lua"
+    if vim.fn.filereadable(db_file) == 0 then return nil end
+    load_tables(key, db_file, db)
+    local t = Schema.cache.tb[key][db]
+    local ct = t and t.col_types and t.col_types[tb]
+    local e = ct and ct[col]
+    return e and types.decode(e) or nil
+end
+
+--- Columns with type info for the same input as M.get_columns.
+--- One entry per (table, column) that HAS type info; columns without info are absent.
+--- @param table_db_tb table[] { { db_name=, tb_name=, alias=? }, ... }
+--- @return { name:string, source:string, info:TDColumnInfo }[]
+function M.get_columns_with_info(table_db_tb)
+    local key, dir = active_catalog()
+    if not key then return {} end
+    local out = {}
+    for _, item in ipairs(table_db_tb or {}) do
+        if item and item.tb_name then
+            local entry_types
+            if item.db_name then
+                local db_file = dir .. "/" .. item.db_name .. ".lua"
+                if vim.fn.filereadable(db_file) == 1 then
+                    load_tables(key, db_file, item.db_name)
+                    local t = Schema.cache.tb[key][item.db_name]
+                    entry_types = t and t.col_types and t.col_types[item.tb_name]
+                end
+            else
+                local sess = M.get_session_table(item.tb_name)
+                entry_types = sess and sess.types
+            end
+            if type(entry_types) == "table" then
+                local source = item.db_name and (item.db_name .. "." .. item.tb_name) or item.tb_name
+                for _, col in ipairs(sorted_keys(entry_types)) do
+                    local info = types.decode(entry_types[col])
+                    if info then
+                        out[#out + 1] = { name = col, source = source, info = info }
+                    end
+                end
+            end
+        end
+    end
+    return out
+end
+
 -----------------------------------------------------------------------
 -- Session-only volatile/temporary tables registry
 -----------------------------------------------------------------------
@@ -557,7 +683,7 @@ function M.get_session_table(name)
     return t and t[name:upper()]
 end
 
-function M.set_session_table(name, columns, source)
+function M.set_session_table(name, columns, source, col_types)
     local key = M.catalog_key()
     if not key or not name then return false end
     Schema.session[key] = Schema.session[key] or {}
@@ -570,7 +696,8 @@ function M.set_session_table(name, columns, source)
     end
     Schema.session[key][name:upper()] = {
         columns = norm_cols,
-        source = source or 'buffer',
+        source  = source or 'buffer',
+        types   = type(col_types) == 'table' and col_types or nil,
     }
     local okd, diag = pcall(require, 'vim-teradata.diagnostics')
     if okd and diag.invalidate_all then diag.invalidate_all() end
@@ -623,12 +750,13 @@ local function write_meta_partial(catalog_dir, user)
     local synced_at_str = existing.synced_at and tostring(existing.synced_at) or "nil"
     local tdpid = user and user.tdpid or existing.tdpid or ""
     local uname = user and user.user or existing.user or ""
+    local fmt = existing.format or (existing.synced_at and 1) or M.CATALOG_FORMAT
     local tmp = meta_path .. ".tmp"
     local f = io.open(tmp, "w")
     if f then
         f:write("-- Auto-generated. Do not edit.\n")
-        f:write(string.format("return { synced_at = %s, partial_synced_at = %d, tdpid = %q, user = %q }\n",
-            synced_at_str, os.time(), tdpid, uname))
+        f:write(string.format("return { synced_at = %s, partial_synced_at = %d, tdpid = %q, user = %q, format = %d }\n",
+            synced_at_str, os.time(), tdpid, uname, fmt))
         f:close()
         if not vim.uv.fs_rename(tmp, meta_path) then
             vim.fn.delete(tmp)
@@ -643,9 +771,11 @@ end
 --- @param requested table  parsed targets
 --- @param mode 'add'|'update'|'delete'
 --- @param user table|nil
+--- @param fetched_types table|nil per_db_types from parse_export_lines
 --- @return { added:string[], updated:string[], removed:string[], missing:string[], affected_dbs:table<string,boolean> }
-local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
+local function merge_into_catalog(catalog_dir, fetched, requested, mode, user, fetched_types)
     fetched = fetched or {}
+    fetched_types = fetched_types or {}
     requested = requested or {}
     vim.fn.mkdir(catalog_dir, "p")
 
@@ -682,19 +812,24 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
     for _, db in ipairs(sorted_keys(affected_dbs)) do
         local db_file = catalog_dir .. "/" .. db .. ".lua"
         local current_tables = {}
+        local current_types = {}
         local had_db_file = (vim.fn.filereadable(db_file) == 1)
         if had_db_file then
             local ok, loaded = pcall(dofile, db_file)
             if ok and type(loaded) == "table" then
                 for k, v in pairs(loaded) do
-                    if k ~= "is_table" and type(v) == "table" then
+                    if not RESERVED_DB_KEYS[k] and type(v) == "table" then
                         current_tables[k] = v
                     end
+                end
+                if type(loaded.col_types) == "table" then
+                    current_types = loaded.col_types
                 end
             end
         end
 
         local f_tables = fetched[db] or {}
+        local f_types = fetched_types[db] or {}
         local req = req_by_db[db] or { all = false, names = {} }
 
         if mode == 'add' then
@@ -705,6 +840,7 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
                     table.insert(added, db .. "." .. tname)
                 end
                 current_tables[tname] = f_tables[tname]
+                current_types[tname] = f_types[tname]
             end
             if req.all then
                 if next(f_tables) == nil then
@@ -732,6 +868,7 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
                     end
                 end
                 current_tables = vim.deepcopy(f_tables)
+                current_types = vim.deepcopy(f_types)
                 if next(f_tables) == nil and not had_db_file then
                     table.insert(missing, db .. ".*")
                 end
@@ -743,11 +880,13 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
                         table.insert(added, db .. "." .. tname)
                     end
                     current_tables[tname] = f_tables[tname]
+                    current_types[tname] = f_types[tname]
                 end
                 for _, tname in ipairs(sorted_keys(req.names)) do
                     if not f_tables[tname] then
                         if current_tables[tname] then
                             current_tables[tname] = nil
+                            current_types[tname] = nil
                             table.insert(removed, db .. "." .. tname)
                         else
                             table.insert(missing, db .. "." .. tname)
@@ -762,6 +901,7 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
                         table.insert(removed, db .. "." .. tname)
                     end
                     current_tables = {}
+                    current_types = {}
                 else
                     table.insert(missing, db .. ".*")
                 end
@@ -769,12 +909,17 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
                 for _, tname in ipairs(sorted_keys(req.names)) do
                     if current_tables[tname] then
                         current_tables[tname] = nil
+                        current_types[tname] = nil
                         table.insert(removed, db .. "." .. tname)
                     else
                         table.insert(missing, db .. "." .. tname)
                     end
                 end
             end
+        end
+
+        for tname in pairs(current_types) do
+            if not current_tables[tname] then current_types[tname] = nil end
         end
 
         if next(current_tables) == nil then
@@ -784,7 +929,7 @@ local function merge_into_catalog(catalog_dir, fetched, requested, mode, user)
             _cache[db_file] = nil
             dbs_set[db] = nil
         else
-            write_db_file(db_file, current_tables, true)
+            write_db_file(db_file, current_tables, true, current_types)
             dbs_set[db] = true
         end
     end
@@ -814,6 +959,33 @@ function M.tbuild_bin()
     return bin
 end
 local tbuild_bin = M.tbuild_bin
+
+local function format_tbuild_error(result)
+    local parts = {}
+    for _, s in ipairs({ result and result.stderr, result and result.stdout }) do
+        if type(s) == "string" and vim.trim(s) ~= "" then
+            table.insert(parts, vim.trim(s))
+        end
+    end
+    local combined = table.concat(parts, "\n")
+    if combined == "" then
+        return string.format("tbuild exited with code %s", tostring(result and result.code or "?"))
+    end
+    local hits = {}
+    for _, line in ipairs(vim.split(combined, "\n", { plain = true })) do
+        local l = vim.trim(line)
+        if l ~= "" and (l:match("[Ee]rror") or l:match("TPT%d+") or l:find("Failure", 1, true)
+            or l:find("terminated", 1, true)) then
+            if not l:find("TPT04101", 1, true) and not l:find("TPT04197", 1, true) then
+                table.insert(hits, l)
+            end
+        end
+    end
+    if #hits > 0 then
+        return table.concat(hits, "\n")
+    end
+    return combined
+end
 
 --- Runs a Teradata export script and processes the resulting data into structured files.
 --- @return nil
@@ -845,10 +1017,12 @@ function M.export_db_data()
     local tmp_dir = data_tmp .. '/_sync/' .. key
     vim.fn.mkdir(tmp_dir, 'p')
 
+    local job_name = string.format("TDSYNC_FULL_%d", os.time())
     local tbuild_command = {
         tbuild_bin(), '-f', tpt_script, '-u',
         string.format("user='%s', logon_mech='%s', tdpid='%s', data_path='%s'",
             current_user.user, current_user.log_mech, current_user.tdpid, tmp_dir),
+        job_name,
     }
 
     local data_tmp_file = tmp_dir .. "/data_tmp.csv"
@@ -859,8 +1033,7 @@ function M.export_db_data()
             if result.code ~= 0 then
                 syncing[key] = nil
                 M.remove_files(data_tmp_file)
-                vim.notify("TDSync failed: " .. (result.stderr or result.stdout or "unknown error"), vim.log.levels
-                    .ERROR)
+                vim.notify("TDSync failed: " .. format_tbuild_error(result), vim.log.levels.ERROR)
                 return
             end
 
@@ -1040,6 +1213,41 @@ function M.parse_object_names(list)
     return targets, errs
 end
 
+--- Expression exported by both TPT jobs: one VARCHAR line per column.
+--- The field order is a contract with parse_export_line (see EXPORT_TYPED_FIELDS):
+--- keep both in sync. Every nullable attribute is coalesced, otherwise a single NULL
+--- would turn the whole line into NULL and drop the column from the catalog.
+M.EXPORT_LINE_EXPR = [[cast(upper(
+               trim(c.DatabaseName)
+            || ',' || trim(c.TableName)
+            || ',' || trim(c.ColumnName)
+            || ',' || coalesce(trim(c.ColumnType), '')
+            || ',' || coalesce(trim(c.ColumnLength), '')
+            || ',' || coalesce(trim(c.DecimalTotalDigits), '')
+            || ',' || coalesce(trim(c.DecimalFractionalDigits), '')
+            || ',' || coalesce(trim(c.CharType), '')
+            || ',' || coalesce(trim(c.Nullable), '')
+            || ',' || coalesce(trim(c.ColumnUDTName), '')
+        ) as varchar(1024))]]
+
+--- @param pred string|nil extra predicate (nil = whole system)
+local function build_columns_select(pred)
+    return string.format([[lock row for access
+        select %s
+        from DBC.TablesV t
+        join DBC.ColumnsV c
+          on t.DatabaseName = c.DatabaseName and t.TableName = c.TableName
+        where t.TableKind in ('T','V','M','O','Q')%s
+        order by c.DatabaseName, c.TableName, c.ColumnId;]],
+        M.EXPORT_LINE_EXPR,
+        pred and ("\n          and ( " .. pred .. " )") or "")
+end
+
+--- SELECT of the full sync; must match export_db.tpt (checked by a test).
+function M.build_full_select_stmt()
+    return build_columns_select(nil)
+end
+
 --- Builds the SELECT statement for export_objects.tpt from a list of DB targets.
 --- @param db_targets table[]
 --- @return string
@@ -1078,14 +1286,7 @@ function M.build_objects_select_stmt(db_targets)
     end
 
     local pred = #clauses > 0 and table.concat(clauses, "\n     or ") or "1=0"
-    return string.format([[lock row for access
-select upper(trim(c.DatabaseName) || ',' || trim(c.TableName) || ',' || trim(c.ColumnName))
-from DBC.TablesV t
-join DBC.ColumnsV c
-  on t.DatabaseName = c.DatabaseName and t.TableName = c.TableName
-where t.TableKind in ('T','V','M','O','Q')
-  and ( %s )
-order by c.DatabaseName, c.TableName, c.ColumnId;]], pred)
+    return build_columns_select(pred)
 end
 
 local function format_sync_summary(stats)
@@ -1178,18 +1379,37 @@ local function handle_session_targets(session_targets, mode, bang, bufnr)
                     if res.rc == 0 and result_path and vim.fn.filereadable(result_path) == 1 then
                         local lines = vim.fn.readfile(result_path)
                         local sep = vim.fn.escape(config.options.sep or '~', "|.*+?^$(){}[]\\`~")
-                        local cols = {}
+                        local hdr_idx = {}
+                        if lines[1] then
+                            for k, h in ipairs(vim.fn.split(lines[1], sep)) do
+                                hdr_idx[trim(h):upper()] = k
+                            end
+                        end
+                        local cols, col_types = {}, {}
                         for i = 2, #lines do
                             if lines[i] ~= '' then
                                 local fields = vim.fn.split(lines[i], sep)
                                 local cname = fields[1] and trim(fields[1]) or nil
                                 if cname and cname ~= '' then
-                                    table.insert(cols, cname:upper())
+                                    local up_col = cname:upper()
+                                    table.insert(cols, up_col)
+                                    if hdr_idx['TYPE'] then
+                                        local info = types.build_info({
+                                            code     = fields[hdr_idx['TYPE']],
+                                            nullable = hdr_idx['NULLABLE'] and fields[hdr_idx['NULLABLE']] or nil,
+                                            len      = hdr_idx['MAX LENGTH'] and fields[hdr_idx['MAX LENGTH']] or nil,
+                                            tot      = hdr_idx['DECIMAL TOTAL DIGITS'] and fields[hdr_idx['DECIMAL TOTAL DIGITS']] or nil,
+                                            frac     = hdr_idx['DECIMAL FRACTIONAL DIGITS'] and fields[hdr_idx['DECIMAL FRACTIONAL DIGITS']] or nil,
+                                            chartype = hdr_idx['CHAR TYPE'] and fields[hdr_idx['CHAR TYPE']] or nil,
+                                            udt      = hdr_idx['UDT NAME'] and fields[hdr_idx['UDT NAME']] or nil,
+                                        })
+                                        if info then col_types[up_col] = info end
+                                    end
                                 end
                             end
                         end
                         if #cols > 0 then
-                            M.set_session_table(name, cols, 'server')
+                            M.set_session_table(name, cols, 'server', next(col_types) and col_types or nil)
                             vim.notify(string.format("TDSync: %s session table %s (%d columns from server)",
                                 existed and "updated" or "added", name, #cols), vim.log.levels.INFO)
                         else
@@ -1204,7 +1424,14 @@ local function handle_session_targets(session_targets, mode, bang, bufnr)
         else
             local entry = local_tables[name]
             if entry and entry.columns and #entry.columns > 0 then
-                M.set_session_table(name, entry.columns, 'buffer')
+                local col_types = {}
+                for _, c in ipairs(entry.columns) do
+                    if type(c) == 'table' and c.name and c.type_text then
+                        local info = types.from_ddl(c.type_text)
+                        if info then col_types[c.name:upper()] = info end
+                    end
+                end
+                M.set_session_table(name, entry.columns, 'buffer', next(col_types) and col_types or nil)
                 if existed then
                     table.insert(updated, name)
                 else
@@ -1376,8 +1603,8 @@ function M.sync_command(args)
 
     local function run_chunk(idx)
         if idx > #chunks then
-            local fetched = parse_export_lines(all_lines)
-            local db_stats = merge_into_catalog(catalog_dir, fetched, db_targets, sub, current_user)
+            local fetched, _, fetched_types = parse_export_lines(all_lines)
+            local db_stats = merge_into_catalog(catalog_dir, fetched, db_targets, sub, current_user, fetched_types)
             syncing[key] = nil
             warned_missing[key] = nil
             invalidate_catalog_cache(key, db_stats.affected_dbs)
@@ -1421,7 +1648,7 @@ function M.sync_command(args)
                 if result.code ~= 0 then
                     syncing[key] = nil
                     M.remove_files(out_csv, jobvars_path)
-                    vim.notify("TDSync failed: " .. (result.stderr or result.stdout or "unknown error"),
+                    vim.notify("TDSync failed: " .. format_tbuild_error(result),
                         vim.log.levels.ERROR)
                     return
                 end

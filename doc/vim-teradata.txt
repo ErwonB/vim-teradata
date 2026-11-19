@@ -310,6 +310,20 @@ history_max ~
     Maximum number of query history runs kept on disk before pruning.
     Set to nil to disable pruning.
 
+                                                  *vim-teradata-opt-diagnostics*
+diagnostics ~
+    Type: `table`
+    Default: `{ enabled = true, debounce_ms = 150, types = true }`
+
+    Controls live buffer diagnostics (see |vim-teradata-guide-diagnostics|):
+        `enabled`      (`boolean`, default `true`) master switch for all
+                       buffer diagnostics.
+        `debounce_ms`  (`integer`, default `150`) delay in milliseconds
+                       after `TextChanged` before diagnostics re-run.
+        `types`        (`boolean`, default `true`) enable catalog-backed
+                       column type checks (T1–T6). Set to `false` to keep
+                       only syntax and schema existence checks.
+
                                                     *vim-teradata-opt-keymaps*
 keymaps ~
     Type: `table<string,string|table>`   See |vim-teradata-default-keymaps|
@@ -780,12 +794,20 @@ cursor plus the next two.
 
                                                                    *:TDSync*
 :TDSync         Build or refresh the local metadata index used by
-                autocomplete. Connects to the active user with TPT and
-                writes one catalog per Teradata machine (`tdpid`) under
-                |vim-teradata-opt-data_dir|. Users on the same machine
-                share a catalog; switching user with |:TDU| switches the
-                catalog used by completion and diagnostics. Run |:TDSync|
-                once per machine.
+                autocomplete and diagnostics. Connects to the active user
+                with TPT and writes one catalog per Teradata machine
+                (`tdpid`) under |vim-teradata-opt-data_dir|. Users on the
+                same machine share a catalog; switching user with |:TDU|
+                switches the catalog used by completion and diagnostics.
+                Run |:TDSync| once per machine.
+
+                The export includes each column's data type, length,
+                precision/scale, character set, and nullability from
+                `DBC.ColumnsV`. View columns have no type attributes in
+                `DBC.ColumnsV` without view resolution, so they are listed
+                without type. Catalogs created before column-type support
+                keep working as before; re-run |:TDSync| to enable column
+                types in completion and diagnostics.
 
                                                                 *:TDSync-add*
                                                              *:TDSync-update*
@@ -796,8 +818,9 @@ cursor plus the next two.
                 Incrementally add, update, or delete one or many objects
                 in the local metadata catalog without running a full sync:
 
-                - `add`: fetch the given objects from `DBC.ColumnsV` via TPT
-                  and merge them into the local catalog.
+                - `add`: fetch the given objects (including column data
+                  types and nullability) from `DBC.ColumnsV` via TPT and
+                  merge them into the local catalog.
                 - `update`: same as `add`, and any requested object that no
                   longer exists on the server is removed from the catalog.
                 - `delete`: remove the given objects from the local catalog
@@ -1032,6 +1055,27 @@ signs, |:lopen|, and |vim.diagnostic.get()| all work normally.
 
 Diagnostics refresh on `TextChanged`, `BufEnter`, and `BufWritePost`.
 
+Type checks ~
+    When the active catalog was synced with column type metadata (format 2),
+    vim-teradata also checks column types in comparisons, predicates, and
+    aggregates:
+    - T1 (WARN): Character column (`CHAR`/`VARCHAR`/`CLOB`) compared with a
+      numeric literal (or numeric item in an `IN (...)` list), causing an
+      implicit conversion on every row.
+    - T2 (WARN): Character column compared via `=` or `IN` (not negated) to
+      a string literal longer than the column's declared character length.
+    - T3 (WARN): Column-to-column comparison across incompatible type
+      categories (e.g. `VARCHAR` vs `INTEGER`).
+    - T4 (INFO): Column-to-column comparison between character columns with
+      different character sets (e.g. `LATIN` vs `UNICODE`).
+    - T5 (WARN): `LIKE` / `NOT LIKE` applied to a `numeric`, `date`, `time`,
+      or `timestamp` column.
+    - T6 (WARN): `SUM()` or `AVG()` applied to a character column.
+
+    Type diagnostics never fire for view columns, derived tables, CTEs, or
+    older untyped catalogs. Set `diagnostics = { types = false }` (see
+    |vim-teradata-opt-diagnostics|) to disable them.
+
 ------------------------------------------------------------------------------
 9.3 Autocomplete                             *vim-teradata-guide-autocomplete*
 
@@ -1040,6 +1084,13 @@ After running |:TDSync| once, completion becomes schema-aware:
     - After `FROM ` / `JOIN `: complete databases, then tables.
     - After `<table>.`:       complete columns of that table.
     - Built-in Teradata functions are always suggested.
+
+When the catalog contains column types, each column candidate displays its
+formatted Teradata data type (e.g. `VARCHAR(20) CHARACTER SET UNICODE`,
+`DECIMAL(18,2)`) in the completion menu description (`detail` /
+`labelDetails.description`) and provides a markdown documentation popup
+listing the type and nullability (`NULL` / `NOT NULL`) for every active
+source table that defines the column.
 
 Completion is exposed as a source to `blink.cmp` and `nvim-cmp`. If
 neither is installed, trigger completion manually with `i_CTRL-X CTRL-U`
@@ -1545,6 +1596,15 @@ Completion returns nothing ~
     3. With `blink.cmp` / `nvim-cmp`, verify `td_sql_completion` is in
        the active source list.
 
+Completion shows no column types ~
+    1. Re-run |:TDSync| (or `:TDSync update DB.TABLE`) so the catalog is
+       upgraded to format 2 (`:checkhealth vim-teradata` reports if a
+       catalog was built before column-type support).
+    2. If you override `tpt_script` or `tpt_objects_script`, make sure your
+       custom TPT script exports the 10-field line from `DBC.ColumnsV`.
+    3. View columns have no type in `DBC.ColumnsV`, so completion shows
+       their names without a type description.
+
 `:TDR` does nothing ~
     A picker is missing. Install one of the supported pickers (see
     |vim-teradata-opt-picker|) and either `ripgrep` and `bat`.
@@ -1624,6 +1684,14 @@ Documentation: https://teradata-nvim.com
 
 ==============================================================================
 14. CHANGELOG                                         *vim-teradata-changelog*
+
+- Column types in metadata catalog (|:TDSync|, |:TDSync-add|,
+  |:TDSync-update|), completion menu/documentation, and type-aware SQL
+  diagnostics T1–T6 (`diagnostics.types`).
+- Virtual answerset: summary footer (`gS`/`gs`), visual quick-calc
+  (`<leader>=`), computed virtual columns (`=`, |:TDCol|, |:TDCols|),
+  Teradata pushdown (`gD`, |:TDColPush|), and volatile table materialization
+  (|:TDMaterialize|, |:TDVQuery|, |:TDEditTarget|).
 
 See the project's GitHub releases page:
 https://github.com/ErwonB/vim-teradata/releases

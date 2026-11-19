@@ -3,7 +3,7 @@ DESCRIPTION 'Export data from Teradata to a file'
 (
     DEFINE SCHEMA FILE_SCHEMA
     (
-        full_line varchar(500)
+        full_line varchar(1024)
     );
 
     DEFINE OPERATOR SQL_SELECTOR

@@ -3,7 +3,7 @@ DESCRIPTION 'Export data from Teradata to a file'
 (
     DEFINE SCHEMA FILE_SCHEMA
     (
-        full_line varchar(500)
+        full_line varchar(1024)
     );
 
     DEFINE OPERATOR SQL_SELECTOR
@@ -12,16 +12,23 @@ DESCRIPTION 'Export data from Teradata to a file'
     ATTRIBUTES
     (
         VARCHAR SelectStmt = 'lock row for access
-        select
-            upper(trim(c.DATABASENAME) || '','' || trim(c.TABLENAME) || '','' ||    trim(c.COLUMNNAME))
-        from DBC.TABLESV t
-        inner join DBC.COLUMNSV c
-        on t.DATABASENAME = c.DATABASENAME
-        and t.TABLENAME = c.TABLENAME
-        where 1=1
-        and t.TABLEKIND in (''T'', ''V'', ''M'', ''O'', ''Q'')
-        order by c.DATABASENAME, c.TABLENAME, c.COLUMNID
-        ;',
+        select cast(upper(
+               trim(c.DatabaseName)
+            || '','' || trim(c.TableName)
+            || '','' || trim(c.ColumnName)
+            || '','' || coalesce(trim(c.ColumnType), '''')
+            || '','' || coalesce(trim(c.ColumnLength), '''')
+            || '','' || coalesce(trim(c.DecimalTotalDigits), '''')
+            || '','' || coalesce(trim(c.DecimalFractionalDigits), '''')
+            || '','' || coalesce(trim(c.CharType), '''')
+            || '','' || coalesce(trim(c.Nullable), '''')
+            || '','' || coalesce(trim(c.ColumnUDTName), '''')
+        ) as varchar(1024))
+        from DBC.TablesV t
+        join DBC.ColumnsV c
+          on t.DatabaseName = c.DatabaseName and t.TableName = c.TableName
+        where t.TableKind in (''T'',''V'',''M'',''O'',''Q'')
+        order by c.DatabaseName, c.TableName, c.ColumnId;',
         VARCHAR PrivateLogName = 'selector_log',
         VARCHAR UserName = @user,
         VARCHAR UserPassword = '$tdwallet('||@user||')',
@@ -46,4 +53,3 @@ DESCRIPTION 'Export data from Teradata to a file'
     APPLY TO OPERATOR (FILE_WRITER)
     SELECT * FROM OPERATOR (SQL_SELECTOR);
 );
-
