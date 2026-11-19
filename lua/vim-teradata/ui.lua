@@ -99,32 +99,12 @@ end
 ---             already shown in that window instead of opening a new split.
 function M.display_output(file_path, query_id, opts)
     opts = opts or {}
-    local lines = opts.max_lines and vim.fn.readfile(file_path, '', opts.max_lines) or vim.fn.readfile(file_path)
+    local header, data, lines = util.parse_result_file(file_path, opts)
     if #lines == 0 then
         vim.notify('Query returned no lines.', vim.log.levels.INFO, { title = 'Teradata' })
         return
     end
     local tpt_view = opts.source == 'tpt'
-
-    local regex_special_chars = "|.*+?^$(){}[]\\`~"
-    local separator = vim.fn.escape(config.options.sep, regex_special_chars)
-    if opts.has_header == false then
-        local names = {}
-        for i = 1, #vim.fn.split(lines[1], separator) do names[i] = 'col' .. i end
-        table.insert(lines, 1, table.concat(names, config.options.sep))
-    end
-    local header = vim.fn.split(lines[1], separator)
-    local data = {}
-    for i = 2, #lines do
-        if lines[i] ~= '' then
-            table.insert(data, vim.fn.split(lines[i], separator))
-        end
-    end
-
-    header = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, header)
-    for i, row in ipairs(data) do
-        data[i] = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, row)
-    end
 
     local buffer_name = (tpt_view and 'Teradata Export' or 'Teradata Result')
         .. (query_id and ' - ' .. query_id or '')
@@ -221,6 +201,31 @@ function M.display_output(file_path, query_id, opts)
         require('vim-teradata.virtual').show_columns(bufnr)
     end, { nargs = 0, desc = 'Teradata: list virtual columns' })
 
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDColPush', function()
+        require('vim-teradata.virtual').push_columns(bufnr)
+    end, { nargs = 0, desc = 'Teradata: push virtual columns to Teradata' })
+
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDMaterialize', function(cmd_opts)
+        local virt = require('vim-teradata.virtual')
+        if cmd_opts.bang then
+            virt.unmaterialize(bufnr)
+        else
+            virt.materialize(bufnr, cmd_opts.args)
+        end
+    end, { bang = true, nargs = '?', desc = 'Teradata: materialize or drop (!) volatile table' })
+
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDVQuery', function()
+        require('vim-teradata.virtual').vquery(bufnr)
+    end, { nargs = 0, desc = 'Teradata: query materialized volatile table in session buffer' })
+
+    vim.api.nvim_buf_create_user_command(bufnr, 'TDEditTarget', function(cmd_opts)
+        require('vim-teradata.virtual').set_edit_target(bufnr, cmd_opts.args)
+    end, {
+        nargs = '?',
+        complete = function() return { 'table', 'volatile' } end,
+        desc = 'Teradata: set or toggle edit target (table | volatile)',
+    })
+
     if original_query then
         explain.process_results(bufnr, original_query, lines)
         local lower = original_query:lower():gsub("^%s*", "")
@@ -237,6 +242,12 @@ function M.display_output(file_path, query_id, opts)
 
     local vcfg = config.ensure().virtual or {}
     grid.set(bufnr, 'virtual_footer_mode', vcfg.footer_default or 'off')
+    grid.set(bufnr, 'original_query', original_query)
+    local qc_init = require('vim-teradata.bteq').query_context(result_id)
+    if qc_init then
+        grid.set(bufnr, 'rows_found', qc_init.rows_found)
+        grid.set(bufnr, 'retlimit_applied', qc_init.retlimit_applied)
+    end
 
     local export_key = (config.ensure().export or {}).keymap
     local export_bound = false
@@ -399,8 +410,10 @@ function M.display_output(file_path, query_id, opts)
             and ('  <%s> Totals'):format(vkeys.footer_next) or ''
         local col_hint = (type(vkeys.add_column) == 'string' and vkeys.add_column ~= '')
             and ('  <%s> ƒ Column'):format(vkeys.add_column) or ''
+        local vt = grid.get(bufnr, 'virtual_materialized')
+        local vt_hint = (vt and vt.name) and ('  [VT: %s]'):format(vt.name) or ''
         local extmark = '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort' ..
-            totals_hint .. col_hint .. (hint_suffix or '')
+            totals_hint .. col_hint .. (hint_suffix or '') .. vt_hint
         table.insert(buffer_lines, '')
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buffer_lines)
         vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
@@ -674,6 +687,11 @@ function M.display_output(file_path, query_id, opts)
                 require('vim-teradata.virtual').cycle_footer(bufnr, -1)
             end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: previous totals footer mode' })
         end
+        if type(vkeys.footer_db) == 'string' and vkeys.footer_db ~= '' then
+            vim.keymap.set('n', vkeys.footer_db, function()
+                require('vim-teradata.virtual').footer_pushdown(bufnr)
+            end, { buffer = bufnr, silent = true, nowait = true, desc = 'Teradata: compute exact totals footer in Teradata' })
+        end
         if type(vkeys.add_column) == 'string' and vkeys.add_column ~= '' then
             vim.keymap.set('n', vkeys.add_column, function()
                 require('vim-teradata.virtual').prompt_add_column(bufnr)
@@ -885,8 +903,10 @@ function M.display_help()
         '  <S>           Save pending edits',
         '  <C>           Cancel edits',
         '  gS/gs         Cycle totals footer',
+        '  gD            Compute exact totals footer in Teradata',
         '  <leader>=     Quick calc on selection',
-        '  =             Add virtual computed column (:TDCol, :TDCol!, :TDColEdit, :TDCols)',
+        '  =             Add virtual computed column (:TDCol, :TDCol!, :TDColEdit, :TDCols, :TDColPush)',
+        '  :TDMaterialize Materialize result in session volatile table (:TDVQuery, :TDEditTarget)',
         string.format('  <%s>           Full export via TPT (confirmation box)',
             (config.options.export or {}).keymap or 'F'),
     }

@@ -244,12 +244,14 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
     end
 
     -- Do not truncate EXPLAIN plans with retlimit (only relevant for 'output')
-    opts.skip_retlimit = (operation == 'output') and has_explain(clean_sql) or false
+    opts.skip_retlimit = ((exec_opts and exec_opts.skip_retlimit) == true)
+        or ((operation == 'output') and has_explain(clean_sql)) or false
 
     local output_path
     local context = {}
     local id = util.get_unique_query_id()
     local query_path
+    local label = exec_opts and exec_opts.label or nil
 
     if operation == 'output' then
         query_path = util.get_history_path('queries_dir_name') .. '/' .. id .. '.sql'
@@ -258,11 +260,14 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
         context = {
             query_id = id,
             result_path = output_path,
+            query_path = query_path,
             retlimit_applied = not opts.skip_retlimit,
         }
         -- Keep the raw SQL, not clean_sql: a re-run must go through the same
         -- replacement / terminator handling as the original submission.
-        last_run = { sql = sql, id = id, session_buf = sess and session_buf or nil }
+        if not (exec_opts and exec_opts.track_last_run == false) then
+            last_run = { sql = sql, id = id, session_buf = sess and session_buf or nil }
+        end
         if sess then result_session[id] = session_buf end
         query_ctx[id] = {
             user = current_user,
@@ -275,6 +280,8 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
     end
 
     -- Register job
+    local init_msg = label and (label .. (sess and ' (Queued)' or ''))
+        or (sess and 'Queued' or 'Started')
     util.jobs_add({
         id          = id,
         operation   = operation,
@@ -282,7 +289,7 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
         user        = current_user.user,
         session     = sess and session_buf or nil,
         rows        = nil,
-        message     = sess and 'Queued' or 'Started',
+        message     = init_msg,
         result_path = (operation == 'output') and output_path or nil,
         query_path  = query_path,
         started_at  = os.time(),
@@ -308,11 +315,11 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
 
             local message
             if status == 'ok' then
-                message = (operation == 'syntax') and 'Syntax OK' or 'OK'
+                message = label or ((operation == 'syntax') and 'Syntax OK' or 'OK')
             else
                 local last = (res.msg or ''):gsub('%s+$', '')
                 last = (#last > 0) and last:match("[^\n]*$") or 'Error'
-                message = last
+                message = label and (label .. ': ' .. last) or last
             end
 
             if operation == 'syntax' then
@@ -343,15 +350,62 @@ local function run_single_query(sql, operation, handle_result, exec_opts)
     if sess then
         local body, post = request_lines(clean_sql, opts, output_path)
         handle = sess:submit(body, post, on_done, function()
-            util.jobs_update(id, { message = 'Running' })
+            util.jobs_update(id, { message = label or 'Running' })
         end)
     else
         local bteq_data = build_script(clean_sql, current_user, opts, output_path)
-        handle = start_job(bteq_data.script, on_done)
+        local runner = M._start_job or start_job
+        handle = runner(bteq_data.script, on_done)
     end
 
     util.jobs_update(id, { handle = handle })
     return id
+end
+
+--- Runs `sql` as an 'output' job and returns the parsed result instead of
+--- opening a grid (unless opts.display = true).
+--- @param sql string
+--- @param opts table|nil {
+---   session_buf   = integer|nil,  -- nil: one-shot, else that session
+---   display       = boolean|nil,  -- true: open a result grid as usual
+---   reuse_win     = integer|nil,
+---   label         = string|nil,   -- shown in :TDJ, e.g. 'virtual: SUM pushdown'
+---   skip_retlimit = boolean|nil,
+--- }
+--- @param cb fun(err: string|nil, result: { header: string[], rows: string[][], query_id: string, rows_found: integer|nil, query_path: string|nil, result_path: string|nil }|nil)|nil
+function M.run_virtual(sql, opts, cb)
+    opts = opts or {}
+    local sbuf = (opts.session_buf and opts.session_buf > 0) and opts.session_buf or -1
+    return run_single_query(sql, 'output', function(res, context)
+        if res.rc ~= 0 then
+            local err_msg = (res.msg and res.msg ~= '') and res.msg or 'BTEQ execution failed'
+            if opts.display then
+                ui.display_error(err_msg)
+            end
+            if cb then cb(err_msg, { query_id = context.query_id, query_path = context.query_path }) end
+            return
+        end
+        local rows_found = util.extract_rows_found(res.log_content)
+        local header, rows = util.parse_result_file(context.result_path)
+        if opts.display then
+            output_callback_with(res, context, { reuse_win = opts.reuse_win })
+        end
+        if cb then
+            cb(nil, {
+                header      = header,
+                rows        = rows,
+                query_id    = context.query_id,
+                rows_found  = rows_found,
+                query_path  = context.query_path,
+                result_path = context.result_path,
+            })
+        end
+    end, {
+        session_buf    = sbuf,
+        track_last_run = false,
+        label          = opts.label,
+        skip_retlimit  = opts.skip_retlimit,
+    })
 end
 
 --- Runs an already prepared SELECT in the persistent session of `session_buf`
@@ -442,8 +496,18 @@ function output_callback_with(res, context, display_opts)
     if res.rc == 0 then
         local result_path = context.result_path
         if vim.fn.getfsize(result_path) > 0 then
-            ui.display_output(result_path, context.query_id, display_opts)
             local actual_lines = util.extract_rows_found(res.log_content)
+            if query_ctx[context.query_id] then
+                query_ctx[context.query_id].rows_found = actual_lines
+            end
+            ui.display_output(result_path, context.query_id, display_opts)
+            local grid = require('vim-teradata.grid_state')
+            local cur_buf = vim.api.nvim_get_current_buf()
+            if grid.get(cur_buf, 'query_id') == context.query_id then
+                grid.set(cur_buf, 'rows_found', actual_lines)
+                grid.set(cur_buf, 'retlimit_applied', context.retlimit_applied)
+                pcall(function() require('vim-teradata.virtual').render_footer(cur_buf) end)
+            end
             if context.retlimit_applied
                 and actual_lines and actual_lines > config.options.retlimit then
                 local msg = string.format('%d actual lines, only %d displayed.', actual_lines, config.options.retlimit)
@@ -625,7 +689,7 @@ end
 function M.run_updates(statements, on_done, opts)
     if #statements == 0 then return end
 
-    local sbuf = M.session_buf_for(opts and opts.query_id)
+    local sbuf = (opts and opts.session_buf) or M.session_buf_for(opts and opts.query_id)
     local sess = sbuf and session.get(sbuf) or nil
     if sbuf and not sess then
         vim.notify('The BTEQ session of this result is closed; updates run in a new BTEQ job.',

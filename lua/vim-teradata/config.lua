@@ -36,7 +36,7 @@
 ---@field treesitter_folds boolean
 ---@field export { enabled: boolean, keymap: string|false, confirm: boolean, operator: 'auto'|'export'|'selector', max_sessions: integer, head_lines: integer|nil, timeout_ms: integer|nil, tpt_script: string|nil }
 ---@field exports_dir_name string
----@field virtual { footer_default: string, footer_scope: 'displayed'|'all', yank_quick_calc: boolean, persist_columns: boolean, header_prefix: string, keymaps: { footer_next: string, footer_prev: string, quick_calc: string, add_column: string } }
+---@field virtual { footer_default: string, footer_scope: 'displayed'|'all', yank_quick_calc: boolean, persist_columns: boolean, header_prefix: string, engine: 'auto'|'lua'|'db', edit_target: 'table'|'volatile', keymaps: { footer_next: string, footer_prev: string, footer_db: string, quick_calc: string, add_column: string } }
 ---@field users VimTeradata.User[]
 ---@field current_user_index integer|nil
 
@@ -119,16 +119,19 @@ M.defaults = {
     },
     exports_dir_name = 'exports',
 
-    -- Virtual answerset (summary footer + selection quick-calc + computed columns)
+    -- Virtual answerset (summary footer + selection quick-calc + computed columns + pushdown)
     virtual = {
         footer_default  = 'off',        -- one of virtual.MODES
         footer_scope    = 'displayed',  -- 'displayed' | 'all'
         yank_quick_calc = false,
         persist_columns = true,
         header_prefix   = 'ƒ ',
+        engine          = 'auto',       -- 'auto' | 'lua' | 'db'
+        edit_target     = 'table',      -- 'table' | 'volatile'
         keymaps = {
             footer_next = 'gS',
             footer_prev = 'gs',
+            footer_db   = 'gD',
             quick_calc  = '<leader>=',
             add_column  = '=',
         },
@@ -220,6 +223,16 @@ local function validate(o)
         vim.notify("[vim-teradata] virtual.footer_scope must be 'displayed' or 'all'; using 'displayed'",
             vim.log.levels.WARN)
         virt.footer_scope = 'displayed'
+    end
+    if not vim.tbl_contains({ 'auto', 'lua', 'db' }, virt.engine) then
+        vim.notify("[vim-teradata] virtual.engine must be 'auto', 'lua' or 'db'; using 'auto'",
+            vim.log.levels.WARN)
+        virt.engine = 'auto'
+    end
+    if not vim.tbl_contains({ 'table', 'volatile' }, virt.edit_target) then
+        vim.notify("[vim-teradata] virtual.edit_target must be 'table' or 'volatile'; using 'table'",
+            vim.log.levels.WARN)
+        virt.edit_target = 'table'
     end
 end
 

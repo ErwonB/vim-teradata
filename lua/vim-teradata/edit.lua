@@ -321,9 +321,10 @@ end
 --- Builds the UPDATE statements for a diff.
 --- @param st TDEditState
 --- @param diffs table<integer, table<integer,string>>  row_id -> col_id -> new value
+--- @param meta_override TDEditMeta|nil optional override metadata (e.g. for volatile table what-if edits)
 --- @return string[] statements
-function M.build_statements(st, diffs)
-    local meta = st.meta
+function M.build_statements(st, diffs, meta_override)
+    local meta = meta_override or st.meta
     local statements = {}
 
     local row_ids = {}
@@ -476,9 +477,30 @@ local function col_byte_range(row_cells, widths, j)
     return pos, pos + w
 end
 
+local function volatile_info(bufnr)
+    local vt = grid.get(bufnr, 'virtual_materialized')
+    if not vt or not vt.name then return nil end
+    local vcfg = (config.options and config.options.virtual)
+        or (config.defaults and config.defaults.virtual)
+        or {}
+    local target = grid.get(bufnr, 'virtual_edit_target') or vcfg.edit_target or 'table'
+    if target ~= 'volatile' then return nil end
+    return vt
+end
+
+local function active_meta(bufnr, st)
+    local vt = volatile_info(bufnr)
+    if vt then
+        local all_header = grid.get(bufnr, 'all_header') or {}
+        return require('vim-teradata.virtual').volatile_edit_meta(vt.name, all_header), vt
+    end
+    return st and st.meta or nil, nil
+end
+
 --- Dims non-updatable columns and highlights cells with a pending edit.
 local function highlight_cells(bufnr)
     local st = state[bufnr]
+    local meta = active_meta(bufnr, st)
     local widths           = buf_var(bufnr, 'teradata_column_widths')
     local row_ids          = buf_var(bufnr, 'teradata_displayed_ids')
     local col_ids          = buf_var(bufnr, 'teradata_displayed_col_ids')
@@ -486,11 +508,11 @@ local function highlight_cells(bufnr)
         or buf_var(bufnr, 'teradata_displayed_header') or {}
     local displayed_data   = buf_var(bufnr, 'teradata_displayed_data') or {}
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
-    if not (widths and row_ids and col_ids) then return end
+    if not (widths and row_ids and col_ids and meta) then return end
     if not st.editing then return end
 
     for j, col_id in ipairs(col_ids) do
-        local col = st.meta.columns[col_id]
+        local col = type(col_id) == 'number' and meta.columns[col_id] or nil
 
         -- read-only columns: dim header + all rows
         if not (col and col.eligible) then
@@ -531,7 +553,8 @@ function M.edit_cell(bufnr)
     local cell, err = cell_at_cursor(bufnr)
     if not cell then return notify(err, vim.log.levels.WARN) end
 
-    local col = st.meta.columns[cell.col_id]
+    local meta = active_meta(bufnr, st)
+    local col = (meta and type(cell.col_id) == 'number') and meta.columns[cell.col_id] or nil
     if not (col and col.eligible) then
         return notify(string.format(
             "Column '%s' is not updatable (only X, a.x, a.x AS X can be edited).",
@@ -576,7 +599,8 @@ function M.set_cell_null(bufnr)
     local cell, err = cell_at_cursor(bufnr)
     if not cell then return notify(err, vim.log.levels.WARN) end
 
-    local col = st.meta.columns[cell.col_id]
+    local meta = active_meta(bufnr, st)
+    local col = (meta and type(cell.col_id) == 'number') and meta.columns[cell.col_id] or nil
     if not (col and col.eligible) then
         return notify(string.format("Column '%s' is not updatable.",
             (col and col.result_name) or ('#' .. cell.col_id)), vim.log.levels.WARN)
@@ -797,9 +821,16 @@ function M.set_edit_hint(bufnr)
     local pending = (cells > 0)
         and string.format('%d change(s) on %d row(s)', cells, rows)
         or 'no change yet'
-    set_hint(bufnr, string.format(
-        '-- EDIT MODE (%s) --  <%s> Edit cell  <%s> Set NULL  <%s> Save  <%s> Cancel',
-        pending, maps.edit_cell, maps.set_null, maps.save, maps.cancel))
+    local _, vt = active_meta(bufnr, st)
+    if vt then
+        set_hint(bufnr, string.format(
+            '-- EDIT MODE (VT %s) -- (%s)  <%s> Edit cell  <%s> Set NULL  <%s> Save  <%s> Cancel',
+            vt.name, pending, maps.edit_cell, maps.set_null, maps.save, maps.cancel))
+    else
+        set_hint(bufnr, string.format(
+            '-- EDIT MODE (%s) --  <%s> Edit cell  <%s> Set NULL  <%s> Save  <%s> Cancel',
+            pending, maps.edit_cell, maps.set_null, maps.save, maps.cancel))
+    end
 end
 
 function M.cancel(bufnr)
@@ -826,7 +857,7 @@ function M.cancel(bufnr)
     end
 end
 
-local function execute(bufnr, statements)
+local function execute(bufnr, statements, run_opts)
     local bteq = require('vim-teradata.bteq')
     bteq.run_updates(statements, function(res, counts)
         if res.rc ~= 0 then
@@ -872,11 +903,15 @@ local function execute(bufnr, statements)
             st.grid_snapshot = nil
             unlock_grid_maps(bufnr)
             vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
-            pcall(function() require('vim-teradata.virtual').recompute(bufnr) end)
+            pcall(function()
+                local virt = require('vim-teradata.virtual')
+                virt.invalidate_footer_db(bufnr)
+                virt.recompute(bufnr)
+            end)
             st.populate()
             M.decorate(bufnr)
         end
-    end)
+    end, run_opts)
 end
 
 function M.save(bufnr)
@@ -893,21 +928,30 @@ function M.save(bufnr)
     -- The pending table is already keyed by ORIGINAL row/column ids and holds
     -- only eligible columns, so it is the diff: no text parsing involved.
     local diffs = st.pending
+    local meta, vt = active_meta(bufnr, st)
+    if vt then
+        assert(require('vim-teradata.virtual').is_materialized_table(vt.name, vt.session_buf),
+            'vim-teradata: refusing to UPDATE unregistered volatile table ' .. tostring(vt.name))
+    end
+    local run_opts = {
+        query_id    = grid.get(bufnr, 'query_id'),
+        session_buf = vt and vt.session_buf or nil,
+    }
 
     local function finish()
-        local statements = M.build_statements(st, diffs)
+        local statements = M.build_statements(st, diffs, meta)
         if config.options.preview_updates then
-            show_preview(statements, function() execute(bufnr, statements) end)
+            show_preview(statements, function() execute(bufnr, statements, run_opts) end)
         else
-            execute(bufnr, statements)
+            execute(bufnr, statements, run_opts)
         end
     end
 
-    if st.meta.mode == 'join' then
+    if meta.mode == 'join' then
         local seen, keys = {}, {}
         for _, changes in pairs(diffs) do
             for col_id in pairs(changes) do
-                local col = type(col_id) == 'number' and st.meta.columns[col_id] or nil
+                local col = type(col_id) == 'number' and meta.columns[col_id] or nil
                 local tk = col and col.table_key or nil
                 if tk and not seen[tk] then
                     seen[tk] = true
@@ -925,8 +969,9 @@ end
 function M.toggle(bufnr)
     local st = state[bufnr]
     if not st then return end
-    if not st.meta.editable then
-        return notify('This result is not editable: ' .. (st.meta.reason or 'unsupported query'),
+    local meta, vt = active_meta(bufnr, st)
+    if not (meta and meta.editable) then
+        return notify('This result is not editable: ' .. ((meta and meta.reason) or 'unsupported query'),
             vim.log.levels.WARN)
     end
 
@@ -945,8 +990,9 @@ function M.toggle(bufnr)
     lock_grid_maps(bufnr)
     highlight_cells(bufnr)
     M.set_edit_hint(bufnr)
+    local mode_label = vt and ('VT ' .. vt.name) or meta.mode
     notify(string.format('Edit mode on (%s). Press %s on a cell to change it.',
-        st.meta.mode, config.options.edit_keymaps.edit_cell))
+        mode_label, config.options.edit_keymaps.edit_cell))
 end
 
 --- Appends the "<E> Edit" affordance to the grid hint line. Called by ui after
@@ -954,16 +1000,19 @@ end
 function M.decorate(bufnr)
     local st = state[bufnr]
     if not st or st.editing then return end
+    local meta = active_meta(bufnr, st)
     local maps = config.options.edit_keymaps
     local vkeys = ((config.options.virtual or {}).keymaps or {})
     local totals_hint = (type(vkeys.footer_next) == 'string' and vkeys.footer_next ~= '')
         and ('  <%s> Totals'):format(vkeys.footer_next) or ''
     local col_hint = (type(vkeys.add_column) == 'string' and vkeys.add_column ~= '')
         and ('  <%s> ƒ Column'):format(vkeys.add_column) or ''
-    if st.meta.editable then
+    local vt = grid.get(bufnr, 'virtual_materialized')
+    local vt_hint = (vt and vt.name) and ('  [VT: %s]'):format(vt.name) or ''
+    if meta and meta.editable then
         set_hint(bufnr, string.format(
-            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s%s%s',
-            maps.toggle, totals_hint, col_hint, st.hint_suffix or ''))
+            '<Tab/S-Tab> Next/Prev Col  <Enter> Filter  <-> Remove Col  <BS> Restore Col  <u> Unfilter  <Up/Down> Sort  <r> Unsort  <%s> Edit%s%s%s%s',
+            maps.toggle, totals_hint, col_hint, st.hint_suffix or '', vt_hint))
     end
 end
 

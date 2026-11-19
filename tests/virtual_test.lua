@@ -377,3 +377,83 @@ test("Patch 2: full UI sort, remove/restore, footer sum, edit-mode what-if, and 
     config.options.data_dir = orig_data_dir
     vim.fn.delete(dir, 'rf')
 end)
+
+test("Patch 3: what-if override meta builds UPDATE against volatile table with all-column WHERE", function()
+    local edit_mod = require('vim-teradata.edit')
+    local override_meta = virtual.volatile_edit_meta('VAS_20261117_1234', { 'DEPT', 'TOTAL_SALES', 'CNT' })
+    local fake_st = {
+        meta     = override_meta,
+        original = {
+            [1] = { 'Sales', '100', 'NULL' },
+        },
+        keys = {},
+    }
+    local diffs = {
+        [1] = { [2] = '250' },
+    }
+    local stmts = edit_mod.build_statements(fake_st, diffs, override_meta)
+    assert(#stmts == 1, 'expected 1 UPDATE statement')
+    local u = stmts[1]
+    assert(u:find('^UPDATE VAS_20261117_1234\n'), 'expected UPDATE target VAS_20261117_1234, got:\n' .. u)
+    assert(u:find('SET "TOTAL_SALES" = 250', 1, true), 'expected SET "TOTAL_SALES" = 250, got:\n' .. u)
+    assert(u:find('"DEPT" = \'Sales\'', 1, true)
+        and u:find('"TOTAL_SALES" = 100', 1, true)
+        and u:find('"CNT" IS NULL', 1, true),
+        'expected WHERE to cover all columns of volatile table, got:\n' .. u)
+end)
+
+test("Patch 3: truncated result shows Σ (partial) on gS and Σ db on gD pushdown", function()
+    local bteq = require('vim-teradata.bteq')
+    local id = 'vcol_pushdown_footer'
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, 'p')
+    local path = dir .. '/' .. id .. '.csv'
+    vim.fn.writefile({
+        'DEPT~AMOUNT',
+        'Sales~10',
+        'Eng~20',
+    }, path)
+
+    local orig_users = config.options.users
+    local orig_idx   = config.options.current_user_index
+    local orig_start = bteq._start_job
+    config.options.users = { { user = 'U', tdpid = 'H', log_mech = 'TD2' } }
+    config.options.current_user_index = 1
+
+    bteq._start_job = function(script_lines, on_done)
+        local joined = table.concat(script_lines, '\n')
+        local out_file = joined:match("%.EXPORT FILE = '([^']+)'")
+        if out_file then
+            vim.fn.writefile({ 'col1~Sum(AMOUNT)', 'NULL~999' }, out_file)
+        end
+        on_done({ rc = 0, msg = '', log_content = { ' *** Query completed. 1 rows found.' } })
+        return { kill = function() end }
+    end
+
+    with_history_query(id, 'SELECT DEPT, AMOUNT FROM T;', function()
+        ui.display_output(path, id, { editable = false })
+        local buf = vim.api.nvim_get_current_buf()
+        grid.set(buf, 'rows_found', 500)
+        grid.set(buf, 'retlimit_applied', true)
+
+        press('gS')
+        local ns = vim.api.nvim_get_namespaces()['vim-teradata-virtual']
+        local marks = vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })
+        local val_line = marks[1][4].virt_lines[2][1][1]
+        assert(val_line:find('Σ (partial)', 1, true), 'expected Σ (partial) on truncated result, got: ' .. val_line)
+
+        press('gD')
+        vim.wait(200, function() return grid.get(buf, 'virtual_footer_db') ~= nil end)
+        marks = vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { details = true })
+        val_line = marks[1][4].virt_lines[2][1][1]
+        assert(val_line:find('Σ db', 1, true) and val_line:find('999', 1, true),
+            'expected Σ db and exact sum 999 after gD, got: ' .. val_line)
+
+        close_current_grid()
+    end)
+
+    bteq._start_job = orig_start
+    config.options.users = orig_users
+    config.options.current_user_index = orig_idx
+    vim.fn.delete(dir, 'rf')
+end)

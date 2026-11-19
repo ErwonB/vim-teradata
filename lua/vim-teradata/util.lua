@@ -1600,6 +1600,43 @@ function M.formatString(s, width)
     return s .. padding
 end
 
+--- Parses a delimited BTEQ/TPT result file into trimmed header and row tables.
+--- @param file_path string
+--- @param opts table|nil { max_lines = integer|nil, has_header = boolean|nil }
+--- @return string[] header, string[][] rows, string[] raw_lines
+function M.parse_result_file(file_path, opts)
+    opts = opts or {}
+    if not file_path or vim.fn.filereadable(file_path) == 0 then
+        return {}, {}, {}
+    end
+    local lines = opts.max_lines and vim.fn.readfile(file_path, '', opts.max_lines) or vim.fn.readfile(file_path)
+    if #lines == 0 then
+        return {}, {}, lines
+    end
+
+    local regex_special_chars = "|.*+?^$(){}[]\\`~"
+    local sep = (config.options and config.options.sep) or (config.defaults and config.defaults.sep) or '~'
+    local separator = vim.fn.escape(sep, regex_special_chars)
+    if opts.has_header == false then
+        local names = {}
+        for i = 1, #vim.fn.split(lines[1], separator) do names[i] = 'col' .. i end
+        table.insert(lines, 1, table.concat(names, sep))
+    end
+    local header = vim.fn.split(lines[1], separator)
+    local data = {}
+    for i = 2, #lines do
+        if lines[i] ~= '' then
+            table.insert(data, vim.fn.split(lines[i], separator))
+        end
+    end
+
+    header = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, header)
+    for i, row in ipairs(data) do
+        data[i] = vim.tbl_map(function(part) return part:gsub('^%s+', ''):gsub('%s+$', '') end, row)
+    end
+    return header, data, lines
+end
+
 --- Generates a unique query ID based on timestamp and a sequence/clock suffix.
 --- @return string The unique ID.
 local _seq = 0

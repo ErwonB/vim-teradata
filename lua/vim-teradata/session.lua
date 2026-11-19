@@ -39,7 +39,28 @@ local NOISE = {
 
 ---@type table<integer, table> bufnr -> session
 local by_buf = {}
+local close_hooks = {}     -- bufnr -> fun(bufnr)[]
+local global_hooks = {}    -- fun(bufnr)[]
 local seq = 0
+
+local function fire_close_hooks(s)
+    if s._close_fired then return end
+    s._close_fired = true
+    local b = s.bufnr
+    local list = close_hooks[b]
+    close_hooks[b] = nil
+    for _, fn in ipairs(list or {}) do
+        pcall(fn, b)
+    end
+    for _, fn in ipairs(global_hooks) do
+        pcall(fn, b)
+    end
+    pcall(vim.api.nvim_exec_autocmds, 'User', {
+        pattern  = 'TeradataSessionClosed',
+        modeline = false,
+        data     = { buf = b },
+    })
+end
 
 local Session = {}
 Session.__index = Session
@@ -293,6 +314,7 @@ function Session:close()
     if not self.alive or self.closing then return end
     self.closing = true
     if by_buf[self.bufnr] == self then by_buf[self.bufnr] = nil end
+    fire_close_hooks(self)
 
     local queued = self.queue
     self.queue = {}
@@ -335,6 +357,7 @@ function Session:_on_exit(code)
 
     vim.schedule(function()
         if by_buf[self.bufnr] == self then by_buf[self.bufnr] = nil end
+        fire_close_hooks(self)
         -- logon failures are reported by the readiness probe (see M.open)
         if not self.closing and self.ready then
             vim.notify(reason, vim.log.levels.WARN, { title = 'Teradata' })
@@ -436,6 +459,19 @@ end
 
 function M.close_all()
     for b in pairs(by_buf) do M.close(b) end
+end
+
+--- Registers a callback invoked when the session of `bufnr` closes.
+--- Also accepts `M.on_close(fn)` for a global close listener.
+--- @param buf_or_fn integer|fun(bufnr: integer)
+--- @param fn fun(bufnr: integer)|nil
+function M.on_close(buf_or_fn, fn)
+    if type(buf_or_fn) == 'function' then
+        global_hooks[#global_hooks + 1] = buf_or_fn
+    elseif type(buf_or_fn) == 'number' and type(fn) == 'function' then
+        close_hooks[buf_or_fn] = close_hooks[buf_or_fn] or {}
+        table.insert(close_hooks[buf_or_fn], fn)
+    end
 end
 
 --- One-line description of the session of `bufnr`, or nil.

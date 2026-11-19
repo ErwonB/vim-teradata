@@ -502,9 +502,12 @@ virtual ~
           yank_quick_calc = false,
           persist_columns = true,
           header_prefix   = 'ƒ ',
+          engine          = 'auto',       -- 'auto' | 'lua' | 'db'
+          edit_target     = 'table',      -- 'table' | 'volatile'
           keymaps = {
             footer_next = 'gS',
             footer_prev = 'gs',
+            footer_db   = 'gD',
             quick_calc  = '<leader>=',
             add_column  = '=',
           },
@@ -533,11 +536,25 @@ virtual ~
         Display prefix prepended to virtual column headers in the grid
         (default `"ƒ "`).
 
+    engine ~
+        Controls how totals are computed:
+        `"lua"`   in-memory Lua only (`gD` / |:TDColPush| still work on
+                  demand).
+        `"auto"`  in-memory Lua by default, marking `(partial)` when the
+                  result was truncated by `retlimit` and `(≈)` when values
+                  exceed 15 significant digits.
+        `"db"`    automatically triggers a Teradata pushdown (`gD`) after
+                  cycling the footer with `gS`.
+
+    edit_target ~
+        Default target for in-grid edits (`"table"` or `"volatile"`). See
+        |:TDEditTarget| and |vim-teradata-guide-virtual|.
+
     keymaps ~
         Result-buffer local mappings for cycling the footer (`footer_next`,
-        `footer_prev`), triggering visual selection quick-calc
-        (`quick_calc`), and prompting for a new computed column
-        (`add_column`).
+        `footer_prev`), running exact database totals (`footer_db`),
+        triggering visual selection quick-calc (`quick_calc`), and prompting
+        for a new computed column (`add_column`).
 
 ------------------------------------------------------------------------------
 5.3 Default keymaps                             *vim-teradata-default-keymaps*
@@ -683,6 +700,31 @@ cursor plus the next two.
                                                                     *:TDCols*
 :TDCols         List the active virtual columns and their expressions in a
                 scratch split (`name = expr`).
+
+                                                                 *:TDColPush*
+:TDColPush      Push the virtual columns of the current result buffer to
+                Teradata by wrapping the base query (or materialized
+                volatile table) in a `SELECT vt.*, <expr> AS "<NAME>"` and
+                opening the result in a new grid split.
+
+                                                             *:TDMaterialize*
+                                                            *:TDMaterialize!*
+:TDMaterialize [{name}]
+:TDMaterialize! Materialize the answerset into a volatile table (`VAS_<id>`
+                by default) inside an open persistent session (|:TDSession|),
+                or drop it (`:TDMaterialize!`). See
+                |vim-teradata-guide-virtual|.
+
+                                                                  *:TDVQuery*
+:TDVQuery       Focus (or split-open) the SQL buffer of the persistent
+                session owning the materialized volatile table and append
+                `SELECT * FROM <name>;` on a new line at the end.
+
+                                                              *:TDEditTarget*
+:TDEditTarget [volatile|table]
+                Set or toggle whether in-grid edits (`<E>` / `<S>`) target
+                the source database table (`table`) or the materialized
+                volatile table (`volatile`).
 
 ------------------------------------------------------------------------------
 7.2 History & search                                *vim-teradata-cmd-history*
@@ -936,6 +978,10 @@ u       Reset all active filters.
 gS / gs Cycle the virtual summary footer mode forward (`gS`) or backward
         (`gs`) through `off`, `sum`, `avg`, `min`, `max`, `count`, `nulls`,
         and `distinct`. See |vim-teradata-guide-virtual|.
+
+gD      Compute the current summary footer mode directly in Teradata over
+        the full query (or materialized volatile table). Shows `Σ db` when
+        complete. See |vim-teradata-guide-virtual|.
 
 <leader>= (visual mode)
         Open the quick-calc floating popup with pooled and per-column
@@ -1406,6 +1452,41 @@ Computed columns ~
         of the SQL query, so re-running (`.`) or reopening from history
         restores your computed columns automatically.
 
+Exact totals in Teradata (gD) ~
+    When a result set is truncated by |vim-teradata-opt-retlimit| or contains
+    high-precision numbers (> 15 significant digits), `virtual.engine = "auto"`
+    marks the Lua footer with `Σ (partial)` or `Σ (≈)`. Press `gD` to wrap the
+    original SELECT in a derived table (`FROM ( <base> ) AS vt ("C1", ...)`)
+    and compute the exact aggregate in Teradata. Top-level `WITH` and
+    `LOCKING ... FOR ACCESS` clauses are hoisted outside the derived table and
+    top-level `ORDER BY` is stripped. While running, the footer displays
+    `… computing in Teradata`, then `Σ db`. In-grid `<CR>` filters are not
+    pushed down: if the view is filtered, the label shows `Σ db (unfiltered)`.
+
+Pushing computed columns (:TDColPush) ~
+    |:TDColPush| rewrites every virtual column expression against the derived
+    table (`vt."<HEADER>"`) and runs `SELECT vt.*, <expr> AS "<NAME>" FROM ...`
+    in Teradata, opening a new result grid where the computed columns are real
+    database columns.
+
+Materializing an answerset (:TDMaterialize) ~
+    With a persistent session open (|:TDSession|), run |:TDMaterialize| in a
+    result buffer to copy the full answerset into a session volatile table
+    (`VAS_<id>` by default) with `NO PRIMARY INDEX ON COMMIT PRESERVE ROWS`.
+    While materialized, the grid hint displays `[VT: <name>]`, and both `gD`
+    and |:TDColPush| query `<name>` directly without re-running the original
+    SQL. Run |:TDVQuery| to jump to the session's SQL buffer with a ready
+    `SELECT * FROM <name>;`. Drop the table early with `:TDMaterialize!`;
+    closing the session drops it automatically and clears `[VT: <name>]`.
+
+What-if editing ~
+    Once a result is materialized, run `:TDEditTarget volatile` (or set
+    `virtual.edit_target = "volatile"`). Pressing `<E>` enters edit mode
+    against the volatile copy (`-- EDIT MODE (VT <name>) --`): every result
+    column is editable and `<S>` sends `UPDATE <name> ...` statements inside
+    the session without ever touching the source production table. Re-run `gD`
+    afterward to see updated database totals on the modified copy.
+
 ==============================================================================
 10. FILETYPES                                         *vim-teradata-filetypes*
 
@@ -1524,6 +1605,14 @@ A: |:TDF| / |:TDFF| work for common DML/DDL but may reorder comments or
 
 Q: How do I change the connection for a single query? ~
 A: Switch active user via |:TDU| before running, then switch back.
+
+Q: Why does gD show a different total than gS? ~
+A: Three reasons: (1) `gS` sums only the rows loaded into the grid (capped by
+   |vim-teradata-opt-retlimit|), whereas `gD` aggregates the full query in
+   Teradata; (2) in-grid `<CR>` filters apply to `gS` (when `footer_scope =
+   "displayed"`) but are not pushed down by `gD` (`Σ db (unfiltered)`); and
+   (3) `gS` uses 64-bit IEEE-754 floats in Lua, while `gD` uses Teradata's
+   exact `DECIMAL` / `BIGINT` arithmetic.
 
 ==============================================================================
 13. LICENSE                                             *vim-teradata-license*
