@@ -465,14 +465,17 @@ export ~
 
         TPT operator used for the export:
             "auto"      EXPORT operator on the wrapped query when possible,
-                        otherwise SELECTOR (report mode, query unchanged).
-                        See |vim-teradata-guide-export|.
+                        otherwise SELECTOR (report mode, comments removed,
+                        whitespace collapsed, empty `''` select items cast to
+                        `VARCHAR(1)`). See |vim-teradata-guide-export|.
             "export"    EXPORT operator only (FastExport protocol). Several
                         sessions, see |vim-teradata-opt-export.max_sessions|.
                         Queries that can't be wrapped are refused.
-            "selector"  SELECTOR operator in report mode, query unchanged. A
-                        single session. Use it on sites without utility
-                        sessions, or to force this route for every query.
+            "selector"  SELECTOR operator in report mode (comments removed,
+                        whitespace collapsed, empty `''` select items cast to
+                        `VARCHAR(1)`). A single session. Use it on sites
+                        without utility sessions, or to force this route for
+                        every query.
 
                                       *vim-teradata-opt-export.max_sessions*
     max_sessions ~
@@ -1352,8 +1355,9 @@ How the query is sent ~
     modifier is moved outside the wrapper. Route W uses the multi-session
     EXPORT operator.
 
-    Route R (SELECTOR operator in report mode, single session, query
-    unchanged) is used when the query can't be wrapped: a top-level
+    Route R (SELECTOR operator in report mode, single session, comments
+    removed, whitespace collapsed, empty `''` select items cast to
+    `VARCHAR(1)`) is used when the query can't be wrapped: a top-level
     `ORDER BY` (including `TOP n ... ORDER BY` and set operations ending
     with `ORDER BY`), a `WITH` (CTE), an unrecognised `LOCK` form, no
     preview header, the tree-sitter teradata parser unavailable, or

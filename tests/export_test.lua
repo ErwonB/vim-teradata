@@ -109,7 +109,13 @@ test("prepared SQL applies replacements and ends with one semicolon", function()
     local sql = export._prepare_sql('-- c\nselect * from ${DB}.t ;;  \n')
     config.options.replacements = saved
     assert(sql == 'select * from MYDB.t;', sql)
-    assert(export._prepare_sql('select 1 -- trailing') == 'select 1 -- trailing\n;')
+    assert(export._prepare_sql('select 1 -- trailing') == 'select 1;')
+end)
+
+test("job variables carry comments-free SQL with widened empty literal", function()
+    local sql = assert(export._prepare_sql("Select\n'01' as \"line_type\" -- it's a comment\n,'' as \"AdditionalSeparator\"\nfrom DB.T\nwhere STTM_DT = date'2026-03-31'"))
+    local text = table.concat(assert(jobvars({ select_stmt = sql })), '\n')
+    assert(text:find([[select_stmt  = 'Select ''01'' as "line_type" ,CAST('''' AS VARCHAR(1)) as "AdditionalSeparator" from DB.T where STTM_DT = date''2026-03-31'';']], 1, true), text)
 end)
 
 test("statement validation accepts a single SELECT only", function()

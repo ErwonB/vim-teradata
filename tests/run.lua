@@ -29,6 +29,7 @@ local files = {
     'tests/catalog_test.lua',
     'tests/session_test.lua',
     'tests/bteq_script_test.lua',
+    'tests/sql_lex_test.lua',
     'tests/export_test.lua',
     'tests/virtual_test.lua',
     'tests/virtual_expr_test.lua',

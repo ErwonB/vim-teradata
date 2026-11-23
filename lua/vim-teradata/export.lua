@@ -1,5 +1,6 @@
-local config = require('vim-teradata.config')
-local util   = require('vim-teradata.util')
+local config  = require('vim-teradata.config')
+local sql_lex = require('vim-teradata.sql_lex')
+local util    = require('vim-teradata.util')
 
 local M = {}
 
@@ -109,21 +110,17 @@ function M._validate_statement(sql)
 end
 
 --- Applies the configured replacements, validates and returns the statement
---- sent to TPT (leading comments dropped, exactly one trailing ';').
+--- sent to TPT (comments removed, whitespace collapsed, empty '' select items
+--- cast to VARCHAR(1), exactly one trailing ';').
 ---@param raw string
 ---@return string|nil sql, string|nil err
 function M._prepare_sql(raw)
     local sql = util.replace_env_vars(raw)
     local ok, err = M._validate_statement(sql)
     if not ok then return nil, err end
-    local stmt
-    for _, s in ipairs(util.split_statements(sql)) do
-        if util.strip_leading_noise(s) ~= '' then stmt = s end
-    end
-    stmt = util.strip_leading_noise(stmt):gsub('[%s;]+$', '')
-    -- a trailing line comment would swallow the terminator
-    local last = stmt:match('[^\n]*$')
-    return stmt .. (last:find('--', 1, true) and '\n;' or ';')
+    local stmt, nerr = sql_lex.normalize_for_export(sql)
+    if not stmt then return nil, nerr end
+    return stmt .. ';' -- no comments left, so no '\n;' special case
 end
 
 --- Splits leading LOCK/LOCKING modifiers (access locks only) from the statement body.
@@ -262,7 +259,13 @@ function M._jobvars_text(vars)
     if type(sep) ~= 'string' or sep == '' or sep:find("[\r\n']") then
         return nil, "The separator ('sep') must not contain a single quote or a newline for exports."
     end
-    local function q(s) return "'" .. s:gsub("'", "''") .. "'" end
+    local stmt = vars.select_stmt or ''
+    local bad = sql_lex.invalid_utf8_at(stmt)
+    if bad then
+        return nil, ('The query is not valid UTF-8 (byte %d). Save it as UTF-8 (:set fenc=utf-8) and export again.'):format(bad)
+    end
+    if stmt:find('%z') then return nil, 'The query contains a NUL character.' end
+    local q = sql_lex.tpt_quote
     local lines = {
         ('user         = %s,'):format(q(u.user)),
         ('logon_mech   = %s,'):format(q(u.log_mech)),
