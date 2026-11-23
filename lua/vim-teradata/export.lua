@@ -159,9 +159,9 @@ function M._wrap_select(sql, ncols)
         terms[i] = ('TRIM(t.c%d) AS c%d'):format(i, i)
         names[i] = 'c' .. i
     end
-    return (lock ~= '' and (lock .. '\n') or '')
+    return (lock ~= '' and (lock .. ' ') or '')
         .. 'SELECT ' .. table.concat(terms, ', ')
-        .. '\nFROM (\n' .. body .. '\n) AS t (' .. table.concat(names, ', ') .. ');'
+        .. ' FROM ( ' .. body .. ' ) AS t (' .. table.concat(names, ', ') .. ');'
 end
 
 local NESTED = { subquery = true, window_specification = true, cte = true, common_table_expression = true }
