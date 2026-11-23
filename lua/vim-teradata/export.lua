@@ -650,7 +650,7 @@ function M.start(ctx)
                     message = rc == 0 and 'TPT ok' or 'TPT warning (rc 4)',
                     finished_at = os.time(),
                 })
-                local what = rows and (fmt_int(rows) .. ' rows ÔåÆ ') or ''
+                local what = rows and (fmt_int(rows) .. ' rows → ') or ''
                 local msg = ('Export done: %s%s (%s, %s)'):format(
                     what, target, util.human_bytes(math.max(size, 0)), fmt_duration(os.time() - started))
                 if rc == 4 then
@@ -713,7 +713,7 @@ function M.start(ctx)
         vim.notify('Export failed to start: ' .. tostring(serr), vim.log.levels.ERROR, title)
         return
     end
-    vim.notify(('Export started: %s ÔåÆ %s'):format(id, target), vim.log.levels.INFO, title)
+    vim.notify(('Export started: %s → %s'):format(id, target), vim.log.levels.INFO, title)
     return export_job_id
 end
 
@@ -768,7 +768,7 @@ function M.start_bteq(ctx)
                 message = 'BTEQ ok',
                 finished_at = os.time(),
             })
-            local what = rows and (fmt_int(rows) .. ' rows ÔåÆ ') or ''
+            local what = rows and (fmt_int(rows) .. ' rows → ') or ''
             vim.notify(('Export done: %s%s (%s, %s)'):format(
                 what, target, util.human_bytes(math.max(size, 0)), fmt_duration(os.time() - started)),
                 vim.log.levels.INFO, title)
@@ -797,7 +797,7 @@ function M.start_bteq(ctx)
         return vim.notify('Export failed to start: ' .. tostring(err), vim.log.levels.ERROR, title)
     end
     util.jobs_update(export_job_id, { handle = handle })
-    vim.notify(('Export started (BTEQ session): %s ÔåÆ %s'):format(id, target), vim.log.levels.INFO, title)
+    vim.notify(('Export started (BTEQ session): %s → %s'):format(id, target), vim.log.levels.INFO, title)
     return export_job_id
 end
 
