@@ -53,6 +53,7 @@ local function settings_lines()
         '.set titledashes off',
         '.set separator ' .. sq(config.options.sep),
         '.set null ' .. sq(config.options.null_token or 'NULL'),
+        '.set recordlength MAX1MB',
         '.set WIDTH 1048575',
     }
 end
